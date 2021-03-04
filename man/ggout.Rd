@@ -15,7 +15,8 @@ ggout(
   scale = 1,
   wholescreen = FALSE,
   replace = FALSE,
-  open = TRUE
+  open = TRUE,
+  iframe = TRUE
 )
 }
 \arguments{
@@ -40,6 +41,8 @@ ggout(
 \item{replace}{Replace file (otherwise add a number).}
 
 \item{open}{Open directly ?}
+
+\item{iframe}{Create an html frame around the plot to ensure fixed dimensions.}
 }
 \value{
 Create a file, and open it in RStudio viewer, as a side effect.

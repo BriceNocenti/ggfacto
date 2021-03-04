@@ -106,6 +106,7 @@ theme_mca <- function(res = res.mca, axes = c(1,2), legend.position = c("none", 
 #' @param wholescreen A big graph in 1080p ?
 #' @param replace Replace file (otherwise add a number).
 #' @param open Open directly ?
+#' @param iframe Create an html frame around the plot to ensure fixed dimensions.
 #'
 #' @return Create a file, and open it in RStudio viewer, as a side effect.
 #' @export
@@ -115,7 +116,7 @@ ggout <- function(plot = last_plot(),
                   type = c("interactive", "normal"),  #"ggplotly"
                   name = "image", xt = "png", dpi =  600,
                   width = 21, pixel_width = NULL, scale = 1, #height = width/1.418919
-                  wholescreen = FALSE, replace = FALSE, open = TRUE) { #frame = FALSE
+                  wholescreen = FALSE, replace = FALSE, open = TRUE, iframe = TRUE) { #
   plot <- plot
   if (wholescreen == TRUE){
     width <- 37.3333
@@ -159,11 +160,11 @@ ggout <- function(plot = last_plot(),
       css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
     }
 
-
-    ggiraph::girafe(ggobj = plot,
-                    width_svg = width/2.563,
-                    height_svg = width/2.563 * plot$heigth_width_ratio
-    ) %>%
+    widget <-
+      ggiraph::girafe(ggobj = plot,
+                      width_svg = width/2.563,
+                      height_svg = width/2.563 * plot$heigth_width_ratio
+      ) %>%
       ggiraph::girafe_options(ggiraph::opts_tooltip(use_fill = TRUE, css = css_tooltip), #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
                               ggiraph::opts_hover(css = css_hover)
                               # opts_zoom(max = 5) # bugue pas mal
@@ -171,8 +172,12 @@ ggout <- function(plot = last_plot(),
                               # opts_hover_inv(css = "opacity:0.1;"),
                               # opts_sizing(rescale = TRUE, width = 0.7), #between 0 and 1
                               # opts_toolbar(saveaspng = FALSE)
-      ) %>%
-      widgetframe::frameWidget(width = pixel_width) #Title and name options : options = widgetframe::frameOptions(name = "Graphique")
+      )
+
+    if (iframe == TRUE) widget <- widgetframe::frameWidget(widget, width = pixel_width)
+    #Title and name options : options = widgetframe::frameOptions(name = "Graphique")
+
+   return(widget)
 
   }
 }

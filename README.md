@@ -36,9 +36,9 @@ data(tea, package = "FactoMineR")
 res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 
 res.mca %>% 
-  ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) %>%
+  ggmca(sup_vars = c("SPC", "age_Q")) %>%
   ggout()
 ```
 
-<iframe src="readme_plot.html">
+<iframe width="860" height="930" src="readme_plot.html">
 </iframe>
