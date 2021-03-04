@@ -47,16 +47,17 @@ res.mca %>%
 
 ```{r, include = FALSE}
 
-library(ggfacto)
-
-data(tea, package = "FactoMineR")
-res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
-
-res.mca %>% 
-  ggmca(sup_vars = c("SPC", "age_Q")) %>%
-  ggout() %>% 
-  widgetframe::saveWidgetframe("readme_plot.html", selfcontained = TRUE)
+# library(ggfacto)
+# 
+# data(tea, package = "FactoMineR")
+# res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+# 
+# res.mca %>% 
+#   ggmca(sup_vars = c("SPC", "age_Q")) %>%
+#   # ggout(iframe = FALSE) %>% 
+#   # htmlwidgets::saveWidget("readme_plot.html")
+#   ggout() %>% 
+#   widgetframe::saveWidgetframe("readme_plot.html", selfcontained = TRUE) #
 ```
 
-Click on the image to open the html interactive graph: 
-[![](readme_plot.png)](https://htmlpreview.github.io/?https://github.com/BriceNocenti/ggfacto/blob/main/readme_plot.html)
+[![](readme_plot.png)]

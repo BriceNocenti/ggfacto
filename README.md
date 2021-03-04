@@ -40,5 +40,4 @@ res.mca %>%
   ggout()
 ```
 
-Click on the image to open the html interactive graph:
-[![](readme_plot.png)](https://htmlpreview.github.io/?https://github.com/BriceNocenti/ggfacto/blob/main/readme_plot.html)
+\[![](readme_plot.png)\]
