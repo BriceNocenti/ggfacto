@@ -36,9 +36,9 @@ data(tea, package = "FactoMineR")
 res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 
 res.mca %>% 
-  ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) %>%
+  ggmca(sup_vars = c("SPC", "age_Q")) %>%
   ggout()
 ```
 
-<iframe src="readme_plot.html">
-</iframe>
+Click on the image to open the html interactive graph:
+[![](readme_plot.png)](https://htmlpreview.github.io/?https://github.com/BriceNocenti/ggfacto/blob/main/readme_plot.html)
