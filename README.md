@@ -40,4 +40,4 @@ res.mca %>%
   ggout()
 ```
 
-\[![](readme_plot.png)\]
+![](readme_plot.png)

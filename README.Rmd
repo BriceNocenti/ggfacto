@@ -60,4 +60,4 @@ res.mca %>%
 #   widgetframe::saveWidgetframe("readme_plot.html", selfcontained = TRUE) #
 ```
 
-[![](readme_plot.png)]
+![](readme_plot.png)
