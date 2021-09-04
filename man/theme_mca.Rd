@@ -5,7 +5,7 @@
 \title{A ggplot2 Theme for Geometrical Data Analysis}
 \usage{
 theme_mca(
-  res = res.mca,
+  res,
   axes = c(1, 2),
   legend.position = c("none", "left", "right", "bottom", "top"),
   no_color_scale = FALSE,

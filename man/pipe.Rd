@@ -2,20 +2,15 @@
 % Please edit documentation in R/utils-pipe.R, R/utils.R
 \name{\%>\%}
 \alias{\%>\%}
-\alias{\%<>\%}
 \title{Pipe operator}
 \usage{
 lhs \%>\% rhs
 
 lhs \%>\% rhs
-
-lhs \%<>\% rhs
 }
 \description{
 See \code{magrittr::\link[magrittr:pipe]{\%>\%}} for details.
 
 See \code{magrittr::\link[magrittr:pipe]{\%>\%}} for details.
-
-See \code{magrittr::\link[magrittr:pipe]{\%<>\%}} for details.
 }
 \keyword{internal}

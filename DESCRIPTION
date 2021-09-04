@@ -1,17 +1,26 @@
 Package: ggfacto
-Type: Package
-Title: graphs for correspondence analysis
-Version: 0.1.0
-Author: Brice Nocenti
-Maintainer: The package maintainer <brice.nocenti@gmail.com>
-Description: Readable, complete and pretty graphs for correspondence analysis made with FactoMineR. Many can be rendered as interactive html plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical: it helps the reader to keep in mind the data contained in the crosstab or Burt table while reading correspondance analysis, thus preventing overinterpretation. Graphs are made with ggplot2, which means that you can use the + syntax to manually add as many graphical pieces you want, or change theme elements. 
+Title: Graphs for Correspondence Analysis
+Version: 0.2.1
+Authors@R: 
+    person(given = "Brice",
+           family = "Nocenti",
+           role = c("aut", "cre"),
+           email = "brice.nocenti@gmail.com")
+Description: Readable, complete and pretty graphs for correspondence analysis made 
+    with FactoMineR. Many can be rendered as interactive html plots, showing useful
+    informations at mouse hover. The interest is not mainly visual but statistical:
+    it helps the reader to keep in mind the data contained in the crosstab or Burt
+    table while reading correspondance analysis, thus preventing overinterpretation.
+    Graphs are made with ggplot2, which means that you can use the + syntax to 
+    manually add as many graphical pieces you want, or change theme elements. 
+URL: https://github.com/BriceNocenti/ggfacto
+BugReports: https://github.com/BriceNocenti/ggfacto/issues
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.1.1
 Imports: 
     magrittr (>= 1.5.0),
-    tablr (>= 0.2.1),
     FactoMineR (>= 2.0.0),
     ggiraph (>= 0.7.0),
     ggplot2 (>= 3.0.0),
@@ -27,8 +36,10 @@ Imports:
     tidyselect (>= 1.1.0),
     vctrs (>= 0.3.0),
     ggrepel (>= 0.9.0),
-    gridExtra (>= 2.0)
-Remotes: 
-    BriceNocenti/tablr
+    gridExtra (>= 2.0),
+    tabxplor (>= 1.0.0),
+    stats (>= 4.0.0),
+    grDevices (>= 4.0.0),
+    htmlwidgets (>= 1.4.0)
 Suggests: 
     finalfit (>= 1.0.0)

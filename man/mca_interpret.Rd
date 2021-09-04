@@ -15,3 +15,4 @@ A tibble
 \description{
 Helper table to interpret MCA
 }
+\keyword{internal}

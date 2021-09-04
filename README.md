@@ -4,6 +4,8 @@
 # ggfacto
 
 <!-- badges: start -->
+
+[![R-CMD-check](https://github.com/BriceNocenti/ggfacto/workflows/R-CMD-check/badge.svg)](https://github.com/BriceNocenti/ggfacto/actions)
 <!-- badges: end -->
 
 Readable, complete and pretty graphs for correspondence analysis made

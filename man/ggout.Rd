@@ -5,36 +5,42 @@
 \title{An Output Function to Draw Dynamic Graphs or Save/Open with ggplot2}
 \usage{
 ggout(
-  plot = last_plot(),
+  plot = ggplot2::last_plot(),
   type = c("interactive", "normal"),
-  name = "image",
+  path = "Plots\\\\Plot",
   xt = "png",
   dpi = 600,
   width = 21,
   pixel_width = NULL,
   scale = 1,
+  height,
   wholescreen = FALSE,
   replace = FALSE,
   open = TRUE,
-  iframe = TRUE
+  iframe = TRUE,
+  savewidget = FALSE
 )
 }
 \arguments{
 \item{plot}{The plot, created with ggplot2.}
 
-\item{type}{Draw interactive graph with ggiraph, or save normal graph with ggsave.}
+\item{type}{Draw \code{interactive} graph with \code{\link[ggiraph:ggiraph]{ggiraph}},
+or save \code{normal} graph with \code{\link[ggplot2:ggsave]{ggsave}}.}
 
-\item{name}{The name of the file to be created.}
+\item{path}{The path where to save the file (without .png or .html extensions)}
 
-\item{xt}{The extension name.}
+\item{xt}{The extension name, when saving as image (interactive graph will
+always be .html).}
 
 \item{dpi}{The resolution.}
 
-\item{width}{The width.}
+\item{width}{The width in centimeters.}
 
 \item{pixel_width}{The width in pixels for widgetframe}
 
 \item{scale}{Fixed ratio between horizontal and vertical axes.}
+
+\item{height}{The height in centimeters (by default, \code{width/1.41})}
 
 \item{wholescreen}{A big graph in 1080p ?}
 
@@ -43,10 +49,13 @@ ggout(
 \item{open}{Open directly ?}
 
 \item{iframe}{Create an html frame around the plot to ensure fixed dimensions.}
+
+\item{savewidget}{With \code{type = 'interactive'}, should the html widget
+be saved on disk ?}
 }
 \value{
-Create a file, and open it in RStudio viewer, as a side effect.
+Creates a file, and opens it in RStudio viewer, as a side effect.
 }
 \description{
-Will be saved in the project directory, //2-Images
+An Output Function to Draw Dynamic Graphs or Save/Open with ggplot2
 }

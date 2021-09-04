@@ -2,7 +2,9 @@
 % Please edit documentation in R/geometrical_data_analysis.R
 \name{pers_or_plot}
 \alias{pers_or_plot}
-\title{Modified odd_ratios plot from finalfit}
+\title{Modified odd_ratios plot from finalfit
+Licence MIT : https://finalfit.org/LICENSE-text.html
+Thanks to Ewen M Harrison.}
 \usage{
 pers_or_plot(
   .data,
@@ -74,4 +76,6 @@ The odd ratios plot.
 }
 \description{
 Modified odd_ratios plot from finalfit
+Licence MIT : https://finalfit.org/LICENSE-text.html
+Thanks to Ewen M Harrison.
 }

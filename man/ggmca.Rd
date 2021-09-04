@@ -16,16 +16,20 @@ ggmca(
   text_repel = FALSE,
   out_lims_move = FALSE,
   title,
+  actives_in_bold = FALSE,
   type = c("text", "points", "labels", "active_vars_only", "numbers"),
   keep_levels,
   discard_levels,
   profiles = TRUE,
-  profiles_tooltip_discard = "^Pas |Non |Not |No",
+  profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   cah,
   max_profiles,
+  color_profiles,
   nb_char_for_color = rep(0, length(sup_vars)),
   shift_colors = 0,
   colornames_recode,
+  scale_color_light = material_colors_light(),
+  scale_color_dark = material_colors_dark(),
   text_size = 3,
   size_scale_max = 8,
   dist_labels = c("auto", 0.04),
@@ -62,6 +66,8 @@ overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
 
 \item{title}{The title of the graph.}
 
+\item{actives_in_bold}{Should active variables be in bold font, or sup variables ?}
+
 \item{type}{Determines the way \code{sup_vars} are printed.
   \itemize{
   \item \code{"text"} : colored text
@@ -92,6 +98,9 @@ together at mouse hover).}
 
 \item{max_profiles}{The maximum number of profiles points to print.}
 
+\item{color_profiles}{If \code{cah} is provided, should the profiles of answers be
+colored depending on their cah class ?}
+
 \item{nb_char_for_color}{If \code{sup_vars} are prefixed with numbers, the
 number of characters to use to create classes that will be used to add
 colors to points.}
@@ -102,6 +111,10 @@ colors to points.}
 \code{\link[forcats]{fct_recode}} style to rename the levels of the color
 variable if needed (levels used for colors are printed in console message
 whenever the function is used).}
+
+\item{scale_color_light}{A scale color for sup vars points}
+
+\item{scale_color_dark}{A scale color for sup vars texts}
 
 \item{text_size}{Size of text.}
 

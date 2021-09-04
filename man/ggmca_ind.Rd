@@ -35,3 +35,4 @@ ggmca_ind(
 \description{
 To be enhanced.
 }
+\keyword{internal}
