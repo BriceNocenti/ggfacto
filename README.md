@@ -39,7 +39,7 @@ res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = F
 
 res.mca %>% 
   ggmca(sup_vars = c("SPC", "age_Q")) %>%
-  ggout()
+  ggi()
 ```
 
 ![](readme_plot.png)

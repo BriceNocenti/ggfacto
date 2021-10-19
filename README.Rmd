@@ -43,7 +43,7 @@ res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = F
 
 res.mca %>% 
   ggmca(sup_vars = c("SPC", "age_Q")) %>%
-  ggout()
+  ggi()
 ```
 
 ```{r, include = FALSE}
@@ -55,9 +55,9 @@ res.mca %>%
 # 
 # res.mca %>% 
 #   ggmca(sup_vars = c("SPC", "age_Q")) %>%
-#   # ggout(iframe = FALSE) %>% 
+#   # ggi(iframe = FALSE) %>% 
 #   # htmlwidgets::saveWidget("readme_plot.html")
-#   ggout() %>% 
+#   ggi() %>% 
 #   widgetframe::saveWidgetframe("readme_plot.html", selfcontained = TRUE) #
 ```
 

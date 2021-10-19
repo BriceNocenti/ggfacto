@@ -21,6 +21,13 @@ NULL
 globalVariables(c(":="))
 
 
+#' @keywords internal
+.onLoad <- function(libname, pkgname) {
+  options("ggfacto.export_dir" = NULL)
+
+  invisible()
+}
+
 
 
 #Fonctions and options to work with factors and lists -------------

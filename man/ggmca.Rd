@@ -2,6 +2,8 @@
 % Please edit documentation in R/geometrical_data_analysis.R
 \name{ggmca}
 \alias{ggmca}
+\alias{ggmca_data}
+\alias{ggmca_plot}
 \title{Readable, Interactive and Beautiful graph for MCA}
 \usage{
 ggmca(
@@ -10,22 +12,64 @@ ggmca(
   tooltip_vars_1lv,
   tooltip_vars,
   axes = c(1, 2),
-  xlim,
-  ylim,
-  cleannames = TRUE,
-  text_repel = FALSE,
-  out_lims_move = FALSE,
-  title,
-  actives_in_bold = FALSE,
+  axes_names = NULL,
   type = c("text", "points", "labels", "active_vars_only", "numbers"),
+  cleannames = TRUE,
   keep_levels,
   discard_levels,
   profiles = TRUE,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   cah,
   max_profiles,
-  color_profiles,
   nb_char_for_color = rep(0, length(sup_vars)),
+  text_repel = FALSE,
+  title,
+  actives_in_bold = FALSE,
+  ellipses = NULL,
+  xlim,
+  ylim,
+  out_lims_move = FALSE,
+  color_profiles,
+  base_profiles_color = "#eeeeee",
+  shift_colors = 0,
+  colornames_recode,
+  scale_color_light = material_colors_light(),
+  scale_color_dark = material_colors_dark(),
+  text_size = 3,
+  size_scale_max = 8,
+  dist_labels = c("auto", 0.04),
+  right_margin = 0
+)
+
+ggmca_data(
+  res.mca = res.mca,
+  sup_vars,
+  tooltip_vars_1lv,
+  tooltip_vars,
+  cleannames = TRUE,
+  keep_levels,
+  discard_levels,
+  profiles = TRUE,
+  profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+  cah,
+  max_profiles,
+  nb_char_for_color = rep(0, length(sup_vars))
+)
+
+ggmca_plot(
+  data,
+  axes = c(1, 2),
+  axes_names = NULL,
+  type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
+  text_repel = FALSE,
+  title,
+  actives_in_bold = FALSE,
+  ellipses = NULL,
+  xlim,
+  ylim,
+  out_lims_move = FALSE,
+  color_profiles,
+  base_profiles_color = "#eeeeee",
   shift_colors = 0,
   colornames_recode,
   scale_color_light = material_colors_light(),
@@ -51,22 +95,8 @@ whose complete levels will be added at the bottom of interactive tooltips.}
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 
-\item{xlim, ylim}{Horizontal and vertical axes limits,
-as double vectors of length 2.}
-
-\item{cleannames}{Set to \code{TRUE} to clean levels names, by removing
-prefix numbers like \code{"1-"}, and text in parentheses.}
-
-\item{text_repel}{When \code{TRUE} the graph is not interactive anymore,
-but the resulting image is better to print because points and labels don't
-overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
-
-\item{out_lims_move}{When \code{TRUE}, the points out of \code{xlim} or
-\code{ylim} are not removed, but moved at the edges of the graph.}
-
-\item{title}{The title of the graph.}
-
-\item{actives_in_bold}{Should active variables be in bold font, or sup variables ?}
+\item{axes_names}{Names of all the axes (not just the two selected ones),
+as a character vector.}
 
 \item{type}{Determines the way \code{sup_vars} are printed.
   \itemize{
@@ -75,7 +105,12 @@ overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
   \item \code{"labels"} : colored labels
   \item \code{"active_vars_only"} : no \code{sup_vars}
   \item \code{"numbers"} : colored labels of prefix numbers, with small names
+  \item \code{"facets"} : one graph of profiles of answer for each levels of the
+  first \code{sup_vars}. A different color is used for each.
 }}
+
+\item{cleannames}{Set to \code{TRUE} to clean levels names, by removing
+prefix numbers like \code{"1-"}, and text in parentheses.}
 
 \item{keep_levels}{A character vector of variables levels to keep : others
 will be discarded.}
@@ -98,12 +133,35 @@ together at mouse hover).}
 
 \item{max_profiles}{The maximum number of profiles points to print.}
 
-\item{color_profiles}{If \code{cah} is provided, should the profiles of answers be
-colored depending on their cah class ?}
-
 \item{nb_char_for_color}{If \code{sup_vars} are prefixed with numbers, the
 number of characters to use to create classes that will be used to add
 colors to points.}
+
+\item{text_repel}{When \code{TRUE} the graph is not interactive anymore,
+but the resulting image is better to print because points and labels don't
+overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
+
+\item{title}{The title of the graph.}
+
+\item{actives_in_bold}{Should active variables be in bold font, or sup variables ?}
+
+\item{ellipses}{Set to a number between 0 and 1 to draw a concentration ellipse for
+each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
+individuals of each category. \code{0.5} draw median-ellipses, containtaing half
+the individuals of each category.}
+
+\item{xlim, ylim}{Horizontal and vertical axes limits,
+as double vectors of length 2.}
+
+\item{out_lims_move}{When \code{TRUE}, the points out of \code{xlim} or
+\code{ylim} are not removed, but moved at the edges of the graph.}
+
+\item{color_profiles}{If \code{cah} is provided, should the answers profiles be
+colored depending on their cah class ?}
+
+\item{base_profiles_color}{The base color for answers profiles. Default to gray.
+Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
+non-colored profiles.}
 
 \item{shift_colors}{Change colors of the \code{sup_vars} points.}
 
@@ -125,30 +183,44 @@ from points.}
 
 \item{right_margin}{A margin at the right, in cm. Useful to read tooltips
 over points placed at the right of the graph without formatting problems.}
+
+\item{data}{A list of data frames made with \link{ggmca_data}.}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}} object to be printed in the
 RStudio Plots pane. Possibility to add other gg objects with \code{+}.
-Sending the result through \code{\link{ggout}} will draw the
+Sending the result through \code{\link{ggi}} will draw the
 interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+
+A list containing the data frames to pass to \link{ggmca_plot}.
 }
 \description{
 A readable, complete and beautiful graph for multiple
 correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-Interactive tooltips, appearing when  hovering near points with mouse,
+Interactive tooltips, appearing when hovering near points with mouse,
 allow to keep in mind many important data (tables of active variables,
 and additionnal chosen variables) while reading the graph.
 Profiles of answers (from the graph of "individuals") are drawn in the back,
 and can be linked to \code{FactoMineR::\link[FactoMineR]{HCPC}} classes.
 Since it is made in the spirit of \code{\link{ggplot2}}, it is possible to
 change theme or add another plot elements with \code{+}. Then, interactive
-tooltips won't appear until you pass the result throught \code{\link{ggout}}.
+tooltips won't appear until you pass the result throught \code{\link{ggi}}.
+Step-by-step functions : use \link{ggmca_data} to get the data frames with every
+parameter in a MCA printing, then modify, and pass to \link{ggmca_plot}
+to draw the graph.
 }
+\section{Functions}{
+\itemize{
+\item \code{ggmca_data}: get the data frames with all parameters to print a MCA graph
+
+\item \code{ggmca_plot}: print MCA graph from data frames with parameters
+}}
+
 \examples{
 data(tea, package = "FactoMineR")
 res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 
 res.mca \%>\%
   ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) \%>\%
-  ggout()        #to make the graph interactive
+  ggi()        #to make the graph interactive
 }

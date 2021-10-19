@@ -4,15 +4,31 @@
 \alias{mca_interpret}
 \title{Helper table to interpret MCA}
 \usage{
-mca_interpret(res.mca = res.mca)
+mca_interpret(res.mca = res.mca, axes = c(1, 2), type = c("html", "console"))
 }
 \arguments{
 \item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},}
+
+\item{axes}{The axes to interpret, as an integer vector. Default to axes 1 and 2.}
+
+\item{type}{By default, a html table is printed. Set to \code{"console"} to print in
+console or axes the numbers as a data.frame.}
 }
 \value{
-A tibble
+An html table (or a tibble).
 }
 \description{
-Helper table to interpret MCA
+A table to help to interpret the meaning of axes in multiple
+correspondence analysis (MCA), based on Brigitte Le Roux, \emph{Analyse geometrique des
+donnees multidimensionnelles}, Dunod, Paris, 2014 / Brigitte Le Roux and Henri Rouanet,
+\emph{Geometric data analysis : from correspondence analysis to structured data
+analysis}, Kluwer, Boston, 2004. Only levels whose relative contribution to the
+variance of axis is superior to the mean contribution are kept. The spread between
+positive levels and negative levels of the same variable is calculated in percentages
+of the variance of the question/variable.
 }
-\keyword{internal}
+\examples{
+data(tea, package = "FactoMineR")
+res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+mca_interpret(res.mca)
+}
