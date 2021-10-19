@@ -56,7 +56,7 @@ overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
 uppercase.}
 
 \item{tooltips}{Choose the content of interactive tooltips at mouse hover :
-\code{"col"} for the table of colums percentages, \code{"row"} for line
+\code{"col"} for the table of columns percentages, \code{"row"} for line
 percentages, \code{c("row", "col")} for both.}
 
 \item{rowtips_subtitle, coltips_subtitle}{The subtitles used before the table

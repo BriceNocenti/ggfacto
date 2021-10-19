@@ -42,12 +42,12 @@ with \code{link[base:options]{options}} to change default directory.}
 \item{open}{Should the resulting file be opened at once ?}
 
 \item{iframe}{Create an html frame around the plot to ensure fixed
-dimensions. Useful when opening the plot in a web brower (but will produre a blank
+dimensions. Useful when opening the plot in a web browser (but will produce a blank
 graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.}
 
 \item{pixel_width}{The width in pixels for widgetframe.}
 
-\item{...}{Aditionnal arguments to pass to \code{\link[ggiraph:girafe]{girafe}}.}
+\item{...}{Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}}.}
 }
 \value{
 An html plot.

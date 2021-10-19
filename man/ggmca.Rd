@@ -30,7 +30,7 @@ ggmca(
   ylim,
   out_lims_move = FALSE,
   color_profiles,
-  base_profiles_color = "#eeeeee",
+  base_profiles_color = "#dddddd",
   shift_colors = 0,
   colornames_recode,
   scale_color_light = material_colors_light(),
@@ -69,7 +69,7 @@ ggmca_plot(
   ylim,
   out_lims_move = FALSE,
   color_profiles,
-  base_profiles_color = "#eeeeee",
+  base_profiles_color = "#dddddd",
   shift_colors = 0,
   colornames_recode,
   scale_color_light = material_colors_light(),
@@ -117,7 +117,7 @@ will be discarded.}
 
 \item{discard_levels}{A character vector of variables levels to discard.}
 
-\item{profiles}{When \code{TRUE}, profiles of answersx are drawn in the back
+\item{profiles}{When \code{TRUE}, profiles of answers are drawn in the back
 of the graph with light-grey points. When hovering with mouse, the answers of
 individuals to active variables will appears. If \code{cah} is provided,
 to hover near one point will color all the points of the same
@@ -147,7 +147,7 @@ overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
 
 \item{ellipses}{Set to a number between 0 and 1 to draw a concentration ellipse for
 each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
-individuals of each category. \code{0.5} draw median-ellipses, containtaing half
+individuals of each category. \code{0.5} draw median-ellipses, containing half
 the individuals of each category.}
 
 \item{xlim, ylim}{Horizontal and vertical axes limits,
@@ -199,12 +199,12 @@ A readable, complete and beautiful graph for multiple
 correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{MCA}}.
 Interactive tooltips, appearing when hovering near points with mouse,
 allow to keep in mind many important data (tables of active variables,
-and additionnal chosen variables) while reading the graph.
+and additional chosen variables) while reading the graph.
 Profiles of answers (from the graph of "individuals") are drawn in the back,
 and can be linked to \code{FactoMineR::\link[FactoMineR]{HCPC}} classes.
 Since it is made in the spirit of \code{\link{ggplot2}}, it is possible to
 change theme or add another plot elements with \code{+}. Then, interactive
-tooltips won't appear until you pass the result throught \code{\link{ggi}}.
+tooltips won't appear until you pass the result through \code{\link{ggi}}.
 Step-by-step functions : use \link{ggmca_data} to get the data frames with every
 parameter in a MCA printing, then modify, and pass to \link{ggmca_plot}
 to draw the graph.
@@ -223,4 +223,10 @@ res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = F
 res.mca \%>\%
   ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) \%>\%
   ggi()        #to make the graph interactive
+
+#Concentration ellipses for each levels of a supplementary variable :
+ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.5, text_repel = TRUE)
+
+#Graph of profiles of answer for each levels of a supplementary variable :
+ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5)
 }

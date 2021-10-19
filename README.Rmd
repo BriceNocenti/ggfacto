@@ -20,7 +20,7 @@ knitr::opts_chunk$set(
 [![R-CMD-check](https://github.com/BriceNocenti/ggfacto/workflows/R-CMD-check/badge.svg)](https://github.com/BriceNocenti/ggfacto/actions)
 <!-- badges: end -->
 
-Readable, complete and pretty graphs for correspondence analysis made with [FactoMineR](http://factominer.free.fr/). Many can be rendered as interactive html plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical : it helps the reader to keep in mind the data contained in the crosstab or Burt table while reading correspondance analysis, thus preventing overinterpretation. Graphs are made with [ggplot2](https://ggplot2.tidyverse.org/), which means that you can use the `+` syntax to manually add as many graphical pieces you want, or change theme elements.
+Readable, complete and pretty graphs for correspondence analysis made with [FactoMineR](http://factominer.free.fr/). Many can be rendered as interactive html plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical : it helps the reader to keep in mind the data contained in the crosstab or Burt table while reading correspondance analysis, thus preventing overinterpretation. Graphs are made with [ggplot2](https://ggplot2.tidyverse.org/), which means that you can use the `+` syntax to manually add as many graphical pieces you want, or change theme elements.
 
 ## Installation
 

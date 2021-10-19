@@ -2,382 +2,6 @@
 
 # Geometrical data analysis AC/ACM----------------------------------------------
 
-#Fonction : un theme ggplot2 commun pour habiller les graphes des ACM
-#' A ggplot2 Theme for Geometrical Data Analysis
-#'
-#' @param res An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
-#' \code{\link[FactoMineR]{CA}}, etc.
-#' @param axes The axes to print, as a numeric vector of length 2.
-#' @param legend.position c("none", "left", "right", "bottom", "top")
-#' @param no_color_scale When TRUE, color_scale will be provided next.
-#' @param size_scale_max Size of the points.
-#' @param xlim Horizontal axe limits.
-#' @param ylim Vertical axe limits.
-#'
-#' @return A list of ggplot2 objects.
-#'
-#' @keywords internal
-theme_mca <- function(res, axes = c(1,2), # res = res.mca
-                      legend.position = c("none", "left", "right", "bottom", "top"),
-                      no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
-  if (exists("axes_names", where = res)) {
-    first_axe_title  <- stringr::str_c("Axe ", axes[1]," (", round(res$eig[axes[1],2], 1),
-                                       "%) : ", res$axes_names[axes[1]])
-    second_axe_title <- stringr::str_c("Axe ", axes[2]," (", round(res$eig[axes[2],2], 1),
-                                       "%) : ", res$axes_names[axes[2]])
-  } else {
-    first_axe_title  <- stringr::str_c("Axe ", axes[1]," (",
-                                       round(res$eig[axes[1],2], 1), "%)")
-    second_axe_title <- stringr::str_c("Axe ", axes[2]," (",
-                                       round(res$eig[axes[2],2], 1), "%)")
-  }
-
-  if (no_color_scale == FALSE) {
-    scale_color_acm <- ggplot2::scale_color_brewer(palette = "Dark2")
-    scale_fill_acm <- ggplot2::scale_fill_brewer(palette = "Dark2")
-  } else {
-    scale_color_acm <- NULL
-    scale_fill_acm <- NULL
-  }
-
-  if (!missing(xlim) & !missing(ylim)) {coord_graph <- ggplot2::coord_fixed(xlim = xlim, ylim = ylim) }
-  else if (!missing(xlim) ) { coord_graph <- ggplot2::coord_fixed(xlim = xlim ) }
-  else if (!missing(ylim) ) { coord_graph <- ggplot2::coord_fixed(ylim = ylim ) }
-  else { coord_graph <- ggplot2::coord_fixed() }
-
-  #if (no_size_scale == FALSE) {
-  scale_size <- ggplot2::scale_size_area(max_size = size_scale_max)
-  #} else {
-  #  scale_size <- NULL
-  #}
-  list(
-    ggplot2::geom_hline(yintercept = 0, color="black", linetype = "dashed"), # Horizontal axe
-    ggplot2::geom_vline(xintercept = 0, color="black", linetype = "dashed"), # Vertical axe
-    ggplot2::labs(x = first_axe_title, y =  second_axe_title),
-    scale_size,
-    scale_color_acm, #Color palette
-    scale_fill_acm,
-    coord_graph, #Assure that proportion between the two axes are kept
-    ggplot2::theme_minimal(),
-    ggplot2::theme(legend.position = legend.position[1],
-                   panel.grid.minor = ggplot2::element_blank(), #element_line(size = 0.05, color="gray96"),
-                   panel.grid.major = ggplot2::element_blank(), #element_line(size = 0.05, color="gray96"),
-                   strip.text = ggplot2::element_text(face = "bold"), #Titles of facets
-                   plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"), #Center titre of graph
-                   axis.title.x = ggplot2::element_text(size = 12, hjust = 1),
-                   axis.title.y = ggplot2::element_text(size = 12, hjust = 1),
-                   text = ggplot2::element_text(family = "sans") #"DejaVu Sans Condensed"
-    )
-  )
-}
-
-# theme_ac <- function(axes = c(1,2), res = res.ca) {
-#   res.ca <- res.ca
-#   list(
-#     geom_hline(yintercept = 0, color="black", linetype = "dashed"), #Axe horizontal
-#     geom_vline(xintercept = 0, color="black", linetype = "dashed"), #Axe vertical
-#     labs(x = paste0("Axe ", axes[1]," (", round(res.ca$eig[axes[1],2], 1), "%)"), # Titres des axes
-#          y = paste0("Axe ", axes[2]," (", round(res.ca$eig[axes[2],2], 1), "%)") ),
-#     scale_size_area(max_size = 10), #Echelle de taille des points
-#     scale_color_brewer(palette = "Dark2"), #Palette de couleurs
-#     scale_fill_brewer(palette = "Dark2"),
-#     coord_fixed(), #Assurer que les proportions relatives des deux axes sont respectees
-#     theme_minimal(),
-#     theme(legend.position = "none",
-#           panel.grid.minor = element_blank(), #element_line(size = 0.05, color="gray96"),
-#           panel.grid.major = element_blank(), #element_line(size = 0.05, color="gray96"),
-#           strip.text = element_text(face = "bold"), #Titre des facets
-#           plot.title = element_text(hjust = 0.5, face = "bold"), #Centrer le titre du graphique
-#           axis.title.x = element_text(size = 12, hjust = 1),
-#           axis.title.y = element_text(size = 12, hjust = 1) )
-#   )
-# }
-
-#' Title Scale color light for MCA.
-#'
-#' @return A character vector of color codes, with color names.
-#' @export
-#'
-#' @examples material_colors_light()
-material_colors_light <- function() {
-  c(    # Material colors :
-    "Deep purple 300" = "#9575cd", #"#7e57c2",
-    "Orange 700"      = "#f57c00",
-    "Light green 600" = "#7cb342",
-
-    "Teal 400"        = "#26a69a",
-    "Red 700"         = "#d32f2f",
-    "Lime 800"        = "#9e9d24",
-
-    #"Jaune 800"       = "#f9a825",  #reserved for hover effect
-    "Brown 400"       = "#8d6e63",
-    "Purple 300"      = "#ba68c8",
-
-    "Pink 300"        = "#f06292",
-    "Green 800"       = "#388e3c",
-    "Blue 400"        = "#42a5f5",
-
-    "Blue Grey 500"   = "#607d8b"
-  )
-}
-
-#' Title Scale color dark for MCA.
-#'
-#' @return A character vector of color codes, with color names.
-#' @export
-#'
-#' @examples material_colors_dark()
-material_colors_dark <- function() {
-  c(
-    "Deep purple 300"  =    "#65499c", #"#4d2c91",
-    "Orange 700"       =    "#bb4d00",
-    "Light green 600"  =    "#4b830d",
-
-    "Teal 400"         =    "#00766c",
-    "Red 700"          =    "#9a0007",
-    "Lime 800"         =    "#6c6f00",
-
-    #"Jaune 800"        =    "#c17900",  #reserved for hover effect
-    "Brown 400"        =    "#5f4339",
-    "Purple 300"       =    "#883997",
-
-    "Pink 300"         =    "#ba2d65",
-    "Green 800"        =    "#00600f",
-    "Blue 400"         =    "#0077c2",
-
-    "Blue Grey 500"    =    "#34515e"
-  )
-}
-
-
-
-
-#' Pass a MCA plot into a html interactive plot
-#' @param plot The plot, created with \link{ggmca} or \link{ggca}.
-#' @param width The width in centimeters. Default to printing device's size.
-#' @param height The height in centimeters. Default to printing device's size.
-#' @param keep_ratio By default, the height is forced based of the relative
-#' size of the MCA's axes. Set to \code{FALSE} to avoid this behavior.
-#' @param savewidget Should the html widget be saved on disk ?
-#' @param dir If saved as file, the directory in which to save the html widget.
-#' Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
-#' with \code{link[base:options]{options}} to change default directory.
-#' @param open Should the resulting file be opened at once ?
-#' @param name The name of the file to save.
-#' @param replace Replace file ? By default, number added to find a new name.
-#' @param iframe Create an html frame around the plot to ensure fixed
-#' dimensions. Useful when opening the plot in a web brower (but will produre a blank
-#' graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
-#' @param pixel_width The width in pixels for widgetframe.
-#' @param ... Aditionnal arguments to pass to \code{\link[ggiraph:girafe]{girafe}}.
-#'
-#' @return An html plot.
-#' @export
-#'
-# @examples
-ggi <- function(plot = ggplot2::last_plot(),
-                width = NULL, height = NULL, keep_ratio = TRUE,
-                savewidget = FALSE, dir = NULL, name = "Plot", replace = FALSE,
-                open = rlang::is_interactive(),
-                iframe = NULL, pixel_width, ...
-) {
-
-  if (is.null(iframe)) iframe <- savewidget
-
-  if ("css_hover" %in% names(plot)) {
-    css_hover <- plot$css_hover
-  } else {
-    css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
-                                     text = "color:gold4;stroke:none;",
-                                     point = "fill:gold;stroke:orange;",
-                                     area = "fill:white")
-  }
-
-  if ("css_tooltip" %in% names(plot)) {
-    css_tooltip <- plot$css_tooltip
-  } else {
-    css_tooltip <- "color:#000000;text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
-  }
-
-  if(.Platform$OS.type == "windows") {
-    css_tooltip <-
-      paste0(css_tooltip, "font-family:", grDevices::windowsFonts("sans"), ";") #%>%
-    #stringr::str_replace("DejaVu Sans Condensed", "DejaVu Sans")
-  }
-
-  if (missing(width)) {
-    width <- grDevices::dev.size("in")[1]
-
-  } else {
-    width <- width/2.54
-  }
-
-  if (keep_ratio == TRUE & !is.null(plot$heigth_width_ratio)) {
-    height <- width * plot$heigth_width_ratio
-
-  } else {
-    if (missing(height)) {
-      height <- grDevices::dev.size("in")[2]
-    } else {
-      height = height/2.54
-    }
-  }
-
-  # if (is.null(plot$heigth_width_ratio)) height <- NULL
-
-  widget <-
-    ggiraph::girafe(ggobj = plot,
-                    width_svg = width,
-                    height_svg = height, #if_else(missing(height), width/2.563 * plot$heigth_width_ratio, height/2.563)
-                    fonts = ifelse(.Platform$OS.type == "windows",
-                                   grDevices::windowsFonts("sans") %>%
-                                     purrr::map(~stringr::str_replace(., "DejaVu Sans Condensed",
-                                                                      "DejaVu Sans")),
-                                   NULL
-                    ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
-                    ...
-    ) %>%
-    ggiraph::girafe_options(ggiraph::opts_tooltip(use_fill = TRUE, css = css_tooltip), #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
-                            ggiraph::opts_hover(css = css_hover)
-                            # ggiraph::opts_zoom(max = 5) # bugue pas mal
-                            # ggiraph::opts_hover(css = girafe_css(css = "fill:purple;stroke:black;", text = "stroke:none;fill:red;font-style:bold;")) #    point = NULL, line, area, image
-                            # ggiraph::opts_hover_inv(css = "opacity:0.1;"),
-                            # ggiraph::opts_sizing(rescale = FALSE)
-                            # ggiraph::opts_sizing(rescale = TRUE, width = 0.7), #between 0 and 1
-                            # ggiraph::opts_toolbar(saveaspng = FALSE)
-    )
-
-
-  if (iframe == TRUE) {
-    if (missing(pixel_width)) pixel_width <- grDevices::dev.size("px")[1]
-
-    widget <-
-      widgetframe::frameWidget(widget, width = pixel_width,
-                               options = widgetframe::frameOptions(
-                                 title = name,
-                                 name = name
-                               ))
-    #Title and name options : options = widgetframe::frameOptions(name = "Graphique")
-  }
-
-  if (savewidget == FALSE) {
-    return(widget)
-
-  } else {
-    path <- plot_path(dir = dir, name = name, extension = "html", replace = replace)
-
-    if (iframe == FALSE) {
-      htmlwidgets::saveWidget(widget, path, title = name)
-    } else {
-      widgetframe::saveWidgetframe(widget, path, selfcontained = TRUE)
-    }
-
-    if (open == TRUE) file.show(path)
-
-    return(invisible(widget))
-  }
-}
-
-
-
-#' Save a plot as image
-#' @param plot The plot, created with ggplot2.
-#' @param xt The extension name, when saving as image (interactive graph will
-#' always be .html).
-#' @param dpi The resolution.
-#' @param width The width in centimeters.
-#' @param height The height in centimeters. By default, \code{width/1.41}.
-#' @param scale Fixed ratio between horizontal and vertical axes.
-#' @param dir If saved as file, the directory in which to save the html widget.
-#' Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
-#' with \code{link[base:options]{options}} to change default directory.
-#' @param open Should the resulting file be opened at once ?
-#' @param name The name of the file to save.
-#' @param replace Replace file ? By default, number added to find a new name.
-
-#'
-#' @return Creates a file, and opens it in RStudio viewer, as a side effect.
-#' @export
-#'
-ggsave2 <- function(plot = ggplot2::last_plot(),
-                    dir = NULL, name = "Plot", xt = "png", dpi = 600,
-                    width = 21, height, scale = 1,
-                    replace = FALSE, open = rlang::is_interactive()) {
-
-  if (missing(height)) {
-    if (exists("plot$heigth_width_ratio")) {
-      height <- width * plot$heigth_width_ratio
-    } else {
-      height <- width / 1.418919
-    }
-  }
-
-  path <- plot_path(dir = dir, name = name, extension = xt, replace = replace)
-
-  ggplot2::ggsave(path, plot = plot, height = height, width = width, units = "cm",
-                  scale = scale, dpi = dpi)
-
-  if (open == TRUE) file.show(path)
-
-  invisible(plot)
-}
-
-
-
-
-#' @keywords internal
-plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FALSE) {
-  if (is.null(dir)) {
-    dir <- getOption("ggfacto.export_dir")
-    if (is.null(dir)) {
-      dir <- tempdir()
-    }
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-
-  #if (dirname(path) != getwd() & dirname(path) != ".") {
-  #   dir_path <- dirname(path)
-  #   if (!dir.exists(dir_path)) dir.create(dir_path, recursive = TRUE)
-  # }
-
-  path <- file.path(dir, basename(name))
-
-  path_name <- stringr::str_remove(path, "\\..+$")
-  if (! stringr::str_detect(path, "\\..+$")) path <- stringr::str_c(path, ".", extension)
-  if (replace == FALSE) {
-    i <- 0
-    file_do_not_exist <- FALSE
-    while (file_do_not_exist == FALSE) {
-      if (file.exists(path)) {
-        i = i+1
-        path <- stringr::str_c(path_name, i, ".", extension)
-      } else {
-        path <-
-          stringr::str_c(path_name, dplyr::if_else(i == 0,
-                                                   "",
-                                                   stringr::str_c(i)),
-                         ".", extension)
-        file_do_not_exist <- TRUE
-      }
-    }
-  }
-  message(path)
-  return(path)
-}
-
-
-
-# res.ca <- FES2017 %>%
-#   dplyr::mutate() %>%
-#   tab(CSER, PR2017ALL1, wt = w5, tot = "no",
-#        rare_to_other = TRUE, subtext = champ_inscrits) %>%
-#   purrr::flatten_df() %>% dplyr::mutate(dplyr::across(tidyselect::where(is_decimal), as.double)) %>% tibble::column_to_rownames(colnames(.)[1]) %>%
-#   FactoMineR::CA()
-#
-# PR1ac <- ggca(res.ca) + ggplot2::ggplot
-#
-# ggi(PR1ac, "ggiraph", pixel_width = 700) %>%
-#   widgetframe::saveWidgetframe("widget.html", selfcontained = TRUE) ; file.show("widget.html")
 
 
 # ggmca(res.mca, split_var = PE3_ord, dplyr::filter = "^.3C",
@@ -425,12 +49,12 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
 #' correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{MCA}}.
 #' Interactive tooltips, appearing when hovering near points with mouse,
 #' allow to keep in mind many important data (tables of active variables,
-#' and additionnal chosen variables) while reading the graph.
+#' and additional chosen variables) while reading the graph.
 #' Profiles of answers (from the graph of "individuals") are drawn in the back,
 #' and can be linked to \code{FactoMineR::\link[FactoMineR]{HCPC}} classes.
 #' Since it is made in the spirit of \code{\link{ggplot2}}, it is possible to
 #' change theme or add another plot elements with \code{+}. Then, interactive
-#' tooltips won't appear until you pass the result throught \code{\link{ggi}}.
+#' tooltips won't appear until you pass the result through \code{\link{ggi}}.
 #' Step-by-step functions : use \link{ggmca_data} to get the data frames with every
 #' parameter in a MCA printing, then modify, and pass to \link{ggmca_plot}
 #' to draw the graph.
@@ -468,7 +92,7 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
 #' @param keep_levels A character vector of variables levels to keep : others
 #' will be discarded.
 #' @param discard_levels A character vector of variables levels to discard.
-#' @param profiles When \code{TRUE}, profiles of answersx are drawn in the back
+#' @param profiles When \code{TRUE}, profiles of answers are drawn in the back
 #' of the graph with light-grey points. When hovering with mouse, the answers of
 #' individuals to active variables will appears. If \code{cah} is provided,
 #' to hover near one point will color all the points of the same
@@ -497,7 +121,7 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
 #' @param actives_in_bold Should active variables be in bold font, or sup variables ?
 #' @param ellipses Set to a number between 0 and 1 to draw a concentration ellipse for
 #' each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
-#' individuals of each category. \code{0.5} draw median-ellipses, containtaing half
+#' individuals of each category. \code{0.5} draw median-ellipses, containing half
 #' the individuals of each category.
 #' @param color_profiles If \code{cah} is provided, should the answers profiles be
 #' colored depending on their cah class ?
@@ -520,6 +144,12 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
 #' res.mca %>%
 #'   ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) %>%
 #'   ggi()        #to make the graph interactive
+#'
+#' #Concentration ellipses for each levels of a supplementary variable :
+#' ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.5, text_repel = TRUE)
+#'
+#' #Graph of profiles of answer for each levels of a supplementary variable :
+#' ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5)
 ggmca <-
   function(res.mca = res.mca, sup_vars, tooltip_vars_1lv, tooltip_vars,
            axes = c(1,2), axes_names = NULL,
@@ -533,7 +163,7 @@ ggmca <-
 
            text_repel = FALSE, title, actives_in_bold = FALSE, ellipses = NULL,
            xlim, ylim, out_lims_move = FALSE,
-           color_profiles, base_profiles_color = "#eeeeee",
+           color_profiles, base_profiles_color = "#dddddd",
            shift_colors = 0, colornames_recode,
            scale_color_light = material_colors_light(),
            scale_color_dark  = material_colors_dark(),
@@ -1238,7 +868,7 @@ ggmca_plot <- function(data,
                        type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
                        text_repel = FALSE, title, actives_in_bold = FALSE, ellipses = NULL,
                        xlim, ylim, out_lims_move = FALSE,
-                       color_profiles, base_profiles_color = "#eeeeee",
+                       color_profiles, base_profiles_color = "#dddddd",
                        shift_colors = 0, colornames_recode,
                        scale_color_light = material_colors_light(),
                        scale_color_dark  = material_colors_dark(),
@@ -1613,12 +1243,12 @@ ggmca_plot <- function(data,
                                            segments = 360, alpha = 1, inherit.aes = FALSE)
           } else {
             ggplot2::geom_path(data = ellipses_coord,
-                                           ggplot2::aes(x = !!dim1, y = !!dim2,
-                                                        group = .data$lvs,
-                                                        color = .data$colorvar),
-                                           stat = "ellipse",
-                                           type = "t", level = ellipses, size = 1,
-                                           segments = 360, alpha = 1, inherit.aes = FALSE)
+                               ggplot2::aes(x = !!dim1, y = !!dim2,
+                                            group = .data$lvs,
+                                            color = .data$colorvar),
+                               stat = "ellipse",
+                               type = "t", level = ellipses, size = 1,
+                               segments = 360, alpha = 1, inherit.aes = FALSE)
           }
 
         # ggplot2::stat_ellipse(data = ind_coord,
@@ -1633,7 +1263,7 @@ ggmca_plot <- function(data,
       }
 
       if(type[1] == "facets") {
-          ind_coord <- ind_coord %>%
+        ind_coord <- ind_coord %>%
           tidyr::nest(row.w = .data$row.w) %>%
           dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
                         wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
@@ -1885,7 +1515,7 @@ ggmca_plot <- function(data,
   #     append(c("css_hover" = css_hover))
   # }
 
-   plot_output <- plot_output %>%
+  plot_output <- plot_output %>%
     append(c("heigth_width_ratio" = heigth_width_ratio)) %>%
     `attr<-`("class", c("gg", "ggplot"))
 
@@ -1925,17 +1555,198 @@ ggmca_plot <- function(data,
 
 
 
-# # dat <- ct2013acm
-# # dat <- res.mca$call$X %>% tibble::add_column(row.w = res.mca$call$row.w)
-# sup_vars = c(sup_vars_contraintes, "PE0")
-# axes = c(1,2)
-# nb_char_for_color = 1
-# keep_levels = character()
-# discard_levels = character()
-# tooltip_vars <- c("SEXE", "cah")
-# cleannames = TRUE
-# names_darker = FALSE
-# shift_colors = 0
+#' Helper table to interpret MCA
+#' @description A table to help to interpret the meaning of axes in multiple
+#' correspondence analysis (MCA), based on Brigitte Le Roux, \emph{Analyse geometrique des
+#' donnees multidimensionnelles}, Dunod, Paris, 2014 / Brigitte Le Roux and Henri Rouanet,
+#' \emph{Geometric data analysis : from correspondence analysis to structured data
+#' analysis}, Kluwer, Boston, 2004. Only levels whose relative contribution to the
+#' variance of axis is superior to the mean contribution are kept. The spread between
+#' positive levels and negative levels of the same variable is calculated in percentages
+#' of the variance of the question/variable.
+#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
+#' @param axes The axes to interpret, as an integer vector. Default to axes 1 and 2.
+#' @param type By default, a html table is printed. Set to \code{"console"} to print in
+#' console or axes the numbers as a data.frame.
+#'
+#' @return An html table (or a tibble).
+#' @export
+#' @examples data(tea, package = "FactoMineR")
+#' res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+#' mca_interpret(res.mca)
+mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "console")) {
+  contrib1 <- res.mca$var$contrib[,axes] %>%
+    tibble::as_tibble(rownames = "levels") %>%
+    tidyr::pivot_longer(-.data$levels, names_prefix ="Dim ", names_to = "Axe",
+                        values_to = "Contrib_mod") %>%
+    dplyr::select(.data$Axe, tidyselect::everything()) %>% dplyr::arrange(.data$Axe) %>%
+    dplyr::mutate(eig_value = res.mca$eig[as.integer(.data$Axe),1],
+                  pct       = round(res.mca$eig[as.integer(.data$Axe),2], 1))
+
+  data <- res.mca$call$X[res.mca$call$quali]
+  var_names <- names(data) %>% purrr::set_names(.)
+  var_names <- purrr::map(var_names, ~ levels(dplyr::pull(data, .x)) ) %>%
+    purrr::imap(
+      ~ rep(.y, length(.x)) %>% purrr::set_names(.x)
+    ) %>%
+    purrr::flatten_chr()
+
+  contrib1 <- contrib1 %>%
+    dplyr::mutate(Question = var_names[.data$levels]) %>%
+    dplyr::group_by(.data$Axe, .data$Question) %>%
+    dplyr::mutate(contrib_q = sum(.data$Contrib_mod))
+
+  #Coordonnees et frequences des levels (pour calculer contribution des ecarts)
+  coord_fk <- res.mca$var$coord[,axes] %>%
+    tibble::as_tibble(rownames = "levels") %>%
+    tibble::add_column(fk = res.mca$call$marge.col) %>%
+    tidyr::pivot_longer(c(-.data$levels, -.data$fk),
+                        names_prefix ="Dim ", names_to = "Axe",
+                        values_to = "coord") %>%
+    dplyr::arrange(.data$Axe)
+
+  #Choisir les levels > a la moyenne, trier par coordonnees positives/negatives
+  contribsup <- contrib1 %>% dplyr::left_join(coord_fk, by = c("Axe", "levels")) %>%
+    dplyr::with_groups(NULL, ~ dplyr::mutate(., mean_ctr = mean(.data$Contrib_mod))) %>%
+    dplyr::filter(.data$Contrib_mod >= .data$mean_ctr) %>%
+    dplyr::arrange(.data$Axe, dplyr::desc(.data$contrib_q),
+                   dplyr::desc(.data$Contrib_mod)) %>%
+    #dplyr::arrange(dplyr::desc(contrib_q)) %>%
+    dplyr::mutate(levels_2 = .data$levels, ctr_neg = .data$Contrib_mod,
+                  ctr_pos  = .data$Contrib_mod, fneg = .data$fk, fpos = .data$fk,
+                  coord_neg = .data$coord, coord_pos = .data$coord) %>%
+    dplyr::select(-.data$Contrib_mod) %>%
+    dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels", "ctr_neg", "fneg",
+                                                     "coord_neg")),
+                                ~ ifelse(coord <= 0, ., NA))) %>%
+    dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels_2", "ctr_pos", "fpos",
+                                                     "coord_pos")),
+                                ~ ifelse(coord > 0, ., NA))) %>%
+    dplyr::ungroup()
+
+
+  #Ajouter les ecarts par Question (en % de la contribution de la question) :
+  contribsup <- contribsup %>%
+    dplyr::group_by(.data$Axe, .data$Question) %>%
+    dplyr::mutate(coord_ecart_neg = stats::weighted.mean(.data$coord_neg,.data$fneg,
+                                                         na.rm = TRUE),
+                  coord_ecart_pos = stats::weighted.mean(.data$coord_pos,.data$fpos,
+                                                         na.rm = T),
+                  poids_ecart_neg = sum(.data$fneg, na.rm = T),
+                  poids_ecart_pos = sum(.data$fpos, na.rm = T)  ) %>%
+    dplyr::mutate(poids_ecart = 1/( 1/.data$poids_ecart_neg + 1/.data$poids_ecart_pos) ) %>%
+    dplyr::mutate(spread = .data$poids_ecart * 100 *
+                    (.data$coord_ecart_pos - .data$coord_ecart_neg)^2 /
+                    (.data$eig_value*.data$contrib_q/100  ) ) %>%
+    dplyr::select(-.data$coord,-.data$fk,-.data$coord_ecart_neg, -.data$coord_ecart_pos,
+                  -.data$poids_ecart_neg, -.data$poids_ecart_pos, -.data$poids_ecart) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(spread = ifelse(is.na(.data$spread), NA, .data$spread) )
+
+  #Contributions totales (positif/negatif sur l'axe), contrib de l'ecart total :
+  total <- contribsup %>%
+    dplyr::group_by(.data$Axe) %>%
+    dplyr::summarise(ctr_neg = sum(.data$ctr_neg, na.rm = TRUE),
+                     ctr_pos = sum(.data$ctr_pos, na.rm = TRUE),
+                     coord_neg = stats::weighted.mean(.data$coord_neg, .data$fneg,
+                                                      na.rm = TRUE),
+                     coord_pos = stats::weighted.mean(.data$coord_pos, .data$fpos,
+                                                      na.rm = TRUE),
+                     poids_neg = sum(.data$fneg, na.rm = TRUE),
+                     poids_pos = sum(.data$fpos, na.rm = TRUE),
+                     poids_ecart = 1/( 1/.data$poids_neg + 1/.data$poids_pos), #fii' = 1/(1/fi + 1/fi').
+                     spread = .data$poids_ecart * 100 *
+                       (.data$coord_pos - .data$coord_neg)^2/mean(.data$eig_value) # = fii' (y l - y ')^2/??l )
+    ) %>% dplyr::select(-.data$coord_neg, -.data$coord_pos, -.data$poids_neg,
+                        -.data$poids_pos, - .data$poids_ecart) %>%
+    tibble::add_column(Question = "All levels") %>%
+    dplyr::mutate(contrib_q = .data$ctr_neg + .data$ctr_pos)
+
+  # #Total general (contributions sur l'axe positif + sur l'axe negatif)
+  # total2 <- contribsup %>%
+  #   dplyr::group_by(.data$Axe) %>%
+  #   dplyr::summarise(contrib_q = sum(.data$ctr_neg, na.rm = TRUE) + sum(.data$ctr_pos, na.rm = TRUE))
+  # #total2 <-  dplyr::bind_rows(total2, total2["Axe"])
+
+  final_tab <- contribsup %>%
+    dplyr::select(-.data$fneg, -.data$fpos, -.data$coord_neg, -.data$coord_pos,
+                  -.data$eig_value) %>%
+    dplyr::bind_rows(total) %>%
+    dplyr::arrange(.data$Axe) %>%
+    dplyr::select(tidyselect::all_of(c("Axe", "pct", "Question", "contrib" = "contrib_q",
+                                       "Positive_levels" = "levels_2", "  " =  "ctr_pos",
+                                       "Negative_levels" = "levels", "   " = "ctr_neg",
+                                       "spread")))
+
+  if (type[1] == "html") {
+    final_tab <- final_tab %>% dplyr::group_by(.data$Axe)
+
+    new_group <- dplyr::group_indices(final_tab)
+    new_group <- which(new_group != dplyr::lag(new_group, default = 0))
+
+    last_row <- nrow(final_tab)
+
+    totrows   <- final_tab %>%
+      dplyr::mutate(row = dplyr::row_number(),
+                    row = row == max(row)) %>%
+      dplyr::pull(row) %>% which()
+
+    questions <- final_tab %>% dplyr::group_by(.data$Axe, .data$Question) %>%
+      dplyr::group_indices()
+    questions <- which(questions != dplyr::lag(questions, default = 0) &
+                         !is.na(dplyr::pull(final_tab, .data$Question)))
+    questions <- questions[!questions %in% new_group]
+
+
+    final_tab <- final_tab %>%
+      dplyr::mutate(dplyr::across(where(is.numeric),
+                                  ~ tidyr::replace_na(stringr::str_c(round(., 1), "%"), ""))) %>%
+      dplyr::mutate(dplyr::across(where(is.character),
+                                  ~ tidyr::replace_na(., ""))) %>%
+      dplyr::mutate(dplyr::across(
+        tidyselect::all_of(c("Question", "contrib", "spread")),
+        ~ dplyr::if_else(condition = .data$Question != dplyr::lag(.data$Question, default = ".novalue."),
+                         true      = .,
+                         false     = "")
+      )) %>%
+      dplyr::mutate(Axe = dplyr::case_when(
+        condition = dplyr::row_number() == 1    ~ paste0("Axe ", .data$Axe, ": ", pct),
+        condition = dplyr::row_number() == 2    ~ "of variance",
+        TRUE                             ~ ""
+      )) %>%
+      dplyr::rename(" " = "Axe") %>%
+      dplyr::select(-tidyselect::all_of("pct"))
+
+
+    final_tab <- final_tab %>%
+      kableExtra::kable() %>%
+      kableExtra::kable_classic(lightable_options = "hover",
+                                #bootstrap_options = c("hover", "condensed", "responsive", "bordered"), #"striped",
+                                full_width = FALSE,
+                                html_font = "DejaVu Sans Condensed", # row_label_position
+                                fixed_thead = TRUE)
+
+    final_tab <- final_tab %>%
+      kableExtra::row_spec(
+        0, bold = TRUE,
+        extra_css = "border-top: 0px solid ; border-bottom: 1px solid ;"
+      ) %>%
+      kableExtra::row_spec(totrows, bold = TRUE) %>%
+      kableExtra::column_spec(c(1, 4, 6, 8), border_left = TRUE) %>%
+      kableExtra::column_spec(8, border_right = TRUE) %>%
+      kableExtra::row_spec(questions, extra_css = "border-top: 1px solid ;") %>%
+      kableExtra::column_spec(1, bold = TRUE,
+                              extra_css = "border-top: 0px solid ; border-bottom: 0px solid ;") %>%
+
+      kableExtra::row_spec(new_group, extra_css = "border-top: 2px solid ;") %>%
+      kableExtra::row_spec(last_row, extra_css = "border-bottom: 2px solid ;")
+
+  }
+
+  final_tab
+}
+
+
 
 
 
@@ -1995,7 +1806,7 @@ ggmca_plot <- function(data,
 #' @param uppercase Print \code{"row"} var or \code{"col"} var labels with
 #' uppercase.
 #' @param tooltips Choose the content of interactive tooltips at mouse hover :
-#'  \code{"col"} for the table of colums percentages, \code{"row"} for line
+#'  \code{"col"} for the table of columns percentages, \code{"row"} for line
 #'  percentages, \code{c("row", "col")} for both.
 #' @param rowtips_subtitle,coltips_subtitle The subtitles used before the table
 #' in interactive tooltips.
@@ -2480,17 +2291,399 @@ ggca <-
 
 
 
+#Fonction : un theme ggplot2 commun pour habiller les graphes des ACM
+#' A ggplot2 Theme for Geometrical Data Analysis
+#'
+#' @param res An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
+#' \code{\link[FactoMineR]{CA}}, etc.
+#' @param axes The axes to print, as a numeric vector of length 2.
+#' @param legend.position c("none", "left", "right", "bottom", "top")
+#' @param no_color_scale When TRUE, color_scale will be provided next.
+#' @param size_scale_max Size of the points.
+#' @param xlim Horizontal axe limits.
+#' @param ylim Vertical axe limits.
+#'
+#' @return A list of ggplot2 objects.
+#'
+#' @keywords internal
+theme_mca <- function(res, axes = c(1,2), # res = res.mca
+                      legend.position = c("none", "left", "right", "bottom", "top"),
+                      no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
+  if (exists("axes_names", where = res)) {
+    first_axe_title  <- stringr::str_c("Axe ", axes[1]," (", round(res$eig[axes[1],2], 1),
+                                       "%) : ", res$axes_names[axes[1]])
+    second_axe_title <- stringr::str_c("Axe ", axes[2]," (", round(res$eig[axes[2],2], 1),
+                                       "%) : ", res$axes_names[axes[2]])
+  } else {
+    first_axe_title  <- stringr::str_c("Axe ", axes[1]," (",
+                                       round(res$eig[axes[1],2], 1), "%)")
+    second_axe_title <- stringr::str_c("Axe ", axes[2]," (",
+                                       round(res$eig[axes[2],2], 1), "%)")
+  }
+
+  if (no_color_scale == FALSE) {
+    scale_color_acm <- ggplot2::scale_color_brewer(palette = "Dark2")
+    scale_fill_acm <- ggplot2::scale_fill_brewer(palette = "Dark2")
+  } else {
+    scale_color_acm <- NULL
+    scale_fill_acm <- NULL
+  }
+
+  if (!missing(xlim) & !missing(ylim)) {coord_graph <- ggplot2::coord_fixed(xlim = xlim, ylim = ylim) }
+  else if (!missing(xlim) ) { coord_graph <- ggplot2::coord_fixed(xlim = xlim ) }
+  else if (!missing(ylim) ) { coord_graph <- ggplot2::coord_fixed(ylim = ylim ) }
+  else { coord_graph <- ggplot2::coord_fixed() }
+
+  #if (no_size_scale == FALSE) {
+  scale_size <- ggplot2::scale_size_area(max_size = size_scale_max)
+  #} else {
+  #  scale_size <- NULL
+  #}
+  list(
+    ggplot2::geom_hline(yintercept = 0, color="black", linetype = "dashed"), # Horizontal axe
+    ggplot2::geom_vline(xintercept = 0, color="black", linetype = "dashed"), # Vertical axe
+    ggplot2::labs(x = first_axe_title, y =  second_axe_title),
+    scale_size,
+    scale_color_acm, #Color palette
+    scale_fill_acm,
+    coord_graph, #Assure that proportion between the two axes are kept
+    ggplot2::theme_minimal(),
+    ggplot2::theme(legend.position = legend.position[1],
+                   panel.grid.minor = ggplot2::element_blank(), #element_line(size = 0.05, color="gray96"),
+                   panel.grid.major = ggplot2::element_blank(), #element_line(size = 0.05, color="gray96"),
+                   strip.text = ggplot2::element_text(face = "bold"), #Titles of facets
+                   plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"), #Center titre of graph
+                   axis.title.x = ggplot2::element_text(size = 12, hjust = 1),
+                   axis.title.y = ggplot2::element_text(size = 12, hjust = 1),
+                   text = ggplot2::element_text(family = "sans") #"DejaVu Sans Condensed"
+    )
+  )
+}
+
+# theme_ac <- function(axes = c(1,2), res = res.ca) {
+#   res.ca <- res.ca
+#   list(
+#     geom_hline(yintercept = 0, color="black", linetype = "dashed"), #Axe horizontal
+#     geom_vline(xintercept = 0, color="black", linetype = "dashed"), #Axe vertical
+#     labs(x = paste0("Axe ", axes[1]," (", round(res.ca$eig[axes[1],2], 1), "%)"), # Titres des axes
+#          y = paste0("Axe ", axes[2]," (", round(res.ca$eig[axes[2],2], 1), "%)") ),
+#     scale_size_area(max_size = 10), #Echelle de taille des points
+#     scale_color_brewer(palette = "Dark2"), #Palette de couleurs
+#     scale_fill_brewer(palette = "Dark2"),
+#     coord_fixed(), #Assurer que les proportions relatives des deux axes sont respectees
+#     theme_minimal(),
+#     theme(legend.position = "none",
+#           panel.grid.minor = element_blank(), #element_line(size = 0.05, color="gray96"),
+#           panel.grid.major = element_blank(), #element_line(size = 0.05, color="gray96"),
+#           strip.text = element_text(face = "bold"), #Titre des facets
+#           plot.title = element_text(hjust = 0.5, face = "bold"), #Centrer le titre du graphique
+#           axis.title.x = element_text(size = 12, hjust = 1),
+#           axis.title.y = element_text(size = 12, hjust = 1) )
+#   )
+# }
+
+#' Title Scale color light for MCA.
+#'
+#' @return A character vector of color codes, with color names.
+#' @export
+#'
+#' @examples material_colors_light()
+material_colors_light <- function() {
+  c(    # Material colors :
+    "Deep purple 300" = "#9575cd", #"#7e57c2",
+    "Orange 700"      = "#f57c00",
+    "Light green 600" = "#7cb342",
+
+    "Teal 400"        = "#26a69a",
+    "Red 700"         = "#d32f2f",
+    "Lime 800"        = "#9e9d24",
+
+    #"Jaune 800"       = "#f9a825",  #reserved for hover effect
+    "Brown 400"       = "#8d6e63",
+    "Purple 300"      = "#ba68c8",
+
+    "Pink 300"        = "#f06292",
+    "Green 800"       = "#388e3c",
+    "Blue 400"        = "#42a5f5",
+
+    "Blue Grey 500"   = "#607d8b"
+  )
+}
+
+#' Title Scale color dark for MCA.
+#'
+#' @return A character vector of color codes, with color names.
+#' @export
+#'
+#' @examples material_colors_dark()
+material_colors_dark <- function() {
+  c(
+    "Deep purple 300"  =    "#65499c", #"#4d2c91",
+    "Orange 700"       =    "#bb4d00",
+    "Light green 600"  =    "#4b830d",
+
+    "Teal 400"         =    "#00766c",
+    "Red 700"          =    "#9a0007",
+    "Lime 800"         =    "#6c6f00",
+
+    #"Jaune 800"        =    "#c17900",  #reserved for hover effect
+    "Brown 400"        =    "#5f4339",
+    "Purple 300"       =    "#883997",
+
+    "Pink 300"         =    "#ba2d65",
+    "Green 800"        =    "#00600f",
+    "Blue 400"         =    "#0077c2",
+
+    "Blue Grey 500"    =    "#34515e"
+  )
+}
+
+
+
+
+#' Pass a MCA plot into a html interactive plot
+#' @param plot The plot, created with \link{ggmca} or \link{ggca}.
+#' @param width The width in centimeters. Default to printing device's size.
+#' @param height The height in centimeters. Default to printing device's size.
+#' @param keep_ratio By default, the height is forced based of the relative
+#' size of the MCA's axes. Set to \code{FALSE} to avoid this behavior.
+#' @param savewidget Should the html widget be saved on disk ?
+#' @param dir If saved as file, the directory in which to save the html widget.
+#' Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
+#' with \code{link[base:options]{options}} to change default directory.
+#' @param open Should the resulting file be opened at once ?
+#' @param name The name of the file to save.
+#' @param replace Replace file ? By default, number added to find a new name.
+#' @param iframe Create an html frame around the plot to ensure fixed
+#' dimensions. Useful when opening the plot in a web browser (but will produce a blank
+#' graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
+#' @param pixel_width The width in pixels for widgetframe.
+#' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}}.
+#'
+#' @return An html plot.
+#' @export
+#'
+# @examples
+ggi <- function(plot = ggplot2::last_plot(),
+                width = NULL, height = NULL, keep_ratio = TRUE,
+                savewidget = FALSE, dir = NULL, name = "Plot", replace = FALSE,
+                open = rlang::is_interactive(),
+                iframe = NULL, pixel_width, ...
+) {
+
+  if (is.null(iframe)) iframe <- savewidget
+
+  if ("css_hover" %in% names(plot)) {
+    css_hover <- plot$css_hover
+  } else {
+    css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
+                                     text = "color:gold4;stroke:none;",
+                                     point = "fill:gold;stroke:orange;",
+                                     area = "fill:white")
+  }
+
+  if ("css_tooltip" %in% names(plot)) {
+    css_tooltip <- plot$css_tooltip
+  } else {
+    css_tooltip <- "color:#000000;text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
+  }
+
+  if(.Platform$OS.type == "windows") {
+    css_tooltip <-
+      paste0(css_tooltip, "font-family:", grDevices::windowsFonts("sans"), ";") #%>%
+    #stringr::str_replace("DejaVu Sans Condensed", "DejaVu Sans")
+  }
+
+  if (missing(width)) {
+    width <- grDevices::dev.size("in")[1]
+
+  } else {
+    width <- width/2.54
+  }
+
+  if (keep_ratio == TRUE & !is.null(plot$heigth_width_ratio)) {
+    height <- width * plot$heigth_width_ratio
+
+  } else {
+    if (missing(height)) {
+      height <- grDevices::dev.size("in")[2]
+    } else {
+      height = height/2.54
+    }
+  }
+
+  # if (is.null(plot$heigth_width_ratio)) height <- NULL
+
+  widget <-
+    ggiraph::girafe(ggobj = plot,
+                    width_svg = width,
+                    height_svg = height, #if_else(missing(height), width/2.563 * plot$heigth_width_ratio, height/2.563)
+                    fonts = ifelse(.Platform$OS.type == "windows",
+                                   grDevices::windowsFonts("sans") %>%
+                                     purrr::map(~stringr::str_replace(., "DejaVu Sans Condensed",
+                                                                      "DejaVu Sans")),
+                                   NULL
+                    ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
+                    ...
+    ) %>%
+    ggiraph::girafe_options(ggiraph::opts_tooltip(use_fill = TRUE, css = css_tooltip), #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
+                            ggiraph::opts_hover(css = css_hover)
+                            # ggiraph::opts_zoom(max = 5) # bugue pas mal
+                            # ggiraph::opts_hover(css = girafe_css(css = "fill:purple;stroke:black;", text = "stroke:none;fill:red;font-style:bold;")) #    point = NULL, line, area, image
+                            # ggiraph::opts_hover_inv(css = "opacity:0.1;"),
+                            # ggiraph::opts_sizing(rescale = FALSE)
+                            # ggiraph::opts_sizing(rescale = TRUE, width = 0.7), #between 0 and 1
+                            # ggiraph::opts_toolbar(saveaspng = FALSE)
+    )
+
+
+  if (iframe == TRUE) {
+    if (missing(pixel_width)) pixel_width <- grDevices::dev.size("px")[1]
+
+    widget <-
+      widgetframe::frameWidget(widget, width = pixel_width,
+                               options = widgetframe::frameOptions(
+                                 title = name,
+                                 name = name
+                               ))
+    #Title and name options : options = widgetframe::frameOptions(name = "Graphique")
+  }
+
+  if (savewidget == FALSE) {
+    return(widget)
+
+  } else {
+    path <- plot_path(dir = dir, name = name, extension = "html", replace = replace)
+
+    if (iframe == FALSE) {
+      htmlwidgets::saveWidget(widget, path, title = name)
+    } else {
+      widgetframe::saveWidgetframe(widget, path, selfcontained = TRUE)
+    }
+
+    if (open == TRUE) file.show(path)
+
+    return(invisible(widget))
+  }
+}
+
+
+
+#' Save a plot as image
+#' @param plot The plot, created with ggplot2.
+#' @param xt The extension name, when saving as image (interactive graph will
+#' always be .html).
+#' @param dpi The resolution.
+#' @param width The width in centimeters.
+#' @param height The height in centimeters. By default, \code{width/1.41}.
+#' @param scale Fixed ratio between horizontal and vertical axes.
+#' @param dir If saved as file, the directory in which to save the html widget.
+#' Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
+#' with \code{link[base:options]{options}} to change default directory.
+#' @param open Should the resulting file be opened at once ?
+#' @param name The name of the file to save.
+#' @param replace Replace file ? By default, number added to find a new name.
+
+#'
+#' @return Creates a file, and opens it in RStudio viewer, as a side effect.
+#' @export
+#'
+ggsave2 <- function(plot = ggplot2::last_plot(),
+                    dir = NULL, name = "Plot", xt = "png", dpi = 600,
+                    width = 21, height, scale = 1,
+                    replace = FALSE, open = rlang::is_interactive()) {
+
+  if (missing(height)) {
+    if (exists("plot$heigth_width_ratio")) {
+      height <- width * plot$heigth_width_ratio
+    } else {
+      height <- width / 1.418919
+    }
+  }
+
+  path <- plot_path(dir = dir, name = name, extension = xt, replace = replace)
+
+  ggplot2::ggsave(path, plot = plot, height = height, width = width, units = "cm",
+                  scale = scale, dpi = dpi)
+
+  if (open == TRUE) file.show(path)
+
+  invisible(plot)
+}
+
+
+
+
+#' @keywords internal
+plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FALSE) {
+  if (is.null(dir)) {
+    dir <- getOption("ggfacto.export_dir")
+    if (is.null(dir)) {
+      dir <- tempdir()
+    }
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+
+  #if (dirname(path) != getwd() & dirname(path) != ".") {
+  #   dir_path <- dirname(path)
+  #   if (!dir.exists(dir_path)) dir.create(dir_path, recursive = TRUE)
+  # }
+
+  path <- file.path(dir, basename(name))
+
+  path_name <- stringr::str_remove(path, "\\..+$")
+  if (! stringr::str_detect(path, "\\..+$")) path <- stringr::str_c(path, ".", extension)
+  if (replace == FALSE) {
+    i <- 0
+    file_do_not_exist <- FALSE
+    while (file_do_not_exist == FALSE) {
+      if (file.exists(path)) {
+        i = i+1
+        path <- stringr::str_c(path_name, i, ".", extension)
+      } else {
+        path <-
+          stringr::str_c(path_name, dplyr::if_else(i == 0,
+                                                   "",
+                                                   stringr::str_c(i)),
+                         ".", extension)
+        file_do_not_exist <- TRUE
+      }
+    }
+  }
+  message(path)
+  return(path)
+}
+
+
+
+# res.ca <- FES2017 %>%
+#   dplyr::mutate() %>%
+#   tab(CSER, PR2017ALL1, wt = w5, tot = "no",
+#        rare_to_other = TRUE, subtext = champ_inscrits) %>%
+#   purrr::flatten_df() %>% dplyr::mutate(dplyr::across(tidyselect::where(is_decimal), as.double)) %>% tibble::column_to_rownames(colnames(.)[1]) %>%
+#   FactoMineR::CA()
+#
+# PR1ac <- ggca(res.ca) + ggplot2::ggplot
+#
+# ggi(PR1ac, "ggiraph", pixel_width = 700) %>%
+#   widgetframe::saveWidgetframe("widget.html", selfcontained = TRUE) ; file.show("widget.html")
+
+
+
+
+
+
 
 
 #To add : - colomn with frequencies divided one by another to see if logit brings
 #something more than the cross-table
 
 #' Modified odd_ratios plot from finalfit
-#' Licence MIT : https://finalfit.org/LICENSE-text.html
-#' Thanks to Ewen M Harrison.
+# Licence MIT : https://finalfit.org/LICENSE-text.html
+# Thanks to Ewen M Harrison.
 #'
 #' @param .data Data frame.
-#' @param dependent Character vector of length 1: name of dedendent variable
+#' @param dependent Character vector of length 1: name of dependent variable
 #' (must have 2 levels).
 #' @param explanatory Character vector of any length: name(s) of explanatory variables.
 #' @param random_effect Character vector of length 1, name of random effect variable.
@@ -2750,200 +2943,6 @@ pers_or_plot <-
 #   pers_or_plot("OBJVRAIacm", explanatory, table_text_size = 4)
 
 
-
-
-
-
-#' Helper table to interpret MCA
-#' @description A table to help to interpret the meaning of axes in multiple
-#' correspondence analysis (MCA), based on Brigitte Le Roux, \emph{Analyse geometrique des
-#' donnees multidimensionnelles}, Dunod, Paris, 2014 / Brigitte Le Roux and Henri Rouanet,
-#' \emph{Geometric data analysis : from correspondence analysis to structured data
-#' analysis}, Kluwer, Boston, 2004. Only levels whose relative contribution to the
-#' variance of axis is superior to the mean contribution are kept. The spread between
-#' positive levels and negative levels of the same variable is calculated in percentages
-#' of the variance of the question/variable.
-#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
-#' @param axes The axes to interpret, as an integer vector. Default to axes 1 and 2.
-#' @param type By default, a html table is printed. Set to \code{"console"} to print in
-#' console or axes the numbers as a data.frame.
-#'
-#' @return An html table (or a tibble).
-#' @export
-#' @examples data(tea, package = "FactoMineR")
-#' res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
-#' mca_interpret(res.mca)
-mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "console")) {
-  contrib1 <- res.mca$var$contrib[,axes] %>%
-    tibble::as_tibble(rownames = "levels") %>%
-    tidyr::pivot_longer(-.data$levels, names_prefix ="Dim ", names_to = "Axe",
-                        values_to = "Contrib_mod") %>%
-    dplyr::select(.data$Axe, tidyselect::everything()) %>% dplyr::arrange(.data$Axe) %>%
-    dplyr::mutate(eig_value = res.mca$eig[as.integer(.data$Axe),1],
-                  pct       = round(res.mca$eig[as.integer(.data$Axe),2], 1))
-
-  data <- res.mca$call$X[res.mca$call$quali]
-  var_names <- names(data) %>% purrr::set_names(.)
-  var_names <- purrr::map(var_names, ~ levels(dplyr::pull(data, .x)) ) %>%
-    purrr::imap(
-      ~ rep(.y, length(.x)) %>% purrr::set_names(.x)
-    ) %>%
-    purrr::flatten_chr()
-
-  contrib1 <- contrib1 %>%
-    dplyr::mutate(Question = var_names[.data$levels]) %>%
-    dplyr::group_by(.data$Axe, .data$Question) %>%
-    dplyr::mutate(contrib_q = sum(.data$Contrib_mod))
-
-  #Coordonnees et frequences des levels (pour calculer contribution des ecarts)
-  coord_fk <- res.mca$var$coord[,axes] %>%
-    tibble::as_tibble(rownames = "levels") %>%
-    tibble::add_column(fk = res.mca$call$marge.col) %>%
-    tidyr::pivot_longer(c(-.data$levels, -.data$fk),
-                        names_prefix ="Dim ", names_to = "Axe",
-                        values_to = "coord") %>%
-    dplyr::arrange(.data$Axe)
-
-  #Choisir les levels > a la moyenne, trier par coordonnees positives/negatives
-  contribsup <- contrib1 %>% dplyr::left_join(coord_fk, by = c("Axe", "levels")) %>%
-    dplyr::with_groups(NULL, ~ dplyr::mutate(., mean_ctr = mean(.data$Contrib_mod))) %>%
-    dplyr::filter(.data$Contrib_mod >= .data$mean_ctr) %>%
-    dplyr::arrange(.data$Axe, dplyr::desc(.data$contrib_q),
-                   dplyr::desc(.data$Contrib_mod)) %>%
-    #dplyr::arrange(dplyr::desc(contrib_q)) %>%
-    dplyr::mutate(levels_2 = .data$levels, ctr_neg = .data$Contrib_mod,
-                  ctr_pos  = .data$Contrib_mod, fneg = .data$fk, fpos = .data$fk,
-                  coord_neg = .data$coord, coord_pos = .data$coord) %>%
-    dplyr::select(-.data$Contrib_mod) %>%
-    dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels", "ctr_neg", "fneg",
-                                                     "coord_neg")),
-                                ~ ifelse(coord <= 0, ., NA))) %>%
-    dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels_2", "ctr_pos", "fpos",
-                                                     "coord_pos")),
-                                ~ ifelse(coord > 0, ., NA))) %>%
-    dplyr::ungroup()
-
-
-  #Ajouter les ecarts par Question (en % de la contribution de la question) :
-  contribsup <- contribsup %>%
-    dplyr::group_by(.data$Axe, .data$Question) %>%
-    dplyr::mutate(coord_ecart_neg = stats::weighted.mean(.data$coord_neg,.data$fneg,
-                                                         na.rm = TRUE),
-                  coord_ecart_pos = stats::weighted.mean(.data$coord_pos,.data$fpos,
-                                                         na.rm = T),
-                  poids_ecart_neg = sum(.data$fneg, na.rm = T),
-                  poids_ecart_pos = sum(.data$fpos, na.rm = T)  ) %>%
-    dplyr::mutate(poids_ecart = 1/( 1/.data$poids_ecart_neg + 1/.data$poids_ecart_pos) ) %>%
-    dplyr::mutate(spread = .data$poids_ecart * 100 *
-                    (.data$coord_ecart_pos - .data$coord_ecart_neg)^2 /
-                    (.data$eig_value*.data$contrib_q/100  ) ) %>%
-    dplyr::select(-.data$coord,-.data$fk,-.data$coord_ecart_neg, -.data$coord_ecart_pos,
-                  -.data$poids_ecart_neg, -.data$poids_ecart_pos, -.data$poids_ecart) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(spread = ifelse(is.na(.data$spread), NA, .data$spread) )
-
-  #Contributions totales (positif/negatif sur l'axe), contrib de l'ecart total :
-  total <- contribsup %>%
-    dplyr::group_by(.data$Axe) %>%
-    dplyr::summarise(ctr_neg = sum(.data$ctr_neg, na.rm = TRUE),
-                     ctr_pos = sum(.data$ctr_pos, na.rm = TRUE),
-                     coord_neg = stats::weighted.mean(.data$coord_neg, .data$fneg,
-                                                      na.rm = TRUE),
-                     coord_pos = stats::weighted.mean(.data$coord_pos, .data$fpos,
-                                                      na.rm = TRUE),
-                     poids_neg = sum(.data$fneg, na.rm = TRUE),
-                     poids_pos = sum(.data$fpos, na.rm = TRUE),
-                     poids_ecart = 1/( 1/.data$poids_neg + 1/.data$poids_pos), #fii' = 1/(1/fi + 1/fi').
-                     spread = .data$poids_ecart * 100 *
-                       (.data$coord_pos - .data$coord_neg)^2/mean(.data$eig_value) # = fii' (y l - y ')^2/??l )
-    ) %>% dplyr::select(-.data$coord_neg, -.data$coord_pos, -.data$poids_neg,
-                        -.data$poids_pos, - .data$poids_ecart) %>%
-    tibble::add_column(Question = "All levels") %>%
-    dplyr::mutate(contrib_q = .data$ctr_neg + .data$ctr_pos)
-
-  # #Total general (contributions sur l'axe positif + sur l'axe negatif)
-  # total2 <- contribsup %>%
-  #   dplyr::group_by(.data$Axe) %>%
-  #   dplyr::summarise(contrib_q = sum(.data$ctr_neg, na.rm = TRUE) + sum(.data$ctr_pos, na.rm = TRUE))
-  # #total2 <-  dplyr::bind_rows(total2, total2["Axe"])
-
-  final_tab <- contribsup %>%
-    dplyr::select(-.data$fneg, -.data$fpos, -.data$coord_neg, -.data$coord_pos,
-                  -.data$eig_value) %>%
-    dplyr::bind_rows(total) %>%
-    dplyr::arrange(.data$Axe) %>%
-    dplyr::select(tidyselect::all_of(c("Axe", "pct", "Question", "contrib" = "contrib_q",
-                                       "Positive_levels" = "levels_2", "  " =  "ctr_pos",
-                                       "Negative_levels" = "levels", "   " = "ctr_neg",
-                                       "spread")))
-
-  if (type[1] == "html") {
-    final_tab <- final_tab %>% dplyr::group_by(.data$Axe)
-
-    new_group <- dplyr::group_indices(final_tab)
-    new_group <- which(new_group != dplyr::lag(new_group, default = 0))
-
-    last_row <- nrow(final_tab)
-
-    totrows   <- final_tab %>%
-      dplyr::mutate(row = dplyr::row_number(),
-                    row = row == max(row)) %>%
-      dplyr::pull(row) %>% which()
-
-    questions <- final_tab %>% dplyr::group_by(.data$Axe, .data$Question) %>%
-      dplyr::group_indices()
-    questions <- which(questions != dplyr::lag(questions, default = 0) &
-                         !is.na(dplyr::pull(final_tab, .data$Question)))
-    questions <- questions[!questions %in% new_group]
-
-
-    final_tab <- final_tab %>%
-      dplyr::mutate(dplyr::across(where(is.numeric),
-                                  ~ tidyr::replace_na(stringr::str_c(round(., 1), "%"), ""))) %>%
-      dplyr::mutate(dplyr::across(where(is.character),
-                                  ~ tidyr::replace_na(., ""))) %>%
-      dplyr::mutate(dplyr::across(
-        tidyselect::all_of(c("Question", "contrib", "spread")),
-        ~ dplyr::if_else(condition = .data$Question != dplyr::lag(.data$Question, default = ".novalue."),
-                         true      = .,
-                         false     = "")
-      )) %>%
-      dplyr::mutate(Axe = dplyr::case_when(
-        condition = dplyr::row_number() == 1    ~ paste0("Axe ", .data$Axe, ": ", pct),
-        condition = dplyr::row_number() == 2    ~ "of variance",
-        TRUE                             ~ ""
-      )) %>%
-      dplyr::rename(" " = "Axe") %>%
-      dplyr::select(-tidyselect::all_of("pct"))
-
-
-    final_tab <- final_tab %>%
-      kableExtra::kable() %>%
-      kableExtra::kable_classic(lightable_options = "hover",
-                                #bootstrap_options = c("hover", "condensed", "responsive", "bordered"), #"striped",
-                                full_width = FALSE,
-                                html_font = "DejaVu Sans Condensed", # row_label_position
-                                fixed_thead = TRUE)
-
-    final_tab <- final_tab %>%
-      kableExtra::row_spec(
-        0, bold = TRUE,
-        extra_css = "border-top: 0px solid ; border-bottom: 1px solid ;"
-      ) %>%
-      kableExtra::row_spec(totrows, bold = TRUE) %>%
-      kableExtra::column_spec(c(1, 4, 6, 8), border_left = TRUE) %>%
-      kableExtra::column_spec(8, border_right = TRUE) %>%
-      kableExtra::row_spec(questions, extra_css = "border-top: 1px solid ;") %>%
-      kableExtra::column_spec(1, bold = TRUE,
-                              extra_css = "border-top: 0px solid ; border-bottom: 0px solid ;") %>%
-
-      kableExtra::row_spec(new_group, extra_css = "border-top: 2px solid ;") %>%
-      kableExtra::row_spec(last_row, extra_css = "border-bottom: 2px solid ;")
-
-  }
-
-  final_tab
-}
 
 
 

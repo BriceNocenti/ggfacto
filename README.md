@@ -11,7 +11,7 @@
 Readable, complete and pretty graphs for correspondence analysis made
 with [FactoMineR](http://factominer.free.fr/). Many can be rendered as
 interactive html plots, showing useful informations at mouse hover. The
-interest is not mainly visual but statistical : it helps the reader to
+interest is not mainly visual but statistical : it helps the reader to
 keep in mind the data contained in the crosstab or Burt table while
 reading correspondance analysis, thus preventing overinterpretation.
 Graphs are made with [ggplot2](https://ggplot2.tidyverse.org/), which

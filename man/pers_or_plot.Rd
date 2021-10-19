@@ -2,9 +2,7 @@
 % Please edit documentation in R/geometrical_data_analysis.R
 \name{pers_or_plot}
 \alias{pers_or_plot}
-\title{Modified odd_ratios plot from finalfit
-Licence MIT : https://finalfit.org/LICENSE-text.html
-Thanks to Ewen M Harrison.}
+\title{Modified odd_ratios plot from finalfit}
 \usage{
 pers_or_plot(
   .data,
@@ -31,7 +29,7 @@ pers_or_plot(
 \arguments{
 \item{.data}{Data frame.}
 
-\item{dependent}{Character vector of length 1: name of dedendent variable
+\item{dependent}{Character vector of length 1: name of dependent variable
 (must have 2 levels).}
 
 \item{explanatory}{Character vector of any length: name(s) of explanatory variables.}
@@ -76,6 +74,4 @@ The odd ratios plot.
 }
 \description{
 Modified odd_ratios plot from finalfit
-Licence MIT : https://finalfit.org/LICENSE-text.html
-Thanks to Ewen M Harrison.
 }
