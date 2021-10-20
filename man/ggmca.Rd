@@ -18,7 +18,7 @@ ggmca(
   keep_levels,
   discard_levels,
   profiles = TRUE,
-  profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+  profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
   cah,
   max_profiles,
   nb_char_for_color = rep(0, length(sup_vars)),
