@@ -93,11 +93,8 @@ ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 
 Make the correspondence analysis :
 
 ``` r
-table <- tabxplor::tab(forcats::gss_cat, race, marital, tot = "no") %>%
-  dplyr::mutate(across(where(tabxplor::is_fmt), tabxplor::get_num)) %>%
-  tibble::column_to_rownames(var = colnames(.)[1])
-
-res.ca <- FactoMineR::CA(table, graph = FALSE)
+tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
+res.ca <- FactoMineR::CA(tabs, graph = FALSE)
 ```
 
 Interactive plot :

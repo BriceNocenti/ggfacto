@@ -976,20 +976,20 @@ ggmca_plot <- function(data,
   theme_acm_with_lims <-
     if (use_theme) {
       if (!missing(xlim) & !missing(ylim))  {
-        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                  size_scale_max = size_scale_max,  # legend.position = "bottom",
-                  xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
+        theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
+                    size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
       } else if (!missing(xlim) ) {
-        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                  size_scale_max = size_scale_max,  # legend.position = "bottom",
-                  xlim = c(xlim[1], xlim[2]) )
+        theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
+                    size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    xlim = c(xlim[1], xlim[2]) )
       } else if (!missing(ylim) )  {
-        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                  size_scale_max = size_scale_max,  # legend.position = "bottom",
-                  ylim = c(ylim[1], ylim[2]))
+        theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
+                    size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    ylim = c(ylim[1], ylim[2]))
       } else {
-        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                  size_scale_max = size_scale_max)
+        theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
+                    size_scale_max = size_scale_max)
       } # legend.position = "bottom",
 
     } else {
@@ -1772,7 +1772,7 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #'  percentages, \code{c("row", "col")} for both.
 #' @param rowtips_subtitle,coltips_subtitle The subtitles used before the table
 #' in interactive tooltips.
-#' @param rowcolor_numbers,colcolor_numbers  If row var or col var levels are
+#' @param rowcolor_numbers,colcolor_numbers If row var or col var levels are
 #' prefixed with numbers(ex. : \code{"1-"} ), the number of digits to use
 #' to create classes that will be used to add colors to points.
 #' @param cleannames Set to \code{TRUE} to clean levels names, by removing
@@ -1795,17 +1795,15 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #' @export
 #'
 #' @examples # Make the correspondence analysis :
-#' table <- tabxplor::tab(forcats::gss_cat, race, marital, tot = "no") %>%
-#'   dplyr::mutate(across(where(tabxplor::is_fmt), tabxplor::get_num)) %>%
-#'   tibble::column_to_rownames(var = colnames(.)[1])
-#'
-#' res.ca <- FactoMineR::CA(table, graph = FALSE)
+#' tabs <- table(forcats::gss_cat$race, forcats::gss_cat$marital)[-4,]
+#' # tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
+#' res.ca <- FactoMineR::CA(tabs, graph = FALSE)
 #'
 #' # Interactive plot :
 #' graph.ca <- ggca(res.ca,
 #'                  title = "Race by marical : correspondence analysis",
 #'                  tooltips = c("row", "col"))
-#' \dontrun{ggi(graph.ca) # to make the plot interactive}
+#' ggi(graph.ca) to make the plot interactive}
 #'
 #' # Image plot :
 #' ggca(res.ca,
@@ -2058,26 +2056,26 @@ ggca <-
     if (dist_labels[1] == "auto") dist_labels <- width_range/50
 
     theme_acm_with_lims <-
-    if (use_theme) {
-      if (!missing(xlim) & !missing(ylim))  {
+      if (use_theme) {
+        if (!missing(xlim) & !missing(ylim))  {
 
-          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                    xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
+          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
+                      xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
+        }
+        else if (!missing(xlim) ) {
+          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
+                      xlim = c(xlim[1], xlim[2]) )
+        }
+        else if (!missing(ylim) )  {
+          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
+                      ylim = c(ylim[1], ylim[2]))
+        }
+        else {
+          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max)  # legend.position = "bottom",
+        }
+      } else {
+        NULL
       }
-      else if (!missing(xlim) ) {
-          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                    xlim = c(xlim[1], xlim[2]) )
-      }
-      else if (!missing(ylim) )  {
-          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                    ylim = c(ylim[1], ylim[2]))
-      }
-      else {
-          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max)  # legend.position = "bottom",
-      }
-    } else {
-      NULL
-    }
 
 
 
@@ -2281,23 +2279,35 @@ ggca <-
 #' @return A list of ggplot2 objects.
 #'
 #' @export
-theme_mca <- function(res, axes = c(1,2), # res = res.mca
-                      legend.position = c("none", "left", "right", "bottom", "top"),
-                      no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
+theme_facto <- function(res, axes = c(1,2), # res = res.mca
+                        legend.position = c("none", "left", "right", "bottom", "top"),
+                        no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
   if (exists("axes_names", where = res)) {
-    first_axe_title  <- stringr::str_c("Axe ", axes[1]," (", round(res$eig[axes[1],2], 1),
-                                       "%) : ", res$axes_names[axes[1]])
-    second_axe_title <- stringr::str_c("Axe ", axes[2]," (", round(res$eig[axes[2],2], 1),
-                                       "%) : ", res$axes_names[axes[2]])
+    first_axe_title  <-
+      stringr::str_c(
+        "Axe ", axes[1]," (", round(res$eig[axes[1],2], 1),
+        "%)",
+        if (!is.null(res$axes_names[axes[1]]) ) paste0(" : ", res$axes_names[axes[1]])
+      )
+    second_axe_title <-
+      stringr::str_c(
+        "Axe ", axes[2]," (", round(res$eig[axes[2],2], 1),
+        "%)",
+        if (!is.null(res$axes_names[axes[2]]) ) paste0(" : ", res$axes_names[axes[2]])
+      )
   } else {
-    first_axe_title  <- stringr::str_c("Axe ", axes[1]," (",
-                                       round(res$eig[axes[1],2], 1), "%)")
-    second_axe_title <- stringr::str_c("Axe ", axes[2]," (",
-                                       round(res$eig[axes[2],2], 1), "%)")
+    first_axe_title  <-
+      stringr::str_c("Axe ", axes[1]," (",
+                     round(res$eig[axes[1],2], 1), "%)")
+    second_axe_title <-
+      stringr::str_c("Axe ", axes[2]," (",
+                     round(res$eig[axes[2],2], 1), "%)")
   }
 
+
+
   if (no_color_scale == FALSE) {
-    scale_color_acm <- ggplot2::scale_color_brewer(palette = "Dark2")
+    scale_color_acm <- ggplot2::scale_color_brewer(palette = "Dark2") #material_colors_light() ?
     scale_fill_acm <- ggplot2::scale_fill_brewer(palette = "Dark2")
   } else {
     scale_color_acm <- NULL
