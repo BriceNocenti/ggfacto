@@ -25,7 +25,8 @@ ggca(
   text_size = 3.5,
   dist_labels = c("auto", 0.12),
   right_margin = 0,
-  size_scale_max = 8
+  size_scale_max = 8,
+  use_theme = TRUE
 )
 }
 \arguments{
@@ -82,6 +83,9 @@ labels from points.}
 over points placed at the right of the graph without formatting problems.}
 
 \item{size_scale_max}{Size of points.}
+
+\item{use_theme}{By default, a specific \pkg{ggplot2} theme is used.
+Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}} object to be printed in the
@@ -110,7 +114,7 @@ res.ca <- FactoMineR::CA(table, graph = FALSE)
 graph.ca <- ggca(res.ca,
                  title = "Race by marical : correspondence analysis",
                  tooltips = c("row", "col"))
-ggi(graph.ca)
+ggi(graph.ca) # to make the plot interactive
 
 # Image plot :
 ggca(res.ca,

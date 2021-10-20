@@ -1,48 +1,6 @@
 
 
-# Geometrical data analysis AC/ACM----------------------------------------------
-
-
-
-# ggmca(res.mca, split_var = PE3_ord, dplyr::filter = "^.3C",
-#              nb_char_for_color = 1,
-#              dist_labels = 0.04, type = "ggplotly") +
-#   ylim(NA, 0) + xlim (NA, 1) ; ggi("ggplotly")
-
-#
-# # dat <- ct2013acm
-# dat <- res.mca$call$X %>% tibble::add_column(row.w = res.mca$call$row.w)
-# sup_vars = c(sup_vars_contraintes, "PE0")
-# tooltip_vars_1lv = c("SEXE", "ENCADRacm")
-# tooltip_vars <- c("cah")
-# axes = c(1,2)
-# nb_char_for_color = 1
-# keep_levels = character()
-# discard_levels = character()
-#
-# cleannames = TRUE
-# names_darker = FALSE
-# shift_colors = 0
-# type = "text"
-# profiles_tooltip_discard = "^Pas "
-#
-# type = "text"
-# sup_vars =  c("PE0", "cah")
-# tooltip_vars_1lv = "ENCADRacm"
-# tooltip_vars = "cah"
-# cah = "cah"
-# colornames_recode <- character()
-# scale_color_light <- material_colors_light()
-# scale_color_dark <- material_colors_dark()
-
-# BUGS :             - Couleur du tooltip change inopinement avec labels : signale david gohel ggiraph
-#                    - legende des couleurs : vilain, "a" en couleur et nom en noir
-# Ajouter :          - calculer taille par couleur en option (bof) ?
-#                    - Option color profiles by active_vars / by cah (on ggmca_ind ?) ?
-#                    - Distinguer cah des autres ; la mettre en labels dans type = "text" ? ; tj couleurs liees aux profils (non) ?
-#                    - analyse des donnees structurees
-
-
+# Geometrical data analysis AC/ACM -------------------------------------------------------
 
 #' Readable, Interactive and Beautiful graph for MCA
 #' @description A readable, complete and beautiful graph for multiple
@@ -130,6 +88,8 @@
 #' non-colored profiles.
 #' @param scale_color_light A scale color for sup vars points
 #' @param scale_color_dark A scale color for sup vars texts
+#' @param use_theme By default, a specific \pkg{ggplot2} theme is used.
+#' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
 #'
 #' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
 #' RStudio Plots pane. Possibility to add other gg objects with \code{+}.
@@ -168,7 +128,7 @@ ggmca <-
            scale_color_light = material_colors_light(),
            scale_color_dark  = material_colors_dark(),
            text_size = 3, size_scale_max = 8, dist_labels = c("auto", 0.04),
-           right_margin = 0
+           right_margin = 0, use_theme = TRUE
   ) {
 
     data <- ggmca_data(
@@ -192,7 +152,8 @@ ggmca <-
                scale_color_light = scale_color_light,
                scale_color_dark  = scale_color_dark,
                text_size = text_size, size_scale_max = size_scale_max,
-               dist_labels = dist_labels, right_margin = right_margin
+               dist_labels = dist_labels, right_margin = right_margin,
+               use_theme = use_theme
     )
 
   }
@@ -858,10 +819,7 @@ ggmca_data <-
 # @inheritParams ggmca
 #' @param data A list of data frames made with \link{ggmca_data}.
 #'
-# @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
-# RStudio Plots pane. Possibility to add other gg objects with \code{+}.
-# Sending the result through \code{\link{ggi}} will draw the
-# interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+#' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
 ggmca_plot <- function(data,
                        axes = c(1,2), axes_names = NULL,
@@ -873,7 +831,7 @@ ggmca_plot <- function(data,
                        scale_color_light = material_colors_light(),
                        scale_color_dark  = material_colors_dark(),
                        text_size = 3, size_scale_max = 8, dist_labels = c("auto", 0.04),
-                       right_margin = 0) {
+                       right_margin = 0, use_theme = TRUE) {
 
   cah              <- data$cah
   active_var_coord <- data$active_var_coord
@@ -946,9 +904,9 @@ ggmca_plot <- function(data,
     colorvar_recode <- sup_vars_coord %>%
       dplyr::pull(.data$colorvar) %>% levels()
     if (length(colorvar_recode) >= 2) {
-      message(stringr::str_c("colors based on: '",
-                             stringr::str_c(colorvar_recode, collapse = "', '"), "'",
-                             collapse = ""))
+      writeLines(stringr::str_c("colors based on: '",
+                                stringr::str_c(colorvar_recode, collapse = "', '"), "'",
+                                collapse = ""))
     }
 
     scale_color_points <- scale_color_light %>%
@@ -1016,23 +974,27 @@ ggmca_plot <- function(data,
   if (dist_labels[1] == "auto") dist_labels <- width_range/40
 
   theme_acm_with_lims <-
-    if (!missing(xlim) & !missing(ylim))  {
-      theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                size_scale_max = size_scale_max,  # legend.position = "bottom",
-                xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
-    } else if (!missing(xlim) ) {
-      theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                size_scale_max = size_scale_max,  # legend.position = "bottom",
-                xlim = c(xlim[1], xlim[2]) )
-    } else if (!missing(ylim) )  {
-      theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                size_scale_max = size_scale_max,  # legend.position = "bottom",
-                ylim = c(ylim[1], ylim[2]))
-    } else {
-      theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
-                size_scale_max = size_scale_max)
-    } # legend.position = "bottom",
+    if (use_theme) {
+      if (!missing(xlim) & !missing(ylim))  {
+        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
+                  size_scale_max = size_scale_max,  # legend.position = "bottom",
+                  xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
+      } else if (!missing(xlim) ) {
+        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
+                  size_scale_max = size_scale_max,  # legend.position = "bottom",
+                  xlim = c(xlim[1], xlim[2]) )
+      } else if (!missing(ylim) )  {
+        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
+                  size_scale_max = size_scale_max,  # legend.position = "bottom",
+                  ylim = c(ylim[1], ylim[2]))
+      } else {
+        theme_mca(res = res.mca, axes = axes, no_color_scale = TRUE,
+                  size_scale_max = size_scale_max)
+      } # legend.position = "bottom",
 
+    } else {
+      NULL
+    }
 
   outlims <- function(data, lim, dim) {
     dim <- rlang::enquo(dim)
@@ -1823,6 +1785,8 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #' @param right_margin A margin at the right, in cm. Useful to read tooltips
 #'  over points placed at the right of the graph without formatting problems.
 #' @param size_scale_max Size of points.
+#' @param use_theme By default, a specific \pkg{ggplot2} theme is used.
+#' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
 #'
 #' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
 #' RStudio Plots pane. Possibility to add other gg objects with \code{+}.
@@ -1841,7 +1805,7 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #' graph.ca <- ggca(res.ca,
 #'                  title = "Race by marical : correspondence analysis",
 #'                  tooltips = c("row", "col"))
-#' #ggi(graph.ca) # to make the plot interactive
+#' \dontrun{ggi(graph.ca) # to make the plot interactive}
 #'
 #' # Image plot :
 #' ggca(res.ca,
@@ -1856,7 +1820,7 @@ ggca <-
            rowcolor_numbers = 0, colcolor_numbers = 0, cleannames = TRUE, filter = "",
            title,
            text_size = 3.5, dist_labels = c("auto", 0.12), right_margin = 0,
-           size_scale_max = 8) {  #, repel_max_iter = 10000
+           size_scale_max = 8, use_theme = TRUE) {  #, repel_max_iter = 10000
 
     dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[1],"`"))))
     dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))  #rlang::expr(eval(parse(text = paste0("`Dim ", axes[2],"`"))))
@@ -2093,17 +2057,29 @@ ggca <-
     heigth_width_ratio <- heigth_width_ratio %>% dplyr::summarise(heigth_width_ratio = !!dim2/!!dim1, .groups = "drop") %>% tibble::deframe()
     if (dist_labels[1] == "auto") dist_labels <- width_range/50
 
-    if (!missing(xlim) & !missing(ylim))  {theme_acm_with_lims <-
-      theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))}
-    else if (!missing(xlim) ) {theme_acm_with_lims <-
-      theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                xlim = c(xlim[1], xlim[2]) )}
-    else if (!missing(ylim) )  {theme_acm_with_lims <-
-      theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                ylim = c(ylim[1], ylim[2]))}
-    else {theme_acm_with_lims <-
-      theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max)} # legend.position = "bottom",
+    theme_acm_with_lims <-
+    if (use_theme) {
+      if (!missing(xlim) & !missing(ylim))  {
+
+          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
+      }
+      else if (!missing(xlim) ) {
+          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    xlim = c(xlim[1], xlim[2]) )
+      }
+      else if (!missing(ylim) )  {
+          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    ylim = c(ylim[1], ylim[2]))
+      }
+      else {
+          theme_mca(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max)  # legend.position = "bottom",
+      }
+    } else {
+      NULL
+    }
+
+
 
     outlims <- function(data, lim, dim) {
       dim <- rlang::enquo(dim)
@@ -2291,21 +2267,20 @@ ggca <-
 
 
 
-#Fonction : un theme ggplot2 commun pour habiller les graphes des ACM
 #' A ggplot2 Theme for Geometrical Data Analysis
 #'
 #' @param res An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
 #' \code{\link[FactoMineR]{CA}}, etc.
 #' @param axes The axes to print, as a numeric vector of length 2.
-#' @param legend.position c("none", "left", "right", "bottom", "top")
-#' @param no_color_scale When TRUE, color_scale will be provided next.
-#' @param size_scale_max Size of the points.
+#' @param legend.position One of \code{c("none", "left", "right", "bottom", "top")}.
+#' @param no_color_scale When TRUE, you can provide color_scale next without warning.
+#' @param size_scale_max Maximum size of the points.
 #' @param xlim Horizontal axe limits.
 #' @param ylim Vertical axe limits.
 #'
 #' @return A list of ggplot2 objects.
 #'
-#' @keywords internal
+#' @export
 theme_mca <- function(res, axes = c(1,2), # res = res.mca
                       legend.position = c("none", "left", "right", "bottom", "top"),
                       no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
@@ -2614,47 +2589,6 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
 
 
 
-#' @keywords internal
-plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FALSE) {
-  if (is.null(dir)) {
-    dir <- getOption("ggfacto.export_dir")
-    if (is.null(dir)) {
-      dir <- tempdir()
-    }
-  }
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
-
-  #if (dirname(path) != getwd() & dirname(path) != ".") {
-  #   dir_path <- dirname(path)
-  #   if (!dir.exists(dir_path)) dir.create(dir_path, recursive = TRUE)
-  # }
-
-  path <- file.path(dir, basename(name))
-
-  path_name <- stringr::str_remove(path, "\\..+$")
-  if (! stringr::str_detect(path, "\\..+$")) path <- stringr::str_c(path, ".", extension)
-  if (replace == FALSE) {
-    i <- 0
-    file_do_not_exist <- FALSE
-    while (file_do_not_exist == FALSE) {
-      if (file.exists(path)) {
-        i = i+1
-        path <- stringr::str_c(path_name, i, ".", extension)
-      } else {
-        path <-
-          stringr::str_c(path_name, dplyr::if_else(i == 0,
-                                                   "",
-                                                   stringr::str_c(i)),
-                         ".", extension)
-        file_do_not_exist <- TRUE
-      }
-    }
-  }
-  message(path)
-  return(path)
-}
-
-
 
 # res.ca <- FES2017 %>%
 #   dplyr::mutate() %>%
@@ -2706,7 +2640,7 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
 #' @param return_df To return the dataframe.
 #' @param ... Other parameters.
 
-#' @return The odd ratios plot.
+#' @return The odd ratios plot as a ggplot2 object.
 #' @export
 #'
 # @examples
@@ -2791,7 +2725,7 @@ pers_or_plot <-
     }
 
 
-    #Ajouts perso???:
+    #Added :
     if (return_df == FALSE) {
       log_range <- max(as.numeric(df.out$OR)) + max(1/as.numeric(df.out$OR))
       if (missing(break_scale)) {
@@ -2944,217 +2878,49 @@ pers_or_plot <-
 
 
 
+# Internal functinos ---------------------------------------------------------------------
 
 
 
-#
-# #Fonction : frequences des modalites actives
-# #' Graph for frequencies of active vars in MCA
-# #'
-# #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
-# #'
-# #' @return A graph of frequencies.
-# #' @export
-# #'
-# # @examples
-# ggmca_freq <- function(res.mca = res.mca) {
-#   res.mca <- res.mca
-#   freq <- res.mca$call$marge.col %>%
-#     tibble::as_tibble(rownames = "Modalites") %>%
-#     dplyr::mutate(frequences = value*length(res.mca$call$quali)*100) %>% dplyr::select(-value)
-#
-#   #Retrouver les questions a partir des modalites
-#   var_names <- names(res.mca$call$X[res.mca$call$quali])
-#   question <- freq %>% dplyr::select (-frequences)
-#   for (i in 1:length(var_names)) {
-#     new_var_name <- paste0(i)
-#     question <- question %>% dplyr::mutate( !!new_var_name := dplyr::if_else(
-#       freq[,1] == levels(eval(parse(text = paste0("res.mca$call$X$", var_names[i])))),
-#       TRUE, FALSE))
-#   }
-#   question <- question %>%
-#     tibble::column_to_rownames(var = "Modalites") %>% t %>% tibble::as_tibble %>%
-#     transmute_all(~which(. == TRUE)) %>%  dplyr::slice(1) %>%  t %>%
-#     purrr::map_chr(~var_names[.])
-#   freq <- freq %>%
-#     tibble::add_column(Questions = question_noms, .before = 1) %>%
-#     dplyr::mutate_if(is.character, as_factor) %>%
-#     dplyr::mutate(frequences = round(frequences, 0))
-#   # dplyr::mutate(frequences = stringr::str_c(frequences, "%"))
-#
-#
-#
-#   ggplot2::ggplot(freq, ggplot2::aes(x = Modalites, y = frequences, fill = Questions)) +
-#     # geom_hline(yintercept = 50, color="black") +
-#     ggplot2::geom_bar(stat = "identity") +
-#     ggplot2::geom_text(ggplot2::aes(label = stringr::str_c(frequences, "%")),
-#                        nudge_y = 3, fontface = "bold") +
-#     # scale_color_brewer(palette = "Dark2") +
-#     # scale_fill_brewer(palette = "Dark2") +
-#     ggplot2::theme_minimal() +
-#     ggplot2::ylim(0,100) +
-#     ggplot2::theme(
-#       plot.background = ggplot2::element_rect(fill = "gray98", colour = NA),
-#       panel.background = ggplot2::element_rect(fill = "gray98", colour = NA),
-#       plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
-#       panel.grid.minor = ggplot2::element_blank(),
-#       panel.grid.major.x = ggplot2::element_blank(),
-#       axis.title = ggplot2::element_blank(),
-#       axis.text.x = ggplot2::element_text(color = "black", angle = 45, hjust = 1,
-#                                           face = "bold", size = 11),
-#       axis.text.y = ggplot2::element_text(color = "black", size = 11),
-#       axis.ticks.y = ggplot2::element_line(color = "gray"),
-#       axis.ticks.length = ggplot2::unit(4, "pt"),
-#       axis.line.y = ggplot2::element_line(color = "gray"),
-#     )
-#
-#
-#
-#
-# }
+#' @keywords internal
+plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FALSE) {
+  if (is.null(dir)) {
+    dir <- getOption("ggfacto.export_dir")
+    if (is.null(dir)) {
+      dir <- tempdir()
+    }
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
 
+  #if (dirname(path) != getwd() & dirname(path) != ".") {
+  #   dir_path <- dirname(path)
+  #   if (!dir.exists(dir_path)) dir.create(dir_path, recursive = TRUE)
+  # }
 
+  path <- file.path(dir, basename(name))
 
-
-
-
-
-
-# #Fonction : graphe avec centres de classes, ellipses medianes et modalites:
-# #Les graphe pondere des individus apparait en fond de trame
-#
-# #' Graph of Individuals with Concentration Ellipses for MCA
-# #' @description To be enhanced.
-# #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-# #' @param split_var The var.
-# #' @param percent Percent.
-# #' @param axes Axes.
-# #' @param type Type.
-# #
-# #' @return A plot.
-# #' @export
-# #'
-# # @examples
-# ggmca_ellipses <- function(res.mca = res.mca, split_var = NULL,
-#                            percent = 0.95, axes = c(1,2), type = "normal") {
-#   res.mca <- res.mca
-#   split_var <- rlang::enquo(split_var)
-#   dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[1],"`"))))
-#   dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[2],"`"))))
-#
-#   levels_split_var <- levels( #Attention dans res.mca l'ordre n'est pas bon
-#     eval(parse(text = paste0(res.mca$call$call$X[[2]],"$",rlang::as_label(split_var)))))
-#   split_var_coord <- res.mca$quali.sup$coord %>%
-#     tibble::as_tibble (rownames = rlang::as_label(split_var)) %>%
-#     dplyr::filter(!!split_var %in% levels_split_var) %>%
-#     dplyr::mutate(!!split_var := forcats::fct_relevel(!!split_var,levels_split_var)) %>% #Right order
-#     dplyr::arrange(!!split_var)
-#
-#   active_var_coord <- res.mca$var$coord %>%
-#     tibble::as_tibble(rownames = "lvs")
-#
-#   #Calculate profiles of answers of the MCA ; weighted : nb of individuals * weight variable
-#   res.mca$call$X <-  res.mca$call$X %>% tibble::add_column(row.w = res.mca$call$row.w)
-#   dat_profils <-
-#     res.mca$call$X[,c(res.mca$call$quali,
-#                       which(colnames(res.mca$call$X)=="row.w"))] %>%
-#     dplyr::group_by_at(dplyr::vars(-row.w)) %>%
-#     dplyr::summarise(pondpr = sum(row.w)) %>%
-#     dplyr::arrange(-pondpr) %>% dplyr::ungroup
-#   res.mca.profils <-   #Redo ACM with weighted profiles :
-#     FactoMineR::MCA(dat_profils[,1:(which(colnames(ct2013profils)=="pondpr" )-1)],
-#                     row.w = dat_profils$pondpr, ncp = res.mca$call$ncp,
-#                     graph = FALSE)
-#   ind_coord <- dat_profils %>% dplyr::select(pondpr) %>%
-#     dplyr::bind_cols( tibble::as_tibble(res.mca.profils$ind$coord) )
-#
-#
-#   ellipses_ind_coord <- res.mca$call$X %>% dplyr::select(!!split_var) %>%
-#     dplyr::bind_cols( tibble::as_tibble(res.mca$ind$coord) ) %>%
-#     dplyr::filter(!stringr::str_detect(!!split_var,".NA")) %>%
-#     dplyr::mutate(!!split_var := forcats::fct_relevel(!!split_var,levels_split_var)) #Right order
-#
-#   if (type == "normal") {
-#
-#     ggplot2::ggplot() +
-#       theme_mca(res = res.mca, axes = axes) +
-#       ggplot2::labs(title = paste0("Les categories de la variable ", rlang::as_label(split_var),
-#                                    " sur les axes ", axes[1], " et ", axes[2],
-#                                    " : ellipses a ",
-#                                    percent*100, "% et points-modalites")) +
-#       ggplot2::geom_point(data = ind_coord,
-#                           ggplot2::aes(x = !!dim1, y = !!dim2, size = pondpr),
-#                           alpha = 0.05, na.rm = TRUE) +
-#       ggplot2::stat_ellipse(data = ellipses_ind_coord,
-#                             ggplot2::aes(x = !!dim1, y = !!dim2, color=!!split_var),
-#                             type = "t", level = percent, size = 1,  segments = 360,
-#                             alpha = 0.5, na.rm = TRUE) +
-#       ggplot2::geom_label(data = active_var_coord,
-#                           ggplot2::aes(x = !!dim1, y = !!dim2, label = lvs),
-#                           color = "black", na.rm = TRUE) +
-#       ggplot2::geom_point(data = split_var_coord, size = 3,
-#                           ggplot2::aes(x = !!dim1, y = !!dim2, color = !!split_var), na.rm = TRUE) +
-#       ggrepel::geom_label_repel(data = split_var_coord,
-#                                 ggplot2::aes(x = !!dim1, y = !!dim2, label = !!split_var,
-#                                              color = !!split_var),
-#                                 fontface = "bold", na.rm = TRUE)
-#   } else if (type == "multi") {
-#
-#     #Variante avec trois ellipses imbriquees colorees a l'interieur :
-#     ggplot2::ggplot() +
-#       theme_mca(res = res.mca, axes = axes) +
-#       ggplot2::labs(title = paste0("Les categories de la variable ", rlang::as_label(split_var),
-#                                    "sur les axes ", axes[1], " et ", axes[2],
-#                                    " : ellipses (a 50%, 86,5% et 95%) et points-modalites")) +
-#       # geom_point(data = ind_coord,
-#       #            ggplot2::aes(x = !!dim1, y = !!dim2, size = pondpr),
-#       #            alpha = 0.05, na.rm = TRUE) +
-#       ggplot2::stat_ellipse(data = ellipses_ind_coord,
-#                             ggplot2::aes(x = !!dim1, y = !!dim2, fill = !!split_var),
-#                             geom = "polygon", type = "t", level = 0.5, size = 1,
-#                             segments = 360, alpha = 0.8, na.rm = TRUE) +
-#       ggplot2::stat_ellipse(data = ellipses_ind_coord,
-#                             ggplot2::aes(x = !!dim1, y = !!dim2, fill = !!split_var),
-#                             geom = "polygon", type = "t", level = 0.865, size = 1,
-#                             segments = 360, alpha = 0.1, na.rm = TRUE) +
-#       ggplot2::stat_ellipse(data = ellipses_ind_coord,
-#                             ggplot2::aes(x = !!dim1, y = !!dim2, fill = !!split_var),
-#                             geom = "polygon", type = "t", level = 0.95, size = 1,
-#                             segments = 360, alpha = 0.05, na.rm = TRUE) +
-#       ggplot2::geom_label(data = active_var_coord,
-#                           ggplot2::aes(x = !!dim1, y = !!dim2, label = lvs),
-#                           na.rm = TRUE, color = "black") +
-#       # geom_point(data = split_var_coord, size = 3,
-#       #            ggplot2::aes(x = !!dim1, y = !!dim2, color = !!split_var)) +
-#       ggplot2::geom_label(data = split_var_coord,
-#                           ggplot2::aes(x = !!dim1, y = !!dim2, label = !!split_var,
-#                                        color = !!split_var), fontface = "bold", na.rm = TRUE)
-#   } else {
-#     stop('unknown type of ellipse')
-#   }
-#
-#   # #Test de la taille des ellipses de concentration dans factominer :
-#   # # ce sont des 95%
-#   # FactoMineR::MCA(ct2013acm[,c(1:9, which(colnames(ct2013acm)=="cah"))],
-#   #     quali.sup = 10, row.w = ct2013acm$pondcal, ncp = 8, graph = FALSE) %>%
-#   #   fviz_mca_biplot(ggtheme = theme_minimal(), geom.ind = "point",
-#   #                   geom.var = "text", col.ind = res.mca$call$X$cah,
-#   #                   alpha.ind = 0.001, palette = "Dark2", col.var = "black",
-#   #                   select.quali.sup = "cah", addEllipses = TRUE
-#   #   ) + coord_fixed()
-# }
-#
-# # #Exemple des ellipses des classes de la meilleure classification :
-# # ggmca_ellipses(res.mca, split_var = cah,
-# #                  percent = 0.5, axes=c(1,2), type="normal") ; ggi()
-# # #Exemple avec CSER :
-# # ggmca_ellipses(res.mca, split_var = CSER,
-# #                   percent = 0.95, axes=c(1,2), type="normal") ; ggi()
-# # ggmca_ellipses(res.mca, split_var = PR0, axes = c(1,2),
-# #                   percent = 0.95, type ="normal") ; ggi()
-# # ggmca_ellipses(res.mca, split_var = PR1, axes = c(1,2),
-# #                    percent = 0.95, type ="normal") ; ggi()
-#
+  path_name <- stringr::str_remove(path, "\\..+$")
+  if (! stringr::str_detect(path, "\\..+$")) path <- stringr::str_c(path, ".", extension)
+  if (replace == FALSE) {
+    i <- 0
+    file_do_not_exist <- FALSE
+    while (file_do_not_exist == FALSE) {
+      if (file.exists(path)) {
+        i = i+1
+        path <- stringr::str_c(path_name, i, ".", extension)
+      } else {
+        path <-
+          stringr::str_c(path_name, dplyr::if_else(i == 0,
+                                                   "",
+                                                   stringr::str_c(i)),
+                         ".", extension)
+        file_do_not_exist <- TRUE
+      }
+    }
+  }
+  writeLines(path)
+  return(path)
+}
 
 
 

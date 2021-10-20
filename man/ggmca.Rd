@@ -38,7 +38,8 @@ ggmca(
   text_size = 3,
   size_scale_max = 8,
   dist_labels = c("auto", 0.04),
-  right_margin = 0
+  right_margin = 0,
+  use_theme = TRUE
 )
 
 ggmca_data(
@@ -77,7 +78,8 @@ ggmca_plot(
   text_size = 3,
   size_scale_max = 8,
   dist_labels = c("auto", 0.04),
-  right_margin = 0
+  right_margin = 0,
+  use_theme = TRUE
 )
 }
 \arguments{
@@ -183,6 +185,9 @@ from points.}
 
 \item{right_margin}{A margin at the right, in cm. Useful to read tooltips
 over points placed at the right of the graph without formatting problems.}
+
+\item{use_theme}{By default, a specific \pkg{ggplot2} theme is used.
+Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 
 \item{data}{A list of data frames made with \link{ggmca_data}.}
 }

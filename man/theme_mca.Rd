@@ -36,4 +36,3 @@ A list of ggplot2 objects.
 \description{
 A ggplot2 Theme for Geometrical Data Analysis
 }
-\keyword{internal}
