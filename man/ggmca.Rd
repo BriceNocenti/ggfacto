@@ -198,6 +198,8 @@ Sending the result through \code{\link{ggi}} will draw the
 interactive graph in the Viewer pane using \code{\link{ggiraph}}.
 
 A list containing the data frames to pass to \link{ggmca_plot}.
+
+A \code{\link[ggplot2]{ggplot}} object.
 }
 \description{
 A readable, complete and beautiful graph for multiple

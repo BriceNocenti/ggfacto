@@ -20,11 +20,11 @@ theme_mca(
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 
-\item{legend.position}{c("none", "left", "right", "bottom", "top")}
+\item{legend.position}{One of \code{c("none", "left", "right", "bottom", "top")}.}
 
-\item{no_color_scale}{When TRUE, color_scale will be provided next.}
+\item{no_color_scale}{When TRUE, you can provide color_scale next without warning.}
 
-\item{size_scale_max}{Size of the points.}
+\item{size_scale_max}{Maximum size of the points.}
 
 \item{xlim}{Horizontal axe limits.}
 

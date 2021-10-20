@@ -114,7 +114,7 @@ res.ca <- FactoMineR::CA(table, graph = FALSE)
 graph.ca <- ggca(res.ca,
                  title = "Race by marical : correspondence analysis",
                  tooltips = c("row", "col"))
-ggi(graph.ca) # to make the plot interactive
+\dontrun{ggi(graph.ca) # to make the plot interactive}
 
 # Image plot :
 ggca(res.ca,

@@ -70,7 +70,7 @@ that label.}
 \item{...}{Other parameters.}
 }
 \value{
-The odd ratios plot.
+The odd ratios plot as a ggplot2 object.
 }
 \description{
 Modified odd_ratios plot from finalfit
