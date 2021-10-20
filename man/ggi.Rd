@@ -47,7 +47,8 @@ graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TR
 
 \item{pixel_width}{The width in pixels for widgetframe.}
 
-\item{...}{Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}}.}
+\item{...}{Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
+\code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.}
 }
 \value{
 An html plot.

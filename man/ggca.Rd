@@ -104,17 +104,15 @@ tooltips won't appear until you pass the result throught \code{\link{ggi}}.
 }
 \examples{
 # Make the correspondence analysis :
-table <- tabxplor::tab(forcats::gss_cat, race, marital, tot = "no") \%>\%
-  dplyr::mutate(across(where(tabxplor::is_fmt), tabxplor::get_num)) \%>\%
-  tibble::column_to_rownames(var = colnames(.)[1])
-
-res.ca <- FactoMineR::CA(table, graph = FALSE)
+tabs <- table(forcats::gss_cat$race, forcats::gss_cat$marital)[-4,]
+# tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
+res.ca <- FactoMineR::CA(tabs, graph = FALSE)
 
 # Interactive plot :
 graph.ca <- ggca(res.ca,
                  title = "Race by marical : correspondence analysis",
                  tooltips = c("row", "col"))
-\dontrun{ggi(graph.ca) # to make the plot interactive}
+ggi(graph.ca) #to make the plot interactive
 
 # Image plot :
 ggca(res.ca,

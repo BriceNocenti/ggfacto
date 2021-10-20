@@ -25,6 +25,8 @@ globalVariables(c(":="))
 .onLoad <- function(libname, pkgname) {
   options("ggfacto.export_dir" = NULL)
 
+  #options("ggfacto.html_font" = )
+
   invisible()
 }
 

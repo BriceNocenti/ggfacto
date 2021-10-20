@@ -7,12 +7,12 @@ Authors@R:
            role = c("aut", "cre"),
            email = "brice.nocenti@gmail.com")
 Description: Readable, complete and pretty graphs for correspondence analysis made 
-    with FactoMineR. Many can be rendered as interactive html plots, showing useful
+    with FactoMineR. They can be rendered as interactive html plots, showing useful
     informations at mouse hover. The interest is not mainly visual but statistical:
-    it helps the reader to keep in mind the data contained in the crosstab or Burt
-    table while reading correspondance analysis, thus preventing overinterpretation.
+    it helps the reader to keep in mind the data contained in the cross-table or Burt
+    table while reading the correspondence analysis, thus preventing over-interpretation.
     Graphs are made with ggplot2, which means that you can use the + syntax to 
-    manually add as many graphical pieces you want, or change theme elements. 
+    manually add as many graphical pieces you want, or change theme elements.
 URL: https://github.com/BriceNocenti/ggfacto
 BugReports: https://github.com/BriceNocenti/ggfacto/issues
 License: GPL (>= 3)

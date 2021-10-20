@@ -117,7 +117,7 @@ ggmca <-
 
            cleannames = TRUE,
            keep_levels, discard_levels,
-           profiles = TRUE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+           profiles = TRUE, profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
            cah, max_profiles,
            nb_char_for_color = rep(0, length(sup_vars)),
 
@@ -1803,7 +1803,7 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #' graph.ca <- ggca(res.ca,
 #'                  title = "Race by marical : correspondence analysis",
 #'                  tooltips = c("row", "col"))
-#' ggi(graph.ca) to make the plot interactive}
+#' ggi(graph.ca) #to make the plot interactive
 #'
 #' # Image plot :
 #' ggca(res.ca,
@@ -2443,7 +2443,8 @@ material_colors_dark <- function() {
 #' dimensions. Useful when opening the plot in a web browser (but will produce a blank
 #' graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
 #' @param pixel_width The width in pixels for widgetframe.
-#' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}}.
+#' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
+#' \code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.
 #'
 #' @return An html plot.
 #' @export
@@ -2473,11 +2474,11 @@ ggi <- function(plot = ggplot2::last_plot(),
     css_tooltip <- "color:#000000;text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
   }
 
-  if(.Platform$OS.type == "windows") {
-    css_tooltip <-
-      paste0(css_tooltip, "font-family:", grDevices::windowsFonts("sans"), ";") #%>%
-    #stringr::str_replace("DejaVu Sans Condensed", "DejaVu Sans")
-  }
+  # if(.Platform$OS.type == "windows") {
+  #   css_tooltip <-
+  #     paste0(css_tooltip, "font-family:", grDevices::windowsFonts("sans"), ";") #%>%
+  #   #stringr::str_replace("DejaVu Sans Condensed", "DejaVu Sans")
+  # }
 
   if (missing(width)) {
     width <- grDevices::dev.size("in")[1]
@@ -2502,13 +2503,13 @@ ggi <- function(plot = ggplot2::last_plot(),
   widget <-
     ggiraph::girafe(ggobj = plot,
                     width_svg = width,
-                    height_svg = height, #if_else(missing(height), width/2.563 * plot$heigth_width_ratio, height/2.563)
-                    fonts = ifelse(.Platform$OS.type == "windows",
-                                   grDevices::windowsFonts("sans") %>%
-                                     purrr::map(~stringr::str_replace(., "DejaVu Sans Condensed",
-                                                                      "DejaVu Sans")),
-                                   NULL
-                    ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
+                    height_svg = height , #if_else(missing(height), width/2.563 * plot$heigth_width_ratio, height/2.563)
+                    # fonts = ifelse(.Platform$OS.type == "windows",
+                    #                grDevices::windowsFonts("sans") %>%
+                    #                  purrr::map(~stringr::str_replace(., "DejaVu Sans Condensed",
+                    #                                                   "DejaVu Sans")),
+                    #                NULL
+                    # ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
                     ...
     ) %>%
     ggiraph::girafe_options(ggiraph::opts_tooltip(use_fill = TRUE, css = css_tooltip), #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent

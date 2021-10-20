@@ -5,3 +5,4 @@
 ^readme_plot\.png$
 docs
 ^\.github$
+^cran-comments\.md$
