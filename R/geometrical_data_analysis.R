@@ -1841,7 +1841,7 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #' graph.ca <- ggca(res.ca,
 #'                  title = "Race by marical : correspondence analysis",
 #'                  tooltips = c("row", "col"))
-#' ggi(graph.ca)
+#' #ggi(graph.ca) # to make the plot interactive
 #'
 #' # Image plot :
 #' ggca(res.ca,
