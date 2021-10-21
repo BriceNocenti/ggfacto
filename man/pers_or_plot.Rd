@@ -36,7 +36,7 @@ pers_or_plot(
 
 \item{random_effect}{Character vector of length 1, name of random effect variable.}
 
-\item{factorlist}{Option to provide output directly from summary_factorlist().}
+\item{factorlist}{Option to provide output directly from \code{summary_factorlist()}.}
 
 \item{glmfit}{Option to provide output directly from \code{glmmulti()} and \code{glmmixed()}.}
 
@@ -72,7 +72,7 @@ that label.}
 \item{...}{Other parameters.}
 }
 \value{
-The odd ratios plot as a ggplot2 object.
+The odd ratios plot as a \code{ggplot2} object.
 }
 \description{
 Modified odd ratios plot from `finalfit`

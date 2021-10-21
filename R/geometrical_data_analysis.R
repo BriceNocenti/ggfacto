@@ -1804,7 +1804,7 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #'
 #' # Interactive plot :
 #' graph.ca <- ggca(res.ca,
-#'                  title = "Race by marical : correspondence analysis",
+#'                  title = "Race by marital : correspondence analysis",
 #'                  tooltips = c("row", "col"))
 #' ggi(graph.ca) #to make the plot interactive
 #'
@@ -2637,7 +2637,7 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
 #' (must have 2 levels).
 #' @param explanatory Character vector of any length: name(s) of explanatory variables.
 #' @param random_effect Character vector of length 1, name of random effect variable.
-#' @param factorlist Option to provide output directly from summary_factorlist().
+#' @param factorlist Option to provide output directly from \code{summary_factorlist()}.
 #' @param glmfit 	Option to provide output directly from \code{glmmulti()} and \code{glmmixed()}.
 #' @param confint_type One of \code{c("profile", "default")} for GLM models or
 #' \code{c("default", "Wald", "profile", "boot")} for \code{glmer models}.
@@ -2658,7 +2658,7 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
 #' @param return_df To return the dataframe.
 #' @param ... Other parameters.
 
-#' @return The odd ratios plot as a ggplot2 object.
+#' @return The odd ratios plot as a \code{ggplot2} object.
 #' @export
 #'
 # @examples
