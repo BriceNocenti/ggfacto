@@ -2,7 +2,7 @@
 % Please edit documentation in R/geometrical_data_analysis.R
 \name{ggca}
 \alias{ggca}
-\title{Readable, Interactive and Beautiful Graph for CA}
+\title{Readable and Interactive graph for simple correspondence analysis}
 \usage{
 ggca(
   res.ca = res.ca,
@@ -89,7 +89,7 @@ Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}} object to be printed in the
-RStudio Plots pane. Possibility to add other gg objects with \code{+}.
+`RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 Sending the result  through \code{\link{ggi}} will draw the
 interactive graph in the Viewer pane using \code{\link{ggiraph}}.
 }
@@ -100,10 +100,11 @@ Interactive tooltips, appearing when hovering on  points with mouse, allow to
 keep in mind all the content of the table while reading the graph. Since it is
 made in the spirit of \code{\link{ggplot2}}, it is possible to change
 theme or add another plot elements with +. Then, interactive
-tooltips won't appear until you pass the result throught \code{\link{ggi}}.
+tooltips won't appear until you pass the result through \code{\link{ggi}}.
 }
 \examples{
 # Make the correspondence analysis :
+\donttest{
 tabs <- table(forcats::gss_cat$race, forcats::gss_cat$marital)[-4,]
 # tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
 res.ca <- FactoMineR::CA(tabs, graph = FALSE)
@@ -118,4 +119,5 @@ ggi(graph.ca) #to make the plot interactive
 ggca(res.ca,
      title = "Race by marical : correspondence analysis",
      text_repel = TRUE)
+     }
 }

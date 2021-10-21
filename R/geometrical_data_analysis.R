@@ -2,7 +2,7 @@
 
 # Geometrical data analysis AC/ACM -------------------------------------------------------
 
-#' Readable, Interactive and Beautiful graph for MCA
+#' Readable and Interactive graph for multiple correspondence analysis
 #' @description A readable, complete and beautiful graph for multiple
 #' correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{MCA}}.
 #' Interactive tooltips, appearing when hovering near points with mouse,
@@ -92,24 +92,25 @@
 #' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
 #'
 #' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
-#' RStudio Plots pane. Possibility to add other gg objects with \code{+}.
+#' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result through \code{\link{ggi}} will draw the
 #' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
 #' @export
 #'
 #' @examples
+#' \donttest{
 #' data(tea, package = "FactoMineR")
 #' res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 #'
 #' res.mca %>%
 #'   ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) %>%
 #'   ggi()        #to make the graph interactive
-#'
 #' #Concentration ellipses for each levels of a supplementary variable :
 #' ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.5, text_repel = TRUE)
 #'
 #' #Graph of profiles of answer for each levels of a supplementary variable :
 #' ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5)
+#' }
 ggmca <-
   function(res.mca = res.mca, sup_vars, tooltip_vars_1lv, tooltip_vars,
            axes = c(1,2), axes_names = NULL,
@@ -1517,7 +1518,7 @@ ggmca_plot <- function(data,
 
 
 
-#' Helper table to interpret MCA
+#' Helper table to interpret multiple correspondence analysis
 #' @description A table to help to interpret the meaning of axes in multiple
 #' correspondence analysis (MCA), based on Brigitte Le Roux, \emph{Analyse geometrique des
 #' donnees multidimensionnelles}, Dunod, Paris, 2014 / Brigitte Le Roux and Henri Rouanet,
@@ -1531,11 +1532,13 @@ ggmca_plot <- function(data,
 #' @param type By default, a html table is printed. Set to \code{"console"} to print in
 #' console or axes the numbers as a data.frame.
 #'
-#' @return An html table (or a tibble).
+#' @return An html table (or a \code{tibble}).
 #' @export
-#' @examples data(tea, package = "FactoMineR")
+#' @examples \donttest{
+#' data(tea, package = "FactoMineR")
 #' res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 #' mca_interpret(res.mca)
+#' }
 mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "console")) {
   contrib1 <- res.mca$var$contrib[,axes] %>%
     tibble::as_tibble(rownames = "levels") %>%
@@ -1739,15 +1742,14 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 
 
 
-
-#' Readable, Interactive and Beautiful Graph for CA
+#' Readable and Interactive graph for simple correspondence analysis
 #' @description A readable, complete and beautiful graph for simple
 #' correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{CA}}.
 #' Interactive tooltips, appearing when hovering on  points with mouse, allow to
 #' keep in mind all the content of the table while reading the graph. Since it is
 #' made in the spirit of \code{\link{ggplot2}}, it is possible to change
 #' theme or add another plot elements with +. Then, interactive
-#' tooltips won't appear until you pass the result throught \code{\link{ggi}}.
+#' tooltips won't appear until you pass the result through \code{\link{ggi}}.
 #'
 #' @param res.ca An object created with \code{FactoMineR::\link[FactoMineR]{CA}}.
 #' @param axes The axes to print, as a numeric vector of length 2.
@@ -1789,12 +1791,13 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
 #'
 #' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
-#' RStudio Plots pane. Possibility to add other gg objects with \code{+}.
+#' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result  through \code{\link{ggi}} will draw the
 #' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
 #' @export
 #'
 #' @examples # Make the correspondence analysis :
+#' \donttest{
 #' tabs <- table(forcats::gss_cat$race, forcats::gss_cat$marital)[-4,]
 #' # tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
 #' res.ca <- FactoMineR::CA(tabs, graph = FALSE)
@@ -1809,6 +1812,7 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
 #' ggca(res.ca,
 #'      title = "Race by marical : correspondence analysis",
 #'      text_repel = TRUE)
+#'      }
 ggca <-
   function(res.ca = res.ca, axes = c(1,2), show_sup = FALSE, xlim, ylim,
            out_lims_move = FALSE,
@@ -2442,7 +2446,8 @@ material_colors_dark <- function() {
 #' @param iframe Create an html frame around the plot to ensure fixed
 #' dimensions. Useful when opening the plot in a web browser (but will produce a blank
 #' graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
-#' @param pixel_width The width in pixels for widgetframe.
+#' @param pixel_width The width in pixels for
+#'  \code{\link[widgetframe:widgetframe]{widgetframe}}.
 #' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
 #' \code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.
 #'
@@ -2556,7 +2561,7 @@ ggi <- function(plot = ggplot2::last_plot(),
 
 
 #' Save a plot as image
-#' @param plot The plot, created with ggplot2.
+#' @param plot The plot, created with \pkg{ggplot2}.
 #' @param xt The extension name, when saving as image (interactive graph will
 #' always be .html).
 #' @param dpi The resolution.
@@ -2571,7 +2576,7 @@ ggi <- function(plot = ggplot2::last_plot(),
 #' @param replace Replace file ? By default, number added to find a new name.
 
 #'
-#' @return Creates a file, and opens it in RStudio viewer, as a side effect.
+#' @return Creates a file, and opens it in `RStudio` viewer, as a side effect.
 #' @export
 #'
 ggsave2 <- function(plot = ggplot2::last_plot(),
@@ -2623,7 +2628,7 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
 #To add : - colomn with frequencies divided one by another to see if logit brings
 #something more than the cross-table
 
-#' Modified odd_ratios plot from finalfit
+#' Modified odd ratios plot from `finalfit`
 # Licence MIT : https://finalfit.org/LICENSE-text.html
 # Thanks to Ewen M Harrison.
 #'
@@ -2633,11 +2638,12 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
 #' @param explanatory Character vector of any length: name(s) of explanatory variables.
 #' @param random_effect Character vector of length 1, name of random effect variable.
 #' @param factorlist Option to provide output directly from summary_factorlist().
-#' @param glmfit 	Option to provide output directly from glmmulti() and glmmixed().
-#' @param confint_type One of c("profile", "default") for GLM models or c("default",
-#'  "Wald", "profile", "boot") for glmer models. Note "default" == "Wald".
+#' @param glmfit 	Option to provide output directly from \code{glmmulti()} and \code{glmmixed()}.
+#' @param confint_type One of \code{c("profile", "default")} for GLM models or
+#' \code{c("default", "Wald", "profile", "boot")} for \code{glmer models}.
+#' Note \code{"default" == "Wald"}.
 #' @param remove_ref 	Logical. Remove reference level for factors.
-#' @param break_scale Manually specify x-axis breaks in format c(0.1, 1, 10).
+#' @param break_scale Manually specify x-axis breaks in format \code{c(0.1, 1, 10)}.
 #' @param column_space 	Adjust table column spacing.
 #' @param dependent_label Main label for plot.
 #' @param prefix Plots are titled by default with the dependent variable. This adds
@@ -2646,8 +2652,9 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
 #' that label.
 #' @param table_text_size Alter font size of table text.
 #' @param title_text_size Alter font size of title text.
-#' @param plot_opts A list of arguments to be appended to the ggplot call by "+".
-#' @param table_opts A list of arguments to be appended to the ggplot table call by "+".
+#' @param plot_opts A list of arguments to be appended to the ggplot call by \code{"+"}.
+#' @param table_opts A list of arguments to be appended to the ggplot table call by
+#'  \code{"+"}.
 #' @param return_df To return the dataframe.
 #' @param ... Other parameters.
 

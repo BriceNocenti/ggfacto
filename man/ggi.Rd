@@ -45,7 +45,8 @@ with \code{link[base:options]{options}} to change default directory.}
 dimensions. Useful when opening the plot in a web browser (but will produce a blank
 graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.}
 
-\item{pixel_width}{The width in pixels for widgetframe.}
+\item{pixel_width}{The width in pixels for
+\code{\link[widgetframe:widgetframe]{widgetframe}}.}
 
 \item{...}{Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
 \code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.}

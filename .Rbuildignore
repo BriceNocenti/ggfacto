@@ -6,3 +6,4 @@
 docs
 ^\.github$
 ^cran-comments\.md$
+^CRAN-RELEASE$

@@ -42,7 +42,7 @@ always be .html).}
 \item{open}{Should the resulting file be opened at once ?}
 }
 \value{
-Creates a file, and opens it in RStudio viewer, as a side effect.
+Creates a file, and opens it in `RStudio` viewer, as a side effect.
 }
 \description{
 Save a plot as image

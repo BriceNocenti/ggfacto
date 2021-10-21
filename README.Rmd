@@ -21,17 +21,17 @@ knitr::opts_chunk$set(
 [![R-CMD-check](https://github.com/BriceNocenti/ggfacto/workflows/R-CMD-check/badge.svg)](https://github.com/BriceNocenti/ggfacto/actions)
 <!-- badges: end -->
 
-Readable, complete and pretty graphs for correspondence analysis made with [FactoMineR](http://factominer.free.fr/). Many can be rendered as interactive html plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical : it helps the reader to keep in mind the data contained in the crosstab or Burt table while reading correspondance analysis, thus preventing overinterpretation. Graphs are made with [ggplot2](https://ggplot2.tidyverse.org/), which means that you can use the `+` syntax to manually add as many graphical pieces you want, or change theme elements.
+Readable, complete and pretty graphs for correspondence analysis made with [FactoMineR](http://factominer.free.fr/). Many can be rendered as interactive html plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical : it helps the reader to keep in mind the data contained in the cross-table or Burt table while reading correspondence analysis, thus preventing overinterpretation. Graphs are made with [ggplot2](https://ggplot2.tidyverse.org/), which means that you can use the `+` syntax to manually add as many graphical pieces you want, or change theme elements.
 
 ## Installation
 
-You can install ggfacto from CRAN: 
+You can install ggfacto from `CRAN`: 
 
 ``` r 
 install.packages("ggfacto")
 ```
 
-Or install the development version from github:
+Or install the development version from `github`:
 
 ``` r
 # install.packages("devtools")
@@ -120,14 +120,14 @@ plot_data$sup_vars_coord <- plot_data$sup_vars_coord %>%
 ggmca_plot(plot_data, ylim = c(NA, 1.2), text_repel = TRUE, size_scale_max = 4)
 ```
 
-The plot can always be modified using the ggplot2 `+` operator : 
+The plot can always be modified using the `ggplot2` `+` operator : 
 ``` {r, fig.width = 6, fig.height = 6, results = "hide"}
 ggmca_plot(plot_data, ylim = c(NA, 1.2), size_scale_max = 4) +
   labs(title = "Multiple correspondence analysis") +
   theme(axis.line = element_line(linetype = "solid") )
 
 ```
-You can then pass to plot to ggi() to make it interactive
+You can then pass to plot to `ggi()` to make it interactive
 
 You can also set `use_theme = FALSE` to use you own ggplot2 theme :
 ``` {r, fig.width = 6, fig.height = 6}

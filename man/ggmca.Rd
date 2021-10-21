@@ -4,7 +4,7 @@
 \alias{ggmca}
 \alias{ggmca_data}
 \alias{ggmca_plot}
-\title{Readable, Interactive and Beautiful graph for MCA}
+\title{Readable and Interactive graph for multiple correspondence analysis}
 \usage{
 ggmca(
   res.mca = res.mca,
@@ -193,7 +193,7 @@ Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}} object to be printed in the
-RStudio Plots pane. Possibility to add other gg objects with \code{+}.
+`RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 Sending the result through \code{\link{ggi}} will draw the
 interactive graph in the Viewer pane using \code{\link{ggiraph}}.
 
@@ -224,16 +224,17 @@ to draw the graph.
 }}
 
 \examples{
+\donttest{
 data(tea, package = "FactoMineR")
 res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 
 res.mca \%>\%
   ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) \%>\%
   ggi()        #to make the graph interactive
-
 #Concentration ellipses for each levels of a supplementary variable :
 ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.5, text_repel = TRUE)
 
 #Graph of profiles of answer for each levels of a supplementary variable :
 ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5)
+}
 }

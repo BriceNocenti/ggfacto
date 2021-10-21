@@ -1,5 +1,10 @@
-## First submission
-This is a first submission.
+## Third submission 
+Thanks to Julia Haider, I did enhance the following points : 
+- Package names and API in DESCRIPTION where single quoted (or put into \pkg{} in documentation).
+- Ensured that functions do not write by default or in examples/vignettes/tests in the user's home filespace. Sorry, I thought I had corrected that one.  Removed ancient readme files which where not used anymore (directory "docs"). 
+
+## Second submission
+Message was : "package ggfacto_0.2.2.tar.gz does not pass the incoming checks automatically, please see the following pre-tests" (2 NOTEs on Windows and Debian). Since one note is "New submission", the real one is "Examples with CPU (user + system) or elapsed time > 5s". To make it disappear, I passed most of examples to "don't test" (since they need to calculate correspondence analysis with the package FactoMineR, which is always too long). 
 
 ## Test environments
 * local Windows 10 install, R 4.1.1 and R devel (4.2.0)
@@ -21,16 +26,12 @@ This is a first submission.
     There were no ERRORs, WARNINGs or NOTEs. 
 
 * https://builder.r-hub.io : 
-    No ERRORs, no WARNINGs, 2 NOTE : 
+    No ERRORs, no WARNINGs, 1 NOTE : 
         New submission
-        Examples with CPU (user + system) or elapsed time > 10s
 
 * https://win-builder.r-project.org : 
-    No ERRORs, no WARNINGs, 2 NOTE : 
+    No ERRORs, no WARNINGs, 1 NOTE : 
         New submission
-        Examples with CPU (user + system) or elapsed time > 5s
-
-The examples which takes time are the miminal examples for the user to understand the usage of the main functions, and can't really be reduced : in order to draw the plots, the correspondence analysis must first be calculated using the package FactoMineR.
 
 ## Downstream dependencies
 There are currently no downstream dependencies for this package.

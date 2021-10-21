@@ -2,7 +2,7 @@
 % Please edit documentation in R/geometrical_data_analysis.R
 \name{mca_interpret}
 \alias{mca_interpret}
-\title{Helper table to interpret MCA}
+\title{Helper table to interpret multiple correspondence analysis}
 \usage{
 mca_interpret(res.mca = res.mca, axes = c(1, 2), type = c("html", "console"))
 }
@@ -15,7 +15,7 @@ mca_interpret(res.mca = res.mca, axes = c(1, 2), type = c("html", "console"))
 console or axes the numbers as a data.frame.}
 }
 \value{
-An html table (or a tibble).
+An html table (or a \code{tibble}).
 }
 \description{
 A table to help to interpret the meaning of axes in multiple
@@ -28,7 +28,9 @@ positive levels and negative levels of the same variable is calculated in percen
 of the variance of the question/variable.
 }
 \examples{
+\donttest{
 data(tea, package = "FactoMineR")
 res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 mca_interpret(res.mca)
+}
 }

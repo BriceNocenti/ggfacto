@@ -2,7 +2,7 @@
 % Please edit documentation in R/geometrical_data_analysis.R
 \name{pers_or_plot}
 \alias{pers_or_plot}
-\title{Modified odd_ratios plot from finalfit}
+\title{Modified odd ratios plot from `finalfit`}
 \usage{
 pers_or_plot(
   .data,
@@ -38,14 +38,15 @@ pers_or_plot(
 
 \item{factorlist}{Option to provide output directly from summary_factorlist().}
 
-\item{glmfit}{Option to provide output directly from glmmulti() and glmmixed().}
+\item{glmfit}{Option to provide output directly from \code{glmmulti()} and \code{glmmixed()}.}
 
-\item{confint_type}{One of c("profile", "default") for GLM models or c("default",
-"Wald", "profile", "boot") for glmer models. Note "default" == "Wald".}
+\item{confint_type}{One of \code{c("profile", "default")} for GLM models or
+\code{c("default", "Wald", "profile", "boot")} for \code{glmer models}.
+Note \code{"default" == "Wald"}.}
 
 \item{remove_ref}{Logical. Remove reference level for factors.}
 
-\item{break_scale}{Manually specify x-axis breaks in format c(0.1, 1, 10).}
+\item{break_scale}{Manually specify x-axis breaks in format \code{c(0.1, 1, 10)}.}
 
 \item{column_space}{Adjust table column spacing.}
 
@@ -61,9 +62,10 @@ that label.}
 
 \item{title_text_size}{Alter font size of title text.}
 
-\item{plot_opts}{A list of arguments to be appended to the ggplot call by "+".}
+\item{plot_opts}{A list of arguments to be appended to the ggplot call by \code{"+"}.}
 
-\item{table_opts}{A list of arguments to be appended to the ggplot table call by "+".}
+\item{table_opts}{A list of arguments to be appended to the ggplot table call by
+\code{"+"}.}
 
 \item{return_df}{To return the dataframe.}
 
@@ -73,5 +75,5 @@ that label.}
 The odd ratios plot as a ggplot2 object.
 }
 \description{
-Modified odd_ratios plot from finalfit
+Modified odd ratios plot from `finalfit`
 }
