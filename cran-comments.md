@@ -1,7 +1,7 @@
 ## Third submission 
 Thanks to Julia Haider, I did enhance the following points : 
 - Package names and API in DESCRIPTION where single quoted (or put into \pkg{} in documentation).
-- Ensured that functions do not write by default or in examples/vignettes/tests in the user's home filespace. Sorry, I thought I had corrected that one.  Removed ancient readme files which where not used anymore (directory "docs"). 
+- Ensured that functions do not write by default or in examples/vignettes/tests in the user's home filespace. Sorry, I thought I had corrected that one.  Removed ancient readme files which where not used anymore (directory "docs").
 
 ## Second submission
 Message was : "package ggfacto_0.2.2.tar.gz does not pass the incoming checks automatically, please see the following pre-tests" (2 NOTEs on Windows and Debian). Since one note is "New submission", the real one is "Examples with CPU (user + system) or elapsed time > 5s". To make it disappear, I passed most of examples to "don't test" (since they need to calculate correspondence analysis with the package FactoMineR, which is always too long). 

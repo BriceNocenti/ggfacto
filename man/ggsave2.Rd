@@ -18,7 +18,7 @@ ggsave2(
 )
 }
 \arguments{
-\item{plot}{The plot, created with ggplot2.}
+\item{plot}{The plot, created with \pkg{ggplot2}.}
 
 \item{dir}{If saved as file, the directory in which to save the html widget.
 Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
