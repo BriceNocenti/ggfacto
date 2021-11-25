@@ -61,7 +61,7 @@
 #' @param cah A variable made with \code{\link[FactoMineR]{HCPC}}, to link
 #' the answers-profiles points who share the same ICPC class (will be colored
 #' together at mouse hover).
-#' @param max_profiles The maximum number of profiles points to print.
+#' @param max_profiles The maximum number of profiles points to print. Default to 5000.
 #' @param nb_char_for_color If \code{sup_vars} are prefixed with numbers, the
 #' number of characters to use to create classes that will be used to add
 #' colors to points.
@@ -119,7 +119,7 @@ ggmca <-
            cleannames = TRUE,
            keep_levels, discard_levels,
            profiles = TRUE, profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
-           cah, max_profiles,
+           cah, max_profiles = 5000,
            nb_char_for_color = rep(0, length(sup_vars)),
 
            text_repel = FALSE, title, actives_in_bold = FALSE, ellipses = NULL,
@@ -168,7 +168,7 @@ ggmca_data <-
            cleannames = TRUE,
            keep_levels, discard_levels, #function_on_dat,
            profiles = TRUE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-           cah, max_profiles,
+           cah, max_profiles = 5000,
            nb_char_for_color = rep(0, length(sup_vars))
            #, tooltip_vars_text
   ) {
@@ -650,23 +650,26 @@ ggmca_data <-
 
 
 
-
     # Profiles of answers ----
     #; weighted : nb of individuals * weight variable
     if (profiles == TRUE) {
-      dat_profils <-
-        res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == cah),
-                         which(names(res.mca$call$X) %in% sup_vars))] %>%
+      ind_coord <-
+        tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == cah),
+                                   which(names(res.mca$call$X) %in% sup_vars))]) %>%
         tibble::add_column(row.w = res.mca$call$row.w) %>%
-        tibble::as_tibble()
-      if (cleannames == TRUE) dat_profils <- dat_profils %>%
-          dplyr::mutate_if(is.factor, fct_clean)
-      if (length(cah) != 0) {
-        #cah_levels <- dplyr::pull(dat_profils, !!rlang::sym(cah) ) %>% levels()
+        dplyr::bind_cols(tibble::as_tibble(res.mca$ind$coord))
 
-        dat_profils <- dat_profils %>%
+      coord_names <- colnames(res.mca$ind$coord)
+
+      if (cleannames == TRUE) ind_coord <- ind_coord %>%
+        dplyr::mutate_if(is.factor, fct_clean)
+      if (length(cah) != 0) {
+        #cah_levels <- dplyr::pull(ind_coord, !!rlang::sym(cah) ) %>% levels()
+
+        ind_coord <- ind_coord %>%
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
                       row.w    = .data$row.w,
+                      coord    = tidyselect::all_of(coord_names),
                       cah      = !!rlang::sym(cah)
           ) %>%
           dplyr::mutate(
@@ -684,45 +687,43 @@ ggmca_data <-
 
           ) %>%
           #dplyr::select(-.data$row.w) %>%
-          dplyr::arrange(-.data$wcount) %>%
+          dplyr::arrange(-.data$wcount)
+
+        if (!missing(max_profiles)) ind_coord <- ind_coord %>% dplyr::slice(1:max_profiles)
+
+        ind_coord <- ind_coord %>%
           dplyr::mutate(nb = dplyr::row_number(), cah_id = as.integer(.data$cah)) %>%
           dplyr::group_by(.data$cah) %>%
           dplyr::mutate(nb_in_cah = dplyr::row_number(), nb_tot_cah = dplyr::n()) %>%
-          dplyr::ungroup()
+          dplyr::ungroup() %>%
+          dplyr::mutate(coord = purrr::map(.data$coord, ~ .[1,])) %>%
+          tidyr::unnest(.data$coord)
+
 
       } else {
-        dat_profils <- dat_profils %>%
+        ind_coord <- ind_coord %>%
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
-                      row.w    = .data$row.w
+                      row.w    = .data$row.w,
+                      coord    = tidyselect::all_of(coord_names)
+
           ) %>%
           dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
                         wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
           ) %>%
-          #dplyr::select(-.data$row.w) %>%
-          dplyr::arrange(-.data$wcount) %>%
-          dplyr::mutate(nb = dplyr::row_number())
+          dplyr::arrange(-.data$wcount)
+
+        if (!missing(max_profiles)) ind_coord <- ind_coord %>% dplyr::slice(1:max_profiles)
+
+        ind_coord <- ind_coord %>%
+          dplyr::mutate(nb = dplyr::row_number(),
+                        coord = purrr::map(.data$coord, ~ .[1,])) %>%
+          tidyr::unnest(.data$coord)
       }
-
-      res.mca.profils <-   #Redo ACM with weighted profiles:
-        FactoMineR::MCA(dat_profils[ , 1:(which(colnames(dat_profils) == "sup_vars") - 1)],
-                        row.w = dat_profils$wcount, ncp = res.mca$call$ncp,
-                        graph = FALSE)
-      ind_coord <- dat_profils %>%
-        dplyr::bind_cols(tibble::as_tibble(res.mca.profils$ind$coord))
-
-      if (!missing(max_profiles)) ind_coord <- ind_coord %>%
-        dplyr::slice (1:max_profiles)
 
       ind_coord <- ind_coord %>%
         dplyr::mutate_at(res.mca$call$quali,
                          ~ fct_detect_replace(., profiles_tooltip_discard, "#")) %>%
-        dplyr::mutate_if(is.factor, as.character) #%>%
-      # dplyr::rowwise() %>%
-      # dplyr::mutate(interactive_text = stringr::str_c(
-      #   dplyr::c_across(res.mca$call$quali),
-      #   collapse = "\n"
-      # )) %>%
-      # dplyr::ungroup()
+        dplyr::mutate_if(is.factor, as.character)
 
 
       if (length(cah) != 0) {
@@ -1528,7 +1529,7 @@ ggmca_plot <- function(data,
 #' positive levels and negative levels of the same variable is calculated in percentages
 #' of the variance of the question/variable.
 #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
-#' @param axes The axes to interpret, as an integer vector. Default to axes 1 and 2.
+#' @param axes The axes to interpret, as an integer vector. Default to the first five axes.
 #' @param type By default, a html table is printed. Set to \code{"console"} to print in
 #' console or axes the numbers as a data.frame.
 #'
@@ -1539,7 +1540,9 @@ ggmca_plot <- function(data,
 #' res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
 #' mca_interpret(res.mca)
 #' }
-mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "console")) {
+mca_interpret <- function(res.mca = res.mca,
+                          axes = 1:min(res.mca$call$ncp, 5),
+                          type = c("html", "console")) {
   contrib1 <- res.mca$var$contrib[,axes] %>%
     tibble::as_tibble(rownames = "levels") %>%
     tidyr::pivot_longer(-.data$levels, names_prefix ="Dim ", names_to = "Axe",
@@ -1562,13 +1565,17 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
     dplyr::mutate(contrib_q = sum(.data$Contrib_mod))
 
   #Coordonnees et frequences des levels (pour calculer contribution des ecarts)
-  coord_fk <- res.mca$var$coord[,axes] %>%
-    tibble::as_tibble(rownames = "levels") %>%
-    tibble::add_column(fk = res.mca$call$marge.col) %>%
+  coord_fk <- dplyr::left_join(
+    tibble::as_tibble(res.mca$var$coord[, axes], rownames = "levels"),
+    tibble::tibble(levels = names(res.mca$call$marge.col),
+                   fk = res.mca$call$marge.col),
+    by = "levels"
+  ) %>%
     tidyr::pivot_longer(c(-.data$levels, -.data$fk),
-                        names_prefix ="Dim ", names_to = "Axe",
+                        names_prefix = "Dim ", names_to = "Axe",
                         values_to = "coord") %>%
     dplyr::arrange(.data$Axe)
+
 
   #Choisir les levels > a la moyenne, trier par coordonnees positives/negatives
   contribsup <- contrib1 %>% dplyr::left_join(coord_fk, by = c("Axe", "levels")) %>%
@@ -1583,10 +1590,10 @@ mca_interpret <- function(res.mca = res.mca, axes = c(1, 2), type = c("html", "c
     dplyr::select(-.data$Contrib_mod) %>%
     dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels", "ctr_neg", "fneg",
                                                      "coord_neg")),
-                                ~ ifelse(coord <= 0, ., NA))) %>%
+                                ~ ifelse(.data$coord <= 0, ., NA))) %>%
     dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels_2", "ctr_pos", "fpos",
                                                      "coord_pos")),
-                                ~ ifelse(coord > 0, ., NA))) %>%
+                                ~ ifelse(.data$coord > 0, ., NA))) %>%
     dplyr::ungroup()
 
 

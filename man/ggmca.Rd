@@ -20,7 +20,7 @@ ggmca(
   profiles = TRUE,
   profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
   cah,
-  max_profiles,
+  max_profiles = 5000,
   nb_char_for_color = rep(0, length(sup_vars)),
   text_repel = FALSE,
   title,
@@ -53,7 +53,7 @@ ggmca_data(
   profiles = TRUE,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   cah,
-  max_profiles,
+  max_profiles = 5000,
   nb_char_for_color = rep(0, length(sup_vars))
 )
 
@@ -133,7 +133,7 @@ among interactive tooltips for profiles of answers (ex. : levels expressing
 the answers-profiles points who share the same ICPC class (will be colored
 together at mouse hover).}
 
-\item{max_profiles}{The maximum number of profiles points to print.}
+\item{max_profiles}{The maximum number of profiles points to print. Default to 5000.}
 
 \item{nb_char_for_color}{If \code{sup_vars} are prefixed with numbers, the
 number of characters to use to create classes that will be used to add

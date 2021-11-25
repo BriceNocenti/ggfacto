@@ -111,7 +111,7 @@ res.ca <- FactoMineR::CA(tabs, graph = FALSE)
 
 # Interactive plot :
 graph.ca <- ggca(res.ca,
-                 title = "Race by marical : correspondence analysis",
+                 title = "Race by marital : correspondence analysis",
                  tooltips = c("row", "col"))
 ggi(graph.ca) #to make the plot interactive
 
