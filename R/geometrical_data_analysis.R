@@ -347,10 +347,12 @@ ggmca_data <-
 
       tabs <- purrr::map(
         sup_vars,
-        ~ tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
+        ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
+                    tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
                              na = "drop", wt = "row.w", pct = "row") %>%
           dplyr::rename_with(~ "lvs", 1) %>%
           dplyr::select(-tidyselect::starts_with("Remove_levels"))
+        })
       ) %>% purrr::set_names(sup_vars)
 
 
@@ -1543,6 +1545,8 @@ ggmca_plot <- function(data,
 mca_interpret <- function(res.mca = res.mca,
                           axes = 1:min(res.mca$call$ncp, 5),
                           type = c("html", "console")) {
+  if (type[1] == "html") requireNamespace("kableExtra")
+
   contrib1 <- res.mca$var$contrib[,axes] %>%
     tibble::as_tibble(rownames = "levels") %>%
     tidyr::pivot_longer(-.data$levels, names_prefix ="Dim ", names_to = "Axe",
@@ -1778,7 +1782,7 @@ mca_interpret <- function(res.mca = res.mca,
 #' uppercase.
 #' @param tooltips Choose the content of interactive tooltips at mouse hover :
 #'  \code{"col"} for the table of columns percentages, \code{"row"} for line
-#'  percentages, \code{c("row", "col")} for both.
+#'  percentages, default to \code{c("row", "col")} for both.
 #' @param rowtips_subtitle,coltips_subtitle The subtitles used before the table
 #' in interactive tooltips.
 #' @param rowcolor_numbers,colcolor_numbers If row var or col var levels are
@@ -1824,19 +1828,19 @@ ggca <-
   function(res.ca = res.ca, axes = c(1,2), show_sup = FALSE, xlim, ylim,
            out_lims_move = FALSE,
            type = c("points", "text", "labels"), text_repel = FALSE, uppercase = "col",
-           tooltips = "row", rowtips_subtitle = "Row pct",
-           coltips_subtitle = "Column pct",
+           tooltips = c("row", "col"),
+           rowtips_subtitle = "Row pct", coltips_subtitle = "Column pct",
            rowcolor_numbers = 0, colcolor_numbers = 0, cleannames = TRUE, filter = "",
            title,
            text_size = 3.5, dist_labels = c("auto", 0.12), right_margin = 0,
            size_scale_max = 8, use_theme = TRUE) {  #, repel_max_iter = 10000
 
     dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[1],"`"))))
-    dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))  #rlang::expr(eval(parse(text = paste0("`Dim ", axes[2],"`"))))
+    dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[2],"`"))))
 
 
     #Lignes :
-    row_coord <- res.ca$row$coord %>% tibble::as_tibble (rownames = "lvs") %>%
+    row_coord <- res.ca$row$coord %>% tibble::as_tibble(rownames = "lvs") %>%
       dplyr::mutate(colorvar = "Active_row") %>%
       dplyr::bind_rows(res.ca$row.sup$coord %>%
                          tibble::as_tibble(rownames = "lvs") %>%
