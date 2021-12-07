@@ -27,6 +27,9 @@
 #' @param axes The axes to print, as a numeric vector of length 2.
 #' @param axes_names Names of all the axes (not just the two selected ones),
 #' as a character vector.
+#' @param axes_reverse Possibility to reserve the coordinates of the axes by providing
+#' a numeric vector : `1` to invert left and right ; `2` to invert up and down ;
+#' `1:2` to invert both.
 #' @param xlim,ylim Horizontal and vertical axes limits,
 #' as double vectors of length 2.
 #' @param cleannames Set to \code{TRUE} to clean levels names, by removing
@@ -81,8 +84,10 @@
 #' each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
 #' individuals of each category. \code{0.5} draw median-ellipses, containing half
 #' the individuals of each category.
-#' @param color_profiles If \code{cah} is provided, should the answers profiles be
-#' colored depending on their cah class ?
+#' @param color_profiles If \code{cah} is provided, you can give a character vector of
+#' levels name of this `cah` variable to color profiles of answers on that basis.
+#' You can also set `color_profiles = TRUE`, but the result is usually difficult to read :
+#' better to draw the profiles of the CAH classes one by one.
 #' @param base_profiles_color The base color for answers profiles. Default to gray.
 #' Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
 #' non-colored profiles.
@@ -113,8 +118,8 @@
 #' }
 ggmca <-
   function(res.mca = res.mca, sup_vars, tooltip_vars_1lv, tooltip_vars,
-           axes = c(1,2), axes_names = NULL,
-           type = c("text", "points", "labels", "active_vars_only", "numbers"),
+           axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
+           type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
 
            cleannames = TRUE,
            keep_levels, discard_levels,
@@ -143,7 +148,7 @@ ggmca <-
     )
 
     ggmca_plot(data = data,
-               axes = axes, axes_names = axes_names,
+               axes = axes, axes_names = axes_names, axes_reverse = axes_reverse,
                type = type,
                text_repel = text_repel, title = title, actives_in_bold = actives_in_bold,
                ellipses = ellipses,
@@ -348,10 +353,10 @@ ggmca_data <-
       tabs <- purrr::map(
         sup_vars,
         ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
-                    tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
+          tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
                              na = "drop", wt = "row.w", pct = "row") %>%
-          dplyr::rename_with(~ "lvs", 1) %>%
-          dplyr::select(-tidyselect::starts_with("Remove_levels"))
+            dplyr::rename_with(~ "lvs", 1) %>%
+            dplyr::select(-tidyselect::starts_with("Remove_levels"))
         })
       ) %>% purrr::set_names(sup_vars)
 
@@ -657,7 +662,7 @@ ggmca_data <-
     if (profiles == TRUE) {
       ind_coord <-
         tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == cah),
-                                   which(names(res.mca$call$X) %in% sup_vars))]) %>%
+                                           which(names(res.mca$call$X) %in% sup_vars))]) %>%
         tibble::add_column(row.w = res.mca$call$row.w) %>%
         dplyr::bind_cols(tibble::as_tibble(res.mca$ind$coord))
 
@@ -816,7 +821,7 @@ ggmca_data <-
 
 
 
-
+data
 
 
 #' @describeIn ggmca print MCA graph from data frames with parameters
@@ -826,7 +831,7 @@ ggmca_data <-
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
 ggmca_plot <- function(data,
-                       axes = c(1,2), axes_names = NULL,
+                       axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
                        type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
                        text_repel = FALSE, title, actives_in_bold = FALSE, ellipses = NULL,
                        xlim, ylim, out_lims_move = FALSE,
@@ -854,6 +859,21 @@ ggmca_plot <- function(data,
   contrib1 <- rlang::sym(stringr::str_c("contrib", axes[1]))
   contrib2 <- rlang::sym(stringr::str_c("contrib", axes[2]))
 
+  if (!length(axes_reverse) == 0) {
+    if (!axes_reverse %in% 1:2) stop("axes_reverse must be 1, 2 or 1:2")
+
+    dims_reverse <- unique(c(rlang::as_name(dim1), rlang::as_name(dim2))[axes_reverse])
+
+    reverse_axe <- function(coord) {
+      coord %>% dplyr::mutate(dplyr::across(tidyselect::all_of(dims_reverse), ~ - .))
+    }
+
+    active_var_coord <- reverse_axe(active_var_coord)
+    mean_point_coord <- reverse_axe(mean_point_coord)
+    if (!is.null(sup_vars_coord)) sup_vars_coord <- reverse_axe(sup_vars_coord)
+    if (!is.null(ind_coord))      ind_coord      <- reverse_axe(ind_coord)
+  }
+
   active_var_coord <- active_var_coord %>%
     dplyr::mutate(interactive_text = stringr::str_c(
       "<b>", .data$lvs, "</b>", #"\nVariable active",
@@ -866,6 +886,12 @@ ggmca_plot <- function(data,
     id = dplyr::row_number())
 
   if (missing(color_profiles))    color_profiles    <- character()
+  if (is.logical(color_profiles)) if (! color_profiles) {
+    color_profiles <- character()
+  } else {
+    color_profiles <- levels(as.factor(dplyr::pull(ind_coord, cah)))
+  }
+
   if (missing(colornames_recode)) colornames_recode <- character()
 
   if (is.null(sup_vars_coord)) {
@@ -936,7 +962,7 @@ ggmca_plot <- function(data,
       warning(stringr::str_c("too much colors, all the last ones were set to last color. Max ", length(scale_color_light)))
     }
 
-    # if (is.null(base_profiles_color)) base_profiles_color <- "#ffffff"
+    if (is.null(base_profiles_color)) base_profiles_color <- "#ffffff"
 
     scale_color_named_vector <- scale_color_points %>%
       append(scale_color_names) %>% .[!is.na(names(.))] %>%
@@ -1064,7 +1090,7 @@ ggmca_plot <- function(data,
         if (cah %in% sup_vars) {
           sup_cah_colorvar <- sup_vars_coord %>%
             dplyr::select(.data$lvs, .data$colorvar) %>%
-            dplyr::filter(stringr::str_detect(.data$colorvar, paste0("^", .data$cah))) %>%
+            dplyr::filter(stringr::str_detect(.data$colorvar, paste0("^", cah))) %>%
             dplyr::mutate(colorvar = .data$lvs %>% magrittr::set_names(.data$colorvar)) %>%
             dplyr::pull(.data$colorvar)
 
@@ -1515,8 +1541,28 @@ ggmca_plot <- function(data,
 
 
 
+#' Benzecri's modified rate of variance
+#'
+#' @param res.mca The result of \link[FactoMineR]{MCA}.
+#' @param fmt By default, the result is given as a numeric vector. Set to `TRUE` to have
+#' a \pkg{tabxplor} \code{link[tabxplor]{fmt}} vector instead.
+#'
+#' @return A numeric vector (or fmt vector with `fmt = TRUE`).
+#' @export
+#'
+# @examples
+benzecri_mrv <- function(res.mca, fmt = FALSE) {
+  Q   <- length(res.mca$call$quali)
+  eig <- purrr::keep(res.mca$eig[, 1], res.mca$eig[, 1] > 1/Q)
+  eig <- (Q/(Q-1))^2 * (eig - 1/Q)^2
+  eig <- eig/sum(eig)
 
-
+  if (fmt) {
+    fmt(pct = eig, n = 0, type = "all")
+  } else {
+    eig * 100
+  }
+}
 
 
 

@@ -13,7 +13,8 @@ ggmca(
   tooltip_vars,
   axes = c(1, 2),
   axes_names = NULL,
-  type = c("text", "points", "labels", "active_vars_only", "numbers"),
+  axes_reverse = NULL,
+  type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
   cleannames = TRUE,
   keep_levels,
   discard_levels,
@@ -61,6 +62,7 @@ ggmca_plot(
   data,
   axes = c(1, 2),
   axes_names = NULL,
+  axes_reverse = NULL,
   type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
   text_repel = FALSE,
   title,
@@ -99,6 +101,10 @@ whose complete levels will be added at the bottom of interactive tooltips.}
 
 \item{axes_names}{Names of all the axes (not just the two selected ones),
 as a character vector.}
+
+\item{axes_reverse}{Possibility to reserve the coordinates of the axes by providing
+a numeric vector : `1` to invert left and right ; `2` to invert up and down ;
+`1:2` to invert both.}
 
 \item{type}{Determines the way \code{sup_vars} are printed.
   \itemize{
@@ -158,8 +164,10 @@ as double vectors of length 2.}
 \item{out_lims_move}{When \code{TRUE}, the points out of \code{xlim} or
 \code{ylim} are not removed, but moved at the edges of the graph.}
 
-\item{color_profiles}{If \code{cah} is provided, should the answers profiles be
-colored depending on their cah class ?}
+\item{color_profiles}{If \code{cah} is provided, you can give a character vector of
+levels name of this `cah` variable to color profiles of answers on that basis.
+You can also set `color_profiles = TRUE`, but the result is usually difficult to read :
+better to draw the profiles of the CAH classes one by one.}
 
 \item{base_profiles_color}{The base color for answers profiles. Default to gray.
 Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
