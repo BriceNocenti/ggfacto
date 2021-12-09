@@ -934,7 +934,7 @@ ggmca_plot <- function(data,
     colorvar_recode <- sup_vars_coord %>%
       dplyr::pull(.data$colorvar) %>% levels()
     if (length(colorvar_recode) >= 2) {
-      writeLines(stringr::str_c("colors based on: '",
+      message(stringr::str_c("colors based on: '",
                                 stringr::str_c(colorvar_recode, collapse = "', '"), "'",
                                 collapse = ""))
     }
