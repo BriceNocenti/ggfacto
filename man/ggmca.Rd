@@ -7,25 +7,27 @@
 \title{Readable and Interactive graph for multiple correspondence analysis}
 \usage{
 ggmca(
-  res.mca = res.mca,
+  res.mca,
+  dat,
   sup_vars,
+  active_tables,
   tooltip_vars_1lv,
   tooltip_vars,
   axes = c(1, 2),
   axes_names = NULL,
   axes_reverse = NULL,
-  type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
-  cleannames = TRUE,
+  type = c("text", "labels", "points", "numbers", "facets"),
+  color_groups = "^.{0}",
   keep_levels,
   discard_levels,
-  profiles = TRUE,
+  cleannames = TRUE,
+  profiles = FALSE,
   profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
   cah,
   max_profiles = 5000,
-  nb_char_for_color = rep(0, length(sup_vars)),
   text_repel = FALSE,
   title,
-  actives_in_bold = FALSE,
+  actives_in_bold = NULL,
   ellipses = NULL,
   xlim,
   ylim,
@@ -37,25 +39,27 @@ ggmca(
   scale_color_light = material_colors_light(),
   scale_color_dark = material_colors_dark(),
   text_size = 3,
-  size_scale_max = 8,
+  size_scale_max = 4,
   dist_labels = c("auto", 0.04),
   right_margin = 0,
   use_theme = TRUE
 )
 
 ggmca_data(
-  res.mca = res.mca,
+  res.mca,
+  dat,
   sup_vars,
+  active_tables,
   tooltip_vars_1lv,
   tooltip_vars,
-  cleannames = TRUE,
+  color_groups = "^.{0}",
   keep_levels,
   discard_levels,
-  profiles = TRUE,
+  cleannames = TRUE,
+  profiles = FALSE,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   cah,
-  max_profiles = 5000,
-  nb_char_for_color = rep(0, length(sup_vars))
+  max_profiles = 5000
 )
 
 ggmca_plot(
@@ -66,7 +70,7 @@ ggmca_plot(
   type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
   text_repel = FALSE,
   title,
-  actives_in_bold = FALSE,
+  actives_in_bold = NULL,
   ellipses = NULL,
   xlim,
   ylim,
@@ -78,7 +82,7 @@ ggmca_plot(
   scale_color_light = material_colors_light(),
   scale_color_dark = material_colors_dark(),
   text_size = 3,
-  size_scale_max = 8,
+  size_scale_max = 4,
   dist_labels = c("auto", 0.04),
   right_margin = 0,
   use_theme = TRUE
@@ -87,8 +91,20 @@ ggmca_plot(
 \arguments{
 \item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.}
 
+\item{dat}{The data in which to find the supplementary variables, etc.}
+
 \item{sup_vars}{A character vectors of supplementary qualitative variables
 to print. They must have been passed in \code{\link[FactoMineR]{MCA}} before.}
+
+\item{active_tables}{Should colored crosstables be added in interactive tooltips ?
+`active_tables == "sup"` crosses each `sup_vars` with active variables.
+`active_tables == "active"` crosses each active_variables with the other ones,
+giving results closely related with the burt table used to calculate multiple
+correspondance analysis. It may take time to calculate with many variables.
+`active_tables == c("active", "sup")` do both. In tooltips, percentages are colored
+in blue when spread from mean is positive (over-representations), and in red when
+spread from mean is negative (under-representations), like in
+\code{\link[tabxplor]{tab}} with `color = "diff"`.}
 
 \item{tooltip_vars_1lv}{A character vectors of variables, whose first level
 (if character/factor) or weighted_mean (if numeric) will be added
@@ -117,19 +133,27 @@ a numeric vector : `1` to invert left and right ; `2` to invert up and down ;
   first \code{sup_vars}. A different color is used for each.
 }}
 
-\item{cleannames}{Set to \code{TRUE} to clean levels names, by removing
-prefix numbers like \code{"1-"}, and text in parentheses.}
+\item{color_groups}{By default, their is one color group by `sup_vars`. It is otherwise
+possible to color `sup_vars` with groups created upon their levels with
+\code{\link[stringr]{str_extract}} and regexes. For exemple, `color_groups = "^."`
+ makes the groups upon the first character of each levels (uselful when their begin
+ by numbers). `color_groups = "^.{3}"` upon the first three characters.
+`color_groups = "NB.+$"`takes anything between the `"NB"` and the end of levels
+names, etc.}
 
 \item{keep_levels}{A character vector of variables levels to keep : others
 will be discarded.}
 
 \item{discard_levels}{A character vector of variables levels to discard.}
 
-\item{profiles}{When \code{TRUE}, profiles of answers are drawn in the back
-of the graph with light-grey points. When hovering with mouse, the answers of
-individuals to active variables will appears. If \code{cah} is provided,
-to hover near one point will color all the points of the same
- \code{\link[FactoMineR]{HCPC}} class.}
+\item{cleannames}{Set to \code{TRUE} to clean levels names, by removing
+prefix numbers like \code{"1-"}, and text in parentheses.}
+
+\item{profiles}{When set to \code{TRUE}, profiles of answers are drawn in the back
+of the graph with light-grey points. When hovering with mouse in the interactive
+version (passed in \code{\link{ggi}}), the answers of individuals to active variables
+will appears. If \code{cah} is provided, to hover near one point will color all the
+points of the same \code{\link[FactoMineR]{HCPC}} class.}
 
 \item{profiles_tooltip_discard}{A regex pattern to remove useless levels
 among interactive tooltips for profiles of answers (ex. : levels expressing
@@ -140,10 +164,6 @@ the answers-profiles points who share the same ICPC class (will be colored
 together at mouse hover).}
 
 \item{max_profiles}{The maximum number of profiles points to print. Default to 5000.}
-
-\item{nb_char_for_color}{If \code{sup_vars} are prefixed with numbers, the
-number of characters to use to create classes that will be used to add
-colors to points.}
 
 \item{text_repel}{When \code{TRUE} the graph is not interactive anymore,
 but the resulting image is better to print because points and labels don't
@@ -156,7 +176,8 @@ overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
 \item{ellipses}{Set to a number between 0 and 1 to draw a concentration ellipse for
 each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
 individuals of each category. \code{0.5} draw median-ellipses, containing half
-the individuals of each category.}
+the individuals of each category. Note that, if `max_profiles` is provided, ellipses
+won't be made with all individuals.}
 
 \item{xlim, ylim}{Horizontal and vertical axes limits,
 as double vectors of length 2.}
@@ -234,15 +255,19 @@ to draw the graph.
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")
-res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+res.mca <- MCA2(tea, active_vars = 1:18)
 
 res.mca \%>\%
-  ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) \%>\%
-  ggi()        #to make the graph interactive
+  ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) \%>\%
+  ggi() #to make the graph interactive
+
 #Concentration ellipses for each levels of a supplementary variable :
-ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.5, text_repel = TRUE)
+ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
+  ellipses = 0.5, text_repel = TRUE, profiles = TRUE)
 
 #Graph of profiles of answer for each levels of a supplementary variable :
-ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5)
+ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
+  type = "facets", ellipses = 0.5, profiles = TRUE)
+
 }
 }

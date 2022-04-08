@@ -2,6 +2,93 @@
 
 # Geometrical data analysis AC/ACM -------------------------------------------------------
 
+
+
+#' Multiple Correspondence Analysis
+#' @description A user-friendly wrapper around \code{\link[FactoMineR]{MCA}}, made to
+#'  work better with \pkg{ggfacto} functions like \code{\link{ggmca}}. All variables can
+#'  be selected by many different expressions, in the way of the `tidyverse`.
+#'  No supplementary vars are to be provided here, since they can be added afterward
+#'  in \code{\link{ggmca}}.
+#'
+#' @param data The data frame.
+#' @param active_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}>
+# @param sup_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}>
+# @param sup_quanti <\link[tidyr:tidyr_tidy_select]{tidy-select}>
+#' @param wt <\link[tidyr:tidyr_tidy_select]{tidy-select}>
+#' @param graph By default no graph is made, since the result can be ploted with
+#'  \code{\link{ggmca}}.
+#' @param ncp The number of axes to keep. Default to 5.
+#' @param excl A character vector of regular expressions to exclude "junk" categories.
+#' Any level of an active variable with any of the detected patterns is not taken into
+#' account in the calculation of axes (which is called specific multiple correspondence analysis).
+#' @param ... Additionnal arguments to pass to \code{\link[FactoMineR]{MCA}}.
+#'
+#' @return A `res.mca` object, with all the data necessary to draw the MCA.
+#' @export
+#'
+#' @examples  data(tea, package = "FactoMineR")
+#' res.mca <- MCA2(tea, active_vars = 1:18)
+#'
+#' res.mca %>%
+#'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) %>%
+#'   ggi() #to make the graph interactive
+MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
+                 wt, excl, ncp = 5, graph = FALSE, ...) {
+  active_vars <- tidyselect::eval_select(rlang::enquo(active_vars), data)
+  #sup_vars    <- tidyselect::eval_select(rlang::enquo(sup_vars)   , data)
+  #sup_quanti  <- tidyselect::eval_select(rlang::enquo(sup_quanti) , data)
+  wt          <- tidyselect::eval_select(rlang::enquo(wt)         , data)
+  stopifnot(length(wt) < 2)
+
+  vars <- active_vars #c(active_vars, sup_vars, sup_quanti)
+  wt   <- if (length(wt) != 0) { data[[wt]] } else {NULL}
+  data <- data[vars]
+
+  new_excl <- character()
+  if (!missing(excl)) {
+    if (any(is.na(excl))) {
+      data <- data %>%
+        dplyr::mutate(dplyr::across(tidyselect::all_of(names(active_vars)),
+                                    ~ forcats::fct_explicit_na(., "NA")
+        ))
+      new_excl <- c("NA", paste0(names(active_vars), "_NA"))
+      excl     <- c(excl[!is.na(excl)])
+    }
+
+    if (length(excl) != 0) {
+      lvs <- purrr::imap_dfr(data, ~ tibble::tibble(var = .y, lvs = levels(.x)))
+      lvs <- lvs %>%
+        dplyr::mutate(excl = stringr::str_detect(.data$lvs, paste0(excl, collapse = "|")),
+                      lvs2 = paste0(.data$var, "_", .data$lvs)
+        ) %>%
+        dplyr::filter(excl)
+
+      new_excl <- c(lvs$lvs, lvs$lvs2, new_excl)
+    }
+  }
+
+  FactoMineR::MCA(
+    data,
+    ncp = ncp,
+    #quali.sup  = if(length(sup_vars  ) != 0) { which(names(data) %in% names(sup_vars  )) } else {NULL},
+    #quanti.sup = if(length(sup_quanti) != 0) { which(names(data) %in% names(sup_quanti)) } else {NULL},
+    row.w = wt,
+    graph = graph,
+    excl  = if (length(new_excl) != 0) {new_excl} else {NULL},
+    ...
+  )
+}
+
+
+
+
+
+
+
+
+
+
 #' Readable and Interactive graph for multiple correspondence analysis
 #' @description A readable, complete and beautiful graph for multiple
 #' correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{MCA}}.
@@ -17,6 +104,7 @@
 #' parameter in a MCA printing, then modify, and pass to \link{ggmca_plot}
 #' to draw the graph.
 #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param dat The data in which to find the supplementary variables, etc.
 #' @param sup_vars A character vectors of supplementary qualitative variables
 #' to print. They must have been passed in \code{\link[FactoMineR]{MCA}} before.
 #' @param tooltip_vars_1lv A character vectors of variables, whose first level
@@ -24,6 +112,15 @@
 #' at the top of interactive tooltips.
 #' @param tooltip_vars A character vector of variables (character/factors),
 #' whose complete levels will be added at the bottom of interactive tooltips.
+#' @param active_tables Should colored crosstables be added in interactive tooltips ?
+#' `active_tables == "sup"` crosses each `sup_vars` with active variables.
+#' `active_tables == "active"` crosses each active_variables with the other ones,
+#' giving results closely related with the burt table used to calculate multiple
+#' correspondance analysis. It may take time to calculate with many variables.
+#' `active_tables == c("active", "sup")` do both. In tooltips, percentages are colored
+#' in blue when spread from mean is positive (over-representations), and in red when
+#' spread from mean is negative (under-representations), like in
+#' \code{\link[tabxplor]{tab}} with `color = "diff"`.
 #' @param axes The axes to print, as a numeric vector of length 2.
 #' @param axes_names Names of all the axes (not just the two selected ones),
 #' as a character vector.
@@ -53,11 +150,11 @@
 #' @param keep_levels A character vector of variables levels to keep : others
 #' will be discarded.
 #' @param discard_levels A character vector of variables levels to discard.
-#' @param profiles When \code{TRUE}, profiles of answers are drawn in the back
-#' of the graph with light-grey points. When hovering with mouse, the answers of
-#' individuals to active variables will appears. If \code{cah} is provided,
-#' to hover near one point will color all the points of the same
-#'  \code{\link[FactoMineR]{HCPC}} class.
+#' @param profiles When set to \code{TRUE}, profiles of answers are drawn in the back
+#' of the graph with light-grey points. When hovering with mouse in the interactive
+#' version (passed in \code{\link{ggi}}), the answers of individuals to active variables
+#' will appears. If \code{cah} is provided, to hover near one point will color all the
+#' points of the same \code{\link[FactoMineR]{HCPC}} class.
 #' @param profiles_tooltip_discard A regex pattern to remove useless levels
 #' among interactive tooltips for profiles of answers (ex. : levels expressing
 #' "no" answers).
@@ -65,9 +162,13 @@
 #' the answers-profiles points who share the same ICPC class (will be colored
 #' together at mouse hover).
 #' @param max_profiles The maximum number of profiles points to print. Default to 5000.
-#' @param nb_char_for_color If \code{sup_vars} are prefixed with numbers, the
-#' number of characters to use to create classes that will be used to add
-#' colors to points.
+#' @param color_groups By default, their is one color group by `sup_vars`. It is otherwise
+#'  possible to color `sup_vars` with groups created upon their levels with
+#'  \code{\link[stringr]{str_extract}} and regexes. For exemple, `color_groups = "^."`
+#'   makes the groups upon the first character of each levels (uselful when their begin
+#'   by numbers). `color_groups = "^.{3}"` upon the first three characters.
+#'  `color_groups = "NB.+$"`takes anything between the `"NB"` and the end of levels
+#'  names, etc.
 #' @param shift_colors Change colors of the \code{sup_vars} points.
 #' @param colornames_recode A named character vector with
 #' \code{\link[forcats]{fct_recode}} style to rename the levels of the color
@@ -83,7 +184,8 @@
 #' @param ellipses Set to a number between 0 and 1 to draw a concentration ellipse for
 #' each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
 #' individuals of each category. \code{0.5} draw median-ellipses, containing half
-#' the individuals of each category.
+#' the individuals of each category. Note that, if `max_profiles` is provided, ellipses
+#' won't be made with all individuals.
 #' @param color_profiles If \code{cah} is provided, you can give a character vector of
 #' levels name of this `cah` variable to color profiles of answers on that basis.
 #' You can also set `color_profiles = TRUE`, but the result is usually difficult to read :
@@ -105,46 +207,51 @@
 #' @examples
 #' \donttest{
 #' data(tea, package = "FactoMineR")
-#' res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+#' res.mca <- MCA2(tea, active_vars = 1:18)
 #'
 #' res.mca %>%
-#'   ggmca(sup_vars = c("SPC", "age_Q"), ylim = c(NA, 1.2)) %>%
-#'   ggi()        #to make the graph interactive
+#'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) %>%
+#'   ggi() #to make the graph interactive
+#'
 #' #Concentration ellipses for each levels of a supplementary variable :
-#' ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.5, text_repel = TRUE)
+#' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
+#'   ellipses = 0.5, text_repel = TRUE, profiles = TRUE)
 #'
 #' #Graph of profiles of answer for each levels of a supplementary variable :
-#' ggmca(res.mca, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5)
+#' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
+#'   type = "facets", ellipses = 0.5, profiles = TRUE)
+#'
 #' }
 ggmca <-
-  function(res.mca = res.mca, sup_vars, tooltip_vars_1lv, tooltip_vars,
+  function(res.mca, dat, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
            axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
-           type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
+           type = c("text", "labels", "points", "numbers", "facets"),
 
-           cleannames = TRUE,
-           keep_levels, discard_levels,
-           profiles = TRUE, profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
+           color_groups = "^.{0}", keep_levels, discard_levels, cleannames = TRUE,
+
+           profiles = FALSE, profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
            cah, max_profiles = 5000,
-           nb_char_for_color = rep(0, length(sup_vars)),
 
-           text_repel = FALSE, title, actives_in_bold = FALSE, ellipses = NULL,
+
+           text_repel = FALSE, title, actives_in_bold = NULL, ellipses = NULL,
            xlim, ylim, out_lims_move = FALSE,
            color_profiles, base_profiles_color = "#dddddd",
            shift_colors = 0, colornames_recode,
            scale_color_light = material_colors_light(),
            scale_color_dark  = material_colors_dark(),
-           text_size = 3, size_scale_max = 8, dist_labels = c("auto", 0.04),
+           text_size = 3, size_scale_max = 4, dist_labels = c("auto", 0.04),
            right_margin = 0, use_theme = TRUE
   ) {
 
     data <- ggmca_data(
+      dat = dat,
       res.mca = res.mca, sup_vars = sup_vars,
-      tooltip_vars_1lv = tooltip_vars_1lv, tooltip_vars = tooltip_vars,
+      active_tables = active_tables, tooltip_vars_1lv = tooltip_vars_1lv, tooltip_vars = tooltip_vars,
       cleannames = cleannames,
       keep_levels = keep_levels, discard_levels = discard_levels,
       profiles = profiles, profiles_tooltip_discard = profiles_tooltip_discard,
       cah = cah, max_profiles = max_profiles,
-      nb_char_for_color = nb_char_for_color
+      color_groups = color_groups
     )
 
     ggmca_plot(data = data,
@@ -169,15 +276,15 @@ ggmca <-
 #' @return A list containing the data frames to pass to \link{ggmca_plot}.
 #' @export
 ggmca_data <-
-  function(res.mca = res.mca, sup_vars, tooltip_vars_1lv, tooltip_vars,
-           cleannames = TRUE,
-           keep_levels, discard_levels, #function_on_dat,
-           profiles = TRUE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-           cah, max_profiles = 5000,
-           nb_char_for_color = rep(0, length(sup_vars))
-           #, tooltip_vars_text
+  function(res.mca, dat, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
+
+           color_groups = "^.{0}", keep_levels, discard_levels, cleannames = TRUE,
+
+           profiles = FALSE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+           cah, max_profiles = 5000
   ) {
     if (missing(sup_vars))          sup_vars          <- character()
+    if (missing(active_tables))     active_tables     <- character()
     if (missing(tooltip_vars_1lv))  tooltip_vars_1lv  <- character()
     if (missing(tooltip_vars))      tooltip_vars      <- character()
     if (missing(keep_levels))       keep_levels       <- character()
@@ -188,9 +295,11 @@ ggmca_data <-
       warning(cah, " was not found among the supplementary variables of the mca")
       cah <- character()
     }
-
+    stopifnot(length(max_profiles) < 2)
 
     active_vars <- stringr::str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
+    excl <- names(res.mca$call$Xtot)[res.mca$call$excl]
+
     if (length(sup_vars)    != 0 )      sup_vars <- sup_vars %>%
       purrr::discard(. %in% active_vars)
     if (length(tooltip_vars_1lv) != 0 ) tooltip_vars_1lv <- tooltip_vars_1lv %>%
@@ -203,74 +312,134 @@ ggmca_data <-
     # if (type[1] %in% c("active_vars_only", "labels", "text")) names_darker <- FALSE
     #}
 
-    data_name <-
-      if (length(res.mca$call$call$X) >= 2) {
-        as.character(res.mca$call$call$X[[2]])
-      } else {
-        as.character(res.mca$call$call$X)
-      }
-    if (! exists(data_name)) {
-      stop(stringr::str_c("database used to make the mca was not found : ",
-                          data_name,
-                          "(needed to put factor levels in the right order
-                            because FactoMineR mess with them)"))
-    }
-    #dat <- eval(res.mca$call$call$X[[2]])
 
 
-    #Supplementary variables ----
+
+
+
+    #Active variables --------------------------------------------------------------------
+    active_var_levels <-
+      purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) %>%
+                   as.factor() %>% levels()) %>%
+      purrr::set_names(active_vars) %>%
+      purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs = .x))
+
+
+    freqs    <- tibble::enframe(res.mca$call$marge.col, "lvs", "freq")
+    coords   <- tibble::as_tibble(res.mca$var$coord, rownames = "lvs")
+    contribs <- tibble::as_tibble(res.mca$var$contrib, rownames = "lvs") %>%
+      dplyr::rename_with(~ stringr::str_replace(., "^Dim ", "contrib"))
+
+    active_vars_data <- active_var_levels %>%
+      dplyr::left_join(freqs, by = "lvs") %>%
+      dplyr::left_join(coords, by = "lvs") %>%
+      dplyr::left_join(contribs, by = "lvs") %>%
+      tidyr::nest(contribs = tidyselect::starts_with("contrib"))
+
+    active_vars_data <- active_vars_data %>%
+      dplyr::group_by(.data$vars) %>%
+      dplyr::mutate(freq = round(.data$freq/sum(.data$freq) * 100, 0)) %>%
+      dplyr::ungroup()
+
+    dimensions <- names(active_vars_data)[stringr::str_detect(names(active_vars_data), "Dim ")] %>%
+      purrr::set_names(.) %>%
+      purrr::map_dfc(~ 0)
+
+    active_vars_data <- active_vars_data %>%
+      dplyr::filter(!is.na(.data$`Dim 1`)) %>%  #Remove excluded levels of active variables
+      dplyr::mutate(lvs = stringr::str_remove(.data$lvs, stringr::str_c("^", .data$vars, "_")))
+
+    if (cleannames == TRUE) active_vars_data <- active_vars_data %>%
+      dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., tabxplor:::cleannames_condition())))
+
+    active_vars_data <- active_vars_data %>%
+      dplyr::mutate(color_group = factor("active_vars"),
+                    id = as.integer(forcats::as_factor(.data$vars)) + 1000L)
+
+
+
+
+
+
+
+
+    #Supplementary variables -------------------------------------------------------------
     if (length(sup_vars) != 0) {
-      #if (missing(dat)) {
-      levels_sup_vars <-
-        purrr::map(sup_vars, ~ dplyr::pull(rlang::eval_tidy(rlang::sym(data_name)), .) %>%
-                     as.factor() %>% levels())
-      #pond_var <- rlang::expr(row.w)
-      # } else {
-      #   levels_sup_vars <- dplyr::select(dat, tidyselect::all_of(sup_vars)) %>%
-      #    purrr::map(levels)
-      #   pond_var <- res.mca$call$call$row.w %>% as.character() %>% .[3] %>%
-      #    rlang::sym()
-      # }
-      levels_sup_vars <-
-        purrr::map2(levels_sup_vars, sup_vars,
-                    ~ append(.x, stringr::str_c(.y, "_", .x)) )
 
-      sup_vars_coord <-
-        purrr::map(levels_sup_vars, function(.lvl) res.mca$quali.sup$coord %>%
-                     tibble::as_tibble(rownames = "lvs") %>%
-                     dplyr::filter(.data$lvs %in% .lvl) %>%
-                     dplyr::mutate(lvs = forcats::fct_relevel(
-                       .data$lvs, purrr::keep(.lvl, .lvl %in% .data$lvs)
-                     )) %>%
-                     dplyr::arrange(.data$lvs) ) %>%
-        magrittr::set_names(sup_vars)
+      sup_vars_data <- purrr::map(sup_vars, ~ varsup(res.mca, dat[[.]]) ) %>%
+        purrr::set_names(sup_vars)
+
+      # Do something with "within" et "between" variance ? ($var) ----
+
+      sup_vars_data <-
+        purrr::imap(sup_vars_data,
+                    ~ tibble::as_tibble(.x$coord, rownames = "lvs") %>%
+                      dplyr::mutate(vars = .y) %>%
+                      dplyr::select(.data$vars, tidyselect::everything())
+        )
+
+      # color_group depending on nb of supplementary variables and nb of characters
+      #  indicated in color_groups
+      color_groups <- vctrs::vec_recycle(color_groups, length(sup_vars))
+      sup_vars_data <- sup_vars_data %>%
+        purrr::map2(color_groups,
+                    ~ dplyr::mutate(.x, color_group = forcats::as_factor(stringr::str_c(
+                      .data$vars, "_", stringr::str_extract(.data$lvs, .y)
+                    ) %>%
+                      stringr::str_remove("_$")
+                    ))
+        )
 
 
-      #When MCA() added variable name at the beginning of levels names, remove it
-      sup_vars_coord <- sup_vars_coord %>%
-        purrr::imap(~ dplyr::mutate(
-          .x,
-          lvs = fct_clean(.data$lvs, stringr::str_c("^", .y, "_")),
-          sup_vars = .y,
-        )) %>%  #More precise ?
-        purrr::map(~ dplyr::select(., .data$lvs, .data$sup_vars,
-                                   tidyselect::starts_with("Dim "))) #!!dim1, !!dim2
-      sup_vars_coord <- sup_vars_coord %>%
-        purrr::map(~dplyr::mutate(., numbers = dplyr::case_when(
-          stringr::str_detect(
-            .data$lvs,
-            "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-"
+      if (length(keep_levels   ) >= 1L) sup_vars_data <- sup_vars_data %>%
+        purrr::map(~ dplyr::filter(., stringr::str_detect(.data$lvs, keep_levels)
+        ) )
+      if (length(discard_levels) >= 1L) sup_vars_data <- sup_vars_data %>%
+        purrr::map(
+          ~ dplyr::filter(., !stringr::str_detect(.data$lvs,
+                                                  stringr::str_c(discard_levels,
+                                                                 collapse = "|"))
           )
-          ~ stringr::str_extract(.data$lvs, "^[^- ]+"),
-          TRUE ~ "" )))
-      if (cleannames == TRUE) sup_vars_coord <- sup_vars_coord %>%
-        purrr::map(~ dplyr::mutate(., lvs = fct_clean(.data$lvs)))
+        )
 
-      dimensions <- names(sup_vars_coord[[1]]) %>%
+      if (cleannames) sup_vars_data <- sup_vars_data %>%
+        purrr::map(~ dplyr::mutate(
+          .,
+          lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., tabxplor:::cleannames_condition()))
+        ))
+
+      dimensions <- names(sup_vars_data[[1]]) %>%
         purrr::keep(stringr::str_detect(., "Dim ")) %>%
         purrr::set_names(.) %>%
         purrr::map_dfc(~ 0)
 
+
+      #Make that, if ICPC is in sup_vars AND in profiles, ggiraph data_id are the same :
+      # les deux seront colores lorsqu'on survolera l'un ou l'autre
+      #sup_vars_data <- sup_vars_data %>% purrr::imap(~ dplyr::mutate(.x, sup_var = .y))
+      if (length(cah) != 0) {
+        if (cah %in% sup_vars) sup_vars_data <- sup_vars_data %>%
+            purrr::map_if(names(.) == cah,
+                          ~ dplyr::mutate(., cah_id = as.integer(.data$lvs) + 10000L),
+                          .else = ~ dplyr::mutate(., cah_id = NA_integer_))
+      }
+
+      #Bind sup_vars data
+      sup_vars_data <- sup_vars_data %>% dplyr::bind_rows()
+
+      # ID numbers to use with ggiraph to highlight elements at hover
+      if (length(cah) != 0) {
+        if (cah %in% sup_vars) {
+          sup_vars_data <- sup_vars_data %>%
+            dplyr::mutate(id = dplyr::if_else(is.na(.data$cah_id),
+                                              dplyr::row_number(),
+                                              .data$cah_id))
+        } else {
+          sup_vars_data <- sup_vars_data %>% dplyr::mutate(id = dplyr::row_number())
+        }
+      } else {
+        sup_vars_data <- sup_vars_data %>% dplyr::mutate(id = dplyr::row_number())
+      }
 
       #Useful functions :
       #fct_relevel_quiet <- purrr::quietly(forcats::fct_relevel)
@@ -284,363 +453,191 @@ ggmca_data <-
       #   )
       # }
 
-
-
-      #Interactive tooltips
-      sup_list <- c(tooltip_vars_1lv, active_vars, tooltip_vars)
-      dat <- res.mca$call$X %>%
-        tibble::add_column(row.w = res.mca$call$row.w) %>%
-        tibble::as_tibble()
-      dat <- dat %>% #dplyr::mutate(no_var2 = "n", no_var3 = "") %>%
-        dplyr::select(
-          tidyselect::all_of(sup_vars),
-          #.data$no_var2, .data$no_var3,
-          tidyselect::all_of(c(tooltip_vars_1lv, active_vars, tooltip_vars)),
-          .data$row.w
-        ) %>%
-        dplyr::select(
-          tidyselect::all_of(c(tooltip_vars_1lv, active_vars, tooltip_vars)),
-          tidyselect::everything()
-        )
-      all_lvl <- purrr::flatten_chr(levels_sup_vars)
-      dat <- dat %>%
-        dplyr::mutate_if(is.factor, ~ forcats::fct_relevel(
-          .,
-          purrr::keep(all_lvl, all_lvl %in% levels(.))
-        ) )
-      if (length(tooltip_vars_1lv) != 0) {
-        tooltip_vars_1lv_3levels <-
-          purrr::map_lgl(dat, ~ is.factor(.) & nlevels(.) >= 3) &
-          colnames(dat) %in% tooltip_vars_1lv
-        if (any(tooltip_vars_1lv_3levels)) dat <- dat %>%
-            dplyr::mutate_if(tooltip_vars_1lv_3levels,
-                             ~ forcats::fct_other(
-                               .,
-                               keep = levels(.)[1],
-                               other_level = "Other_levels"
-                             ))
-        dat <- dat %>%
-          dplyr::mutate(dplyr::across(
-            tidyselect::all_of(tooltip_vars_1lv),
-            ~ forcats::fct_recode(., purrr::set_names(levels(.)[-1], "Remove_levels"))
-          ))
-      }
-
-      active_vars_2levels <-
-        purrr::map_lgl(dat[active_vars], ~ is.factor(.) & nlevels(.) == 2)
-      active_vars_2levels <- names(active_vars_2levels[active_vars_2levels])
-
-      if (length(active_vars_2levels) != 0) {
-        dat <- dat %>%
-          dplyr::mutate(dplyr::across(
-            tidyselect::all_of(active_vars_2levels),
-            ~ forcats::fct_recode(., purrr::set_names(levels(.)[-1], "Remove_levels"))
-          ))
-      }
-
-      #When MCA() added variable name at the beginning of levels names, remove it
-      dat <- dat %>% dplyr::mutate(dplyr::across(
-        tidyselect::all_of(c(sup_list, sup_vars)),
-        ~ fct_clean(., stringr::str_c("^", dplyr::cur_column(), "_"))
-      ))
-
-      if (cleannames == TRUE) dat <- dat %>%
-        dplyr::mutate(dplyr::across(
-          tidyselect::all_of(c(sup_list, sup_vars)),
-          ~ fct_clean(., cleannames_condition())
-        ))
-
-      tabs <- purrr::map(
-        sup_vars,
-        ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
-          tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
-                             na = "drop", wt = "row.w", pct = "row") %>%
-            dplyr::rename_with(~ "lvs", 1) %>%
-            dplyr::select(-tidyselect::starts_with("Remove_levels"))
-        })
-      ) %>% purrr::set_names(sup_vars)
-
-
-      # sup_vars_count <-
-      #   purrr::map(tabs, ~ dplyr::mutate(dplyr::select(., lvs, Total),
-      #                                    Total = vctrs::field(.data$Total, "wn") ))
-
-      col_vars_levels <- purrr::map(tabs, ~ tabxplor::tab_get_vars(.)$col_vars_levels)
-
-      tooltip_first_levels <- col_vars_levels %>%
-        purrr::map(~ .[names(.) %in% tooltip_vars] %>% purrr::map(dplyr::first) %>%
-                     purrr::flatten_chr()
-        )
-
-      active_first_variable <- col_vars_levels %>%
-        purrr::map(~ .[names(.) %in% active_vars] %>%
-                     dplyr::first() %>% dplyr::first()
-        )
-
-      format_pct <- function(diff, pct, colname) {
-        dplyr::case_when(
-          diff == 0 ~ paste0(colname, ": ", pct), #"\n"
-
-          diff >  0 ~ paste0(
-            colname, ": ", #"\n",
-            "(", stringr::str_pad(paste0(
-              "+" , abs(diff)), 3, pad = "#"),"%) ",
-            stringr::str_pad(pct, 3, pad = "#")),
-
-          diff <  0 ~ paste0(
-            colname, ": ", #"\n",
-            "(", stringr::str_pad(paste0(
-              "-" , abs(diff)), 4, pad = "#"),"%) ",
-            stringr::str_pad(pct, 3, pad = "#"))
-        ) %>%
-          stringr::str_replace_all(
-            "#",
-            stringi::stri_unescape_unicode("\\u202f\\u202f")
-          )
-      }
-
-      interactive_text <-
-        purrr::pmap(
-          list(tabs,
-               tooltip_first_levels, names(tooltip_first_levels),
-               active_first_variable),
-
-          ~ dplyr::mutate(..1,
-                          Total = vctrs::field(.data$Total, "wn")) %>%
-            dplyr::rename("wcount" = "Total") %>%
-            dplyr::relocate(.data$wcount, .after = "lvs") %>%
-            dplyr::mutate(begin_text = paste0(
-              "<b>", lvs,"</b>\nFrequency: ",
-              paste0(format(round(.data$wcount / dplyr::last(.data$wcount) * 100, 0)), "%")
-            ) ) %>%
-            dplyr::relocate(begin_text, .after = "wcount") %>%
-
-            dplyr::mutate(dplyr::across(
-              tidyselect::all_of(..2),
-              function(.var) paste0(
-                "\n<b>Distribution by ", attr(.var, "col_var"), ":</b>" , "\n",
-                format_pct(diff    = round(vctrs::field(.var, "diff") * 100, 0),
-                           pct     = format(.var),
-                           colname = dplyr::cur_column())                    )
-            )) %>%
-            dplyr::mutate(dplyr::across(
-              tidyselect::all_of(..4),
-              function(.var) paste0(
-                "\n<b>Active variables:</b>", "\n",
-                format_pct(diff    = round(vctrs::field(.var, "diff") * 100, 0),
-                           pct     = format(.var),
-                           colname = dplyr::cur_column())                    )
-            )) %>%
-
-            dplyr::mutate(dplyr::across(
-              where(tabxplor::is_fmt),
-              ~ format_pct(diff    = round(vctrs::field(., "diff") * 100, 0),
-                           pct     = format(.),
-                           colname = dplyr::cur_column())
-            ))
-        )
-
-      # %>%
-      # purrr::flatten()
-
-      # tooltip_text_final <- interactive_text %>%
-      #   purrr::map(~ tidyr::unite(., "interactive_text", -1:-2, sep = ""))
-
-      # tooltip_text_final$cah$interactive_text[2] %>% cat()
-      #  tooltip_text_final$PE0$interactive_text[2] %>% cat()
-
-      tooltip_text_final <- interactive_text %>%
-        purrr::map(~ tidyr::nest(., interactive_text = names(.)[purrr::map_lgl(., is.character)] ))
-
-      mean_point_coord <-
-        tooltip_text_final[[1]] %>%
-        dplyr::filter(stringr::str_detect(.data$lvs, "^Total")) %>%
-        dplyr::mutate(lvs = "Central point",
-                      colorvar = "0", numbers = "", wcount = 1,
-                      interactive_text = purrr::map(.data$interactive_text,
-                                                    ~ dplyr::mutate(
-                                                      .,
-                                                      begin_text = stringr::str_replace(
-                                                        begin_text,
-                                                        "^<b>Total",
-                                                        "<b>Central point"
-                                                      )))
-        ) %>%
-        dplyr::bind_cols(dimensions)
-
-      sup_vars_coord <-  sup_vars_coord %>%
-        purrr::map2(tooltip_text_final, ~ dplyr::inner_join(.x, .y, by = "lvs")) %>%
-        magrittr::set_names(sup_vars)  #%>% purrr::imap(~ dplyr::mutate(.x, lvs = fct_clean(lvs, stringr::str_c(.y, "_")) ))
-
-
-      if (length(keep_levels   ) >= 1L) sup_vars_coord <- sup_vars_coord %>%
-        purrr::map(~ dplyr::filter(., stringr::str_detect(.data$lvs, keep_levels) |
-                                     stringr::str_detect(.data$numbers, keep_levels)) )
-      if (length(discard_levels) >= 1L) sup_vars_coord <- sup_vars_coord %>%
-        purrr::map(
-          ~ dplyr::filter(., !stringr::str_detect(.data$lvs,
-                                                  stringr::str_c(discard_levels,
-                                                                 collapse = "|")) &
-                            !stringr::str_detect(.data$numbers,
-                                                 stringr::str_c(discard_levels,
-                                                                collapse = "|")))
-        )
-
-
-      #Make that, if ICPC is in sup_vars AND in profiles, ggiraph data_id are the same :
-      # les deux seront colores lorsqu'on survolera l'un ou l'autre
-      #sup_vars_coord <- sup_vars_coord %>% purrr::imap(~ dplyr::mutate(.x, sup_var = .y))
-      if (length(cah) != 0) {
-        if (cah %in% sup_vars) sup_vars_coord <- sup_vars_coord %>%
-            purrr::map_if(names(.) == cah,
-                          ~ dplyr::mutate(., cah_id = as.integer(.data$lvs) + 10000L),
-                          .else = ~ dplyr::mutate(., cah_id = NA_integer_))
-      }
-
-
-      # Colorvar depending on nb of supplementary variables and nb of characters
-      #  indicated in nb_char_for_color
-      if (length(nb_char_for_color) == 1) {
-        sup_vars_coord <- sup_vars_coord %>%
-          purrr::map2(sup_vars, ~ dplyr::mutate(
-            .x,
-            colorvar = as.factor(stringr::str_c(
-              .y,
-              "_",
-              stringr::str_sub(numbers, 1, nb_char_for_color)) %>%
-                stringr::str_remove("_$"))
-          ))
-      } else if (length(nb_char_for_color) == length(sup_vars)) {
-        sup_vars_coord <-
-          purrr::pmap(list(sup_vars_coord, sup_vars, nb_char_for_color),
-                      ~ dplyr::mutate(
-                        ..1,
-                        colorvar = as.factor(stringr::str_c(
-                          ..2,
-                          "_",
-                          stringr::str_sub(.data$numbers, 1, ..3)) %>%
-                            stringr::str_remove("_$")) ))
-      }
-      sup_vars_coord <- sup_vars_coord %>% dplyr::bind_rows()
-
-      # if (type[1] %in% c("points", "numbers"))  sup_vars_coord <- sup_vars_coord %>%
-      #   dplyr::mutate(colorvar_names = as.factor(stringr::str_c("names_", .data$colorvar)))
-      # #} else { sup_vars_coord <- sup_vars_coord %>% dplyr::mutate(colorvar_names =  colorvar) }
-
-
-
-      if (length(cah) != 0) {
-        if (cah %in% sup_vars) {
-          sup_vars_coord <- sup_vars_coord %>%
-            dplyr::mutate(id = dplyr::if_else(is.na(.data$cah_id),
-                                              dplyr::row_number(),
-                                              .data$cah_id))
-        } else {
-          sup_vars_coord <- sup_vars_coord %>% dplyr::mutate(id = dplyr::row_number())
-        }
-      } else {
-        sup_vars_coord <- sup_vars_coord %>% dplyr::mutate(id = dplyr::row_number())
-      }
-
-      # Remove special chars in graph
-      if (cleannames == TRUE) sup_vars_coord <- sup_vars_coord %>%
-        dplyr::mutate(lvs = stringr::str_remove_all(.data$lvs, cleannames_condition()) %>%
-                        # stringr::str_replace_all(lvs,
-                        #                          "[^[:alnum:][:punct:]]",
-                        #                          " ") %>%
-                        stringr::str_squish()
-        )
-
-      sup_vars_coord <- sup_vars_coord %>%
-        dplyr::relocate(tidyselect::starts_with("Dim "), .after = dplyr::last_col())
+      vars_data <- dplyr::bind_rows(active_vars_data, sup_vars_data)
 
     } else {
-      sup_vars_coord <- NULL
+      vars_data <- active_vars_data
+      #sup_vars_data <- NULL
+    }
+
+    #Add central point
+    vars_data <- vars_data %>%
+      dplyr::add_row(vars        = "All",
+                     lvs         = factor("Central point"),
+                     color_group = factor("Central point")) %>%
+      dplyr::mutate(dplyr::across(
+        tidyselect::starts_with("Dim "),
+        ~ dplyr::if_else(lvs == "Central point", 0, .)
+      ))
+
+    #Reorder variables in vars_data
+    vars_data <- vars_data %>%
+      dplyr::relocate(tidyselect::starts_with("Dim "), tidyselect::any_of("contribs"),
+                      .after = dplyr::last_col())
+
+
+
+
+
+    ###Prepare data for tooltips and profiles ---
+    non_active_vars <- c(sup_vars, tooltip_vars_1lv, tooltip_vars)
+    if (length(non_active_vars) != 0 ) {
+      dat  <- dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]),
+                               dplyr::select(dat, tidyselect::all_of(non_active_vars)))
+    } else {
+      dat <- tibble::as_tibble(res.mca$call$X[active_vars])
+    }
+    #sel3 <- tooltip_vars[!tooltip_vars %in% c(sel1, active_vars)]
+    #dat3 <- dat %>% dplyr::select(tidyselect::all_of(sel3))
+
+    dat <- dat %>%
+      dplyr::mutate(dplyr::across(where(is.character), as.factor)) %>%
+      dplyr::mutate(dplyr::across(where(is.factor), forcats::fct_drop)) %>%
+      tibble::add_column(row.w = res.mca$call$row.w)
+
+    #Remove excluded levels (now, or after by renaming them here)
+    excl_levels <-
+      purrr::imap_dfr(dat[active_vars], ~ tibble::tibble(active_vars = .y, lvs = levels(.x))) |>
+      #dplyr::mutate(lvs2 = stringr::str_c(.data$active_vars, "_",.data$ lvs)) |>
+      dplyr::filter(.data$lvs %in% excl) #| .data$lvs2 %in% excl
+
+    excl_levels <- excl_levels |>
+      dplyr::group_by(active_vars) |>
+      dplyr::summarise(excl = list(.data$lvs), .groups = "drop")
+
+    excl_levels <- purrr::set_names(excl_levels$excl, excl_levels$active_vars)
+
+    active_var_real_levels <-
+      purrr::imap(dat[active_vars], ~ tibble::tibble(active_vars = .y, lvs = levels(.x)))
+
+    active_vars_excl <- active_var_real_levels %>%
+      purrr::map(~ dplyr::filter(., .data$lvs %in% excl) %>% dplyr::pull(.data$lvs))
+    active_vars_excl <- active_vars_excl[purrr::map_lgl(active_vars_excl, ~ length(.) != 0)]
+
+    dat <- dat %>%
+      dplyr::mutate(dplyr::across(
+        tidyselect::all_of(names(active_vars_excl)),
+        ~ forcats::fct_relevel(., active_vars_excl[[dplyr::cur_column()]], after = Inf) %>%
+          forcats::fct_recode(rlang::splice(purrr::set_names(active_vars_excl[[dplyr::cur_column()]],
+                                                             "Remove_levels")))
+      ))
+
+    #When MCA() added variable name at the beginning of levels names, remove it
+    dat <- dat %>%
+      dplyr::mutate(dplyr::across(
+        tidyselect::all_of(active_vars),
+        ~ forcats::fct_relabel(., ~ stringr::str_remove(., paste0("^", dplyr::cur_column(), "_")))
+      ))
+
+    if (cleannames == TRUE) dat <- dat %>%
+      dplyr::mutate(dplyr::across(
+        where(is.factor),
+        ~ forcats::fct_relabel(., ~stringr::str_remove_all(., cleannames_condition()))
+      ))
+
+
+
+
+
+
+    ### Interactive tooltips (sup/active) ----
+    if ("active" %in% active_tables | "sup" %in% active_tables) {
+      vars_to_keep <- character()
+      if ("active" %in% active_tables) vars_to_keep <- c(vars_to_keep, active_vars)
+      if ("sup"    %in% active_tables) vars_to_keep <- c(vars_to_keep, sup_vars)
+      active_tables <- vars_to_keep
+    }
+
+    # Calculate crosstabs for variables in active_tables, and frequencies for sup_vars
+    # If crosstabs are not calculated for active_vars, retrieve the info in active_vars_data
+    active_vars_without_crosstables <- active_vars[!active_vars %in% active_tables]
+
+    tables_to_do <- c(active_tables[!active_tables %in% sup_vars], sup_vars)
+    if(length(tables_to_do) != 0) {
+
+
+
+      interactive_text <- interactive_tooltips(dat,
+                                               sup_vars         = sup_vars,
+                                               active_vars      = active_vars,
+                                               #active_vars_data = active_vars_data,
+                                               active_tables    = active_tables,
+                                               tooltip_vars_1lv = tooltip_vars_1lv,
+                                               tooltip_vars     = tooltip_vars#,
+                                               #excl             = excl,
+                                               #cleannames       = cleannames
+                                               )
+
+      text_vars <- names(interactive_text)[purrr::map_lgl(interactive_text, is.character)]
+
+      vars_data <- vars_data %>% dplyr::left_join(interactive_text, by = c("vars", "lvs"))
+
+    } else {
+      text_vars <- "begin_text"
+      vars_data <- vars_data %>% dplyr::mutate(begin_text = NA_character_)
+    }
+
+    if (length(active_vars_without_crosstables) != 0) {
+      vars_data <- vars_data %>%
+        dplyr::mutate(begin_text = dplyr::if_else(
+          .data$vars %in% active_vars_without_crosstables,
+          true  = paste0("<b>", .data$lvs,"</b>\n", .data$vars,
+                         "\nFrequency: ", paste0(.data$freq, "%")),
+          false = .data$begin_text
+        ))
     }
 
 
+    #If no entire table have been calculated, we don't have the data for mean point
+    #   => we use the data available in res.mca
+    if (length(active_tables) == 0 ) {
+      mean_point_interactive_text <- vars_data %>%
+        dplyr::filter(.data$color_group == "active_vars") %>%
+        dplyr::mutate(
+          text = stringr::str_c("\n", .data$lvs, " : ", .data$freq,"%")
+        ) %>%
+        dplyr::summarise(
+          text = stringr::str_c(.data$text, collapse = "")
+        ) %>%
+        dplyr::pull(.data$text)
 
-
-
-    #Active variables ----
-    levels_active_vars <-
-      purrr::map(active_vars, ~ dplyr::pull(rlang::eval_tidy(rlang::sym(data_name)), .) %>%
-                   as.factor() %>% levels()) %>%
-      magrittr::set_names(active_vars) %>%
-      purrr::imap(~ append(.x, stringr::str_c(.y, "_", .x)))
-
-    active_vars_wcount <-
-      purrr::map(levels_active_vars, function(.lvl) res.mca$call$marge.col %>%
-                   tibble::as_tibble(rownames = "lvs") %>%
-                   dplyr::rename(freq = .data$value) %>%
-                   dplyr::filter(.data$lvs %in% .lvl) %>%
-                   dplyr::mutate(
-                     lvs = forcats::fct_relevel(.data$lvs,
-                                                purrr::keep(.lvl,
-                                                            .lvl %in% .data$lvs))
-                   ) %>%
-                   dplyr::arrange(.data$lvs) ) %>% magrittr::set_names(active_vars)
-    # active_vars_wcount %>% purrr::imap(~ dplyr::mutate(.x, lvs = fct_clean(lvs, stringr::str_c("^", .y, "_"))))
-    if (cleannames == TRUE) active_vars_wcount <- active_vars_wcount %>%
-      purrr::map(~ dplyr::mutate(., lvs = fct_clean(.data$lvs)))
-    active_vars_wcount <- active_vars_wcount %>%
-      purrr::map(~ dplyr::mutate_at(., -1, ~ round(./sum(.) * 100, 0)))
-
-    active_var_coord <- res.mca$var$coord %>% tibble::as_tibble(rownames = "lvs") #%>%
-    #dplyr::select(.data$lvs, !!dim1, !!dim2)
-    if (cleannames == TRUE) active_var_coord <- active_var_coord %>%
-      dplyr::mutate(lvs = fct_clean(.data$lvs))
-
-    dimensions <- names(active_var_coord)[-1] %>%
-      purrr::set_names(.) %>%
-      purrr::map_dfc(~ 0)
-
-    # If no sup var is given, make tooltip of mean point based on information within res.mca
-    if (length(sup_vars) == 0) {
-      mean_point_interactive_text <- active_vars_wcount %>%
-        purrr::map(~ dplyr::slice(., - nrow(.)) %>%
-                     dplyr::mutate(interactive_text = stringr::str_c("\n",
-                                                                     .data$lvs,
-                                                                     " : ",
-                                                                     .data$freq,
-                                                                     "%")) %>%
-                     dplyr::summarise(interactive_text = stringr::str_c(
-                       .data$interactive_text,
-                       collapse = ""
-                     ) ) %>%
-                     dplyr::pull(.data$interactive_text)
-        ) %>% purrr::flatten_chr() %>%
-        stringr::str_c(collapse = "")
       mean_point_interactive_text <-
         stringr::str_c("<b>Central point</b>",
                        "\nFrequency: 100%",
                        "\n\n<b>Active variables :</b>",
                        mean_point_interactive_text)
-      mean_point_coord <-
-        tibble::tibble(colorvar = "0", numbers = 0, wcount = 1,
-                       interactive_text = mean_point_interactive_text) %>%
-        dplyr::bind_cols(dimensions)
 
-      # mean_point_coord <-
+      vars_data <- vars_data %>%
+        dplyr::mutate(begin_text = dplyr::if_else(
+          .data$lvs == "Central point",
+          true  = mean_point_interactive_text,
+          false = .data$begin_text
+        ))
+
+      # mean_point_data <-
       #   tibble::tibble(!!!dimensions := 0,
-      #                  colorvar = "0", numbers = 0, wcount = 1,
+      #                  color_group = "0", numbers = 0, wcount = 1,
       #                  interactive_text = mean_point_interactive_text)
       # scale_color_named_vector <- character()
       # type <- "active_vars_only"
     }
 
-    active_vars_wcount <- active_vars_wcount %>% dplyr::bind_rows()
 
-    contribs <-
-      tibble::as_tibble(res.mca$var$contrib, rownames = "lvs") %>%
-      dplyr::rename_with(~ stringr::str_replace(., "^Dim ", "contrib"))
+    vars_data <- dplyr::select(vars_data, -tidyselect::any_of("freq"))
+    vars_data <- tidyr::nest(vars_data, interactive_text = tidyselect::all_of(text_vars))
 
-    active_var_coord <- active_var_coord %>%
-      dplyr::left_join(active_vars_wcount, by = "lvs") %>%
-      dplyr::left_join(contribs, by = "lvs")
 
-    active_var_coord <- active_var_coord %>%
-      dplyr::relocate(tidyselect::starts_with("Dim |contrib"), .after = dplyr::last_col())
+
+
+
+
+
+
+
+
+
+
+
 
 
     # res.mca$var$cos2 %>% tibble::as_tibble(rownames = "lvs") %>% dplyr::mutate_at(-1, ~ tabxplor::as_pct(.)) # %>% dplyr::rowwise() %>% dplyr::mutate(Total = sum(dplyr::c_across(`Dim 1`:`Dim 8`)))
@@ -654,26 +651,44 @@ ggmca_data <-
     #   dplyr::mutate_all(~ tabxplor::as_pct(./Total)) %>% dplyr::bind_cols(tibble::as_tibble(res.mca$var$cos2, rownames = "lvs")[1]) %>%
     #   dplyr::select(lvs, tidyselect::everything())
 
+    # # Add tables of crossed active vars in tooltips
+    #  interactive_text <- interactive_tooltips(dat, sup_vars, active_vars,
+    #                                           tooltip_vars_1lv, tooltip_vars)
+    #
+    #  interactive_text <- interactive_text %>%
+    #    purrr::map(~ tidyr::nest(., interactive_text = names(.)[purrr::map_lgl(., is.character)] ))
 
 
 
-    # Profiles of answers ----
+
+
+
+    ### Profiles of answers ----
     #; weighted : nb of individuals * weight variable
-    if (profiles == TRUE) {
-      ind_coord <-
-        tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == cah),
-                                           which(names(res.mca$call$X) %in% sup_vars))]) %>%
-        tibble::add_column(row.w = res.mca$call$row.w) %>%
-        dplyr::bind_cols(tibble::as_tibble(res.mca$ind$coord))
+    if (profiles) {
+      ind_data <- dplyr::bind_cols(
+        dplyr::select(dat, -tidyselect::any_of(c(tooltip_vars_1lv, tooltip_vars))),
+        tibble::as_tibble(res.mca$ind$coord)
+      )
+
+      # ind_data <-
+      #   tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == cah),
+      #                                      which(names(res.mca$call$X) %in% sup_vars) )]) %>%
+      #   tibble::add_column(row.w = res.mca$call$row.w) %>%
+      #   dplyr::bind_cols(tibble::as_tibble(res.mca$ind$coord))
 
       coord_names <- colnames(res.mca$ind$coord)
 
-      if (cleannames == TRUE) ind_coord <- ind_coord %>%
-        dplyr::mutate_if(is.factor, fct_clean)
-      if (length(cah) != 0) {
-        #cah_levels <- dplyr::pull(ind_coord, !!rlang::sym(cah) ) %>% levels()
+      # if (cleannames == TRUE) ind_data <- ind_data %>%
+      #   dplyr::mutate(dplyr::across(
+      #     where(is.factor),
+      #     ~ forcats::fct_relabel(~ stringr::str_remove_all(., tabxplor:::cleannames_condition()))
+      #     ))
 
-        ind_coord <- ind_coord %>%
+      if (length(cah) != 0) {
+        #cah_levels <- dplyr::pull(ind_data, !!rlang::sym(cah) ) %>% levels()
+
+        ind_data <- ind_data %>%
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
                       row.w    = .data$row.w,
                       coord    = tidyselect::all_of(coord_names),
@@ -693,12 +708,11 @@ ggmca_data <-
             ) %>% unlist()
 
           ) %>%
-          #dplyr::select(-.data$row.w) %>%
           dplyr::arrange(-.data$wcount)
 
-        if (!missing(max_profiles)) ind_coord <- ind_coord %>% dplyr::slice(1:max_profiles)
+        if (length(max_profiles) != 0) ind_data <- ind_data %>% dplyr::slice(1:max_profiles)
 
-        ind_coord <- ind_coord %>%
+        ind_data <- ind_data %>%
           dplyr::mutate(nb = dplyr::row_number(), cah_id = as.integer(.data$cah)) %>%
           dplyr::group_by(.data$cah) %>%
           dplyr::mutate(nb_in_cah = dplyr::row_number(), nb_tot_cah = dplyr::n()) %>%
@@ -708,7 +722,7 @@ ggmca_data <-
 
 
       } else {
-        ind_coord <- ind_coord %>%
+        ind_data <- ind_data %>%
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
                       row.w    = .data$row.w,
                       coord    = tidyselect::all_of(coord_names)
@@ -719,22 +733,22 @@ ggmca_data <-
           ) %>%
           dplyr::arrange(-.data$wcount)
 
-        if (!missing(max_profiles)) ind_coord <- ind_coord %>% dplyr::slice(1:max_profiles)
+        if (length(max_profiles) != 0) ind_data <- ind_data %>% dplyr::slice(1:max_profiles)
 
-        ind_coord <- ind_coord %>%
-          dplyr::mutate(nb = dplyr::row_number(),
+        ind_data <- ind_data %>%
+          dplyr::mutate(nb    = dplyr::row_number(),
                         coord = purrr::map(.data$coord, ~ .[1,])) %>%
           tidyr::unnest(.data$coord)
       }
 
-      ind_coord <- ind_coord %>%
-        dplyr::mutate_at(res.mca$call$quali,
-                         ~ fct_detect_replace(., profiles_tooltip_discard, "#")) %>%
-        dplyr::mutate_if(is.factor, as.character)
+      ind_data <- ind_data %>%
+        dplyr::mutate(dplyr::across(tidyselect::all_of(active_vars),
+                                    ~ fct_detect_replace(., profiles_tooltip_discard, "#"))) %>%
+        dplyr::mutate(dplyr::across(where(is.factor), as.character))
 
 
       if (length(cah) != 0) {
-        ind_coord <- ind_coord %>%
+        ind_data <- ind_data %>%
           dplyr::mutate(
             cah_base = .data$cah,
             count_base = .data$count,
@@ -760,16 +774,16 @@ ggmca_data <-
                         "wcount" = "wcount_base")
 
       } else {
-        ind_coord <- ind_coord %>%
+        ind_data <- ind_data %>%
           dplyr::mutate(
-            count_base = .data$count,
+            count_base  = .data$count,
             wcount_base = .data$wcount,
-            profile_nb = stringr::str_c("<b>Answer profile n",
+            profile_nb  = stringr::str_c("<b>Answer profile n",
                                         stringi::stri_unescape_unicode("\\u00b0"),
                                         nb = .data$nb,  "</b>"),
-            count      = stringr::str_c("n: ", format(round(.data$count, 0),
+            count       = stringr::str_c("n: ", format(round(.data$count, 0),
                                                       trim = TRUE, big.mark = " ")),
-            wcount     = dplyr::if_else(
+            wcount      = dplyr::if_else(
               condition = .data$count == .data$wcount,
               true      = "",
               false     = stringr::str_c("weighted n: ",
@@ -778,42 +792,25 @@ ggmca_data <-
             )
           ) %>%
           tidyr::nest(interactive_text = c("profile_nb", "count", "wcount",
-                                           active_vars)) %>%
+                                           tidyselect::all_of(active_vars))) %>%
           dplyr::rename("count" = "count_base", "wcount" = "wcount_base")
-
-
-
-        #   profiles <-
-        #     ggiraph::geom_point_interactive(
-        #       data = ind_coord,
-        #       ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
-        #                    tooltip = .data$interactive_text,
-        #                    data_id = .data$nb + 10000),
-        #       color = "#eeeeee", na.rm = TRUE, inherit.aes = FALSE, show.legend = FALSE
-        #     )
       }
 
-      ind_coord <- ind_coord %>%
+      ind_data <- ind_data %>%
         dplyr::select(-tidyselect::any_of(c("nb_in_cah", "nb_tot_cah"))) %>%
         dplyr::relocate(tidyselect::any_of(c("nb", "count", "wcount", "cah", "cah_id",
                                              "interactive_text", "sup_vars", "row.w")),
                         .before = 1)
 
     } else {
-      ind_coord <- NULL
+      ind_data <- NULL
     }
 
 
-    data <- list("res.mca"          = list(eig = res.mca$eig,
-                                           axes_names = res.mca$axes_names),
-                 "active_var_coord" = active_var_coord,
-                 "mean_point_coord" = mean_point_coord,
-                 "ind_coord"        = ind_coord,
-                 "sup_vars_coord"   = sup_vars_coord,
-                 # "dim1"             = dim1,
-                 # "dim2"             = dim2,
-                 # "sup_vars"         = sup_vars,
-                 "cah"              = cah
+    data <- list("vars_data"= vars_data,
+                 "ind_data" = ind_data,
+                 "res.mca"  = list(eig = res.mca$eig, axes_names = res.mca$axes_names),
+                 "cah"      = cah
     )
 
     data
@@ -821,7 +818,7 @@ ggmca_data <-
 
 
 
-data
+
 
 
 #' @describeIn ggmca print MCA graph from data frames with parameters
@@ -833,21 +830,24 @@ data
 ggmca_plot <- function(data,
                        axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
                        type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
-                       text_repel = FALSE, title, actives_in_bold = FALSE, ellipses = NULL,
+                       text_repel = FALSE, title, actives_in_bold = NULL, ellipses = NULL,
                        xlim, ylim, out_lims_move = FALSE,
                        color_profiles, base_profiles_color = "#dddddd",
                        shift_colors = 0, colornames_recode,
                        scale_color_light = material_colors_light(),
                        scale_color_dark  = material_colors_dark(),
-                       text_size = 3, size_scale_max = 8, dist_labels = c("auto", 0.04),
+                       text_size = 3, size_scale_max = 4, dist_labels = c("auto", 0.04),
                        right_margin = 0, use_theme = TRUE) {
 
+  vars_data        <- data$vars_data
+  ind_data         <- data$ind_data
+  #active_vars_data <- data$active_vars_data
+  #sup_vars_data    <- data$sup_vars_data
+  #mean_point_data  <- data$mean_point_data
   cah              <- data$cah
-  active_var_coord <- data$active_var_coord
-  sup_vars_coord   <- data$sup_vars_coord
-  mean_point_coord <- data$mean_point_coord
-  ind_coord        <- data$ind_coord
-  sup_vars         <- sup_vars_coord$sup_vars %>% unique()
+  sup_vars         <- vars_data %>%
+    dplyr::filter(!.data$color_group %in% c("active_vars", "Central point")) |>
+    dplyr::pull(.data$vars) |> unique()
   res.mca          <- data$res.mca
 
   if (!is.null(axes_names)) res.mca$axes_names <- axes_names
@@ -859,6 +859,17 @@ ggmca_plot <- function(data,
   contrib1 <- rlang::sym(stringr::str_c("contrib", axes[1]))
   contrib2 <- rlang::sym(stringr::str_c("contrib", axes[2]))
 
+  if (missing(color_profiles))    color_profiles    <- character()
+  if (is.logical(color_profiles)) if (! color_profiles) {
+    color_profiles <- character()
+  } else {
+    color_profiles <- levels(as.factor(dplyr::pull(ind_data, cah)))
+  }
+
+  if (missing(colornames_recode)) colornames_recode <- character()
+
+  if (length(actives_in_bold) == 0) actives_in_bold <- length(sup_vars) == 0
+
   if (!length(axes_reverse) == 0) {
     if (!axes_reverse %in% 1:2) stop("axes_reverse must be 1, 2 or 1:2")
 
@@ -868,120 +879,115 @@ ggmca_plot <- function(data,
       coord %>% dplyr::mutate(dplyr::across(tidyselect::all_of(dims_reverse), ~ - .))
     }
 
-    active_var_coord <- reverse_axe(active_var_coord)
-    mean_point_coord <- reverse_axe(mean_point_coord)
-    if (!is.null(sup_vars_coord)) sup_vars_coord <- reverse_axe(sup_vars_coord)
-    if (!is.null(ind_coord))      ind_coord      <- reverse_axe(ind_coord)
+    vars_data <- reverse_axe(vars_data)
+    if (!is.null(ind_data)) ind_data <- reverse_axe(ind_data)
   }
 
-  active_var_coord <- active_var_coord %>%
-    dplyr::mutate(interactive_text = stringr::str_c(
-      "<b>", .data$lvs, "</b>", #"\nVariable active",
-      "\nFrequency: ", stringr::str_c(.data$freq, "%"),
-      "\nContrib axe ", axes[1], " : ", stringr::str_pad(round(!!contrib1, 0), 2),
-      "%",
-      "\nContrib axe ", axes[2], " : ", stringr::str_pad(round(!!contrib2, 0), 2),
-      "%"
-    ),
-    id = dplyr::row_number())
 
-  if (missing(color_profiles))    color_profiles    <- character()
-  if (is.logical(color_profiles)) if (! color_profiles) {
-    color_profiles <- character()
-  } else {
-    color_profiles <- levels(as.factor(dplyr::pull(ind_coord, cah)))
-  }
+  #Add contribs in tooltips for active_vars ----
+  vars_data <- vars_data %>%
+    dplyr::mutate(
+      contribs = purrr::map_if(
+        .data$contribs, !purrr::map_lgl(.data$contribs, is.null),
+        ~ dplyr::mutate(., text = stringr::str_c(
+          "\nContrib axe ", axes[1], " : ", stringr::str_pad(round(!!contrib1, 0), 2), "%",
+          "\nContrib axe ", axes[2], " : ", stringr::str_pad(round(!!contrib2, 0), 2), "%"
+        )) %>%
+          dplyr::pull(text),
 
-  if (missing(colornames_recode)) colornames_recode <- character()
+        .else = ~ ""
+      ) %>%
+        purrr::flatten_chr(),
 
-  if (is.null(sup_vars_coord)) {
-    type <- "active_vars_only"
-    scale_color_named_vector <- character()
-  }
+      interactive_text = purrr::map2(
+        .data$interactive_text, .data$contribs,
+        ~ dplyr::mutate(.x, begin_text = stringr::str_c(.data$begin_text, .y))
+      )
+    ) %>%
+    dplyr::select(-.data$contribs)
 
-  # Collapse the interactive tooltips dataframes (above for ind_coord) :
-  mean_point_coord <- mean_point_coord %>%
+
+  # Collapse the interactive tooltips dataframes
+  vars_data <- vars_data %>%
     dplyr::mutate(interactive_text = purrr::map_chr(
       .data$interactive_text,
-      ~ stringr::str_c(., collapse = "\n")
+      ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
     ))
 
-  if (!is.null(sup_vars_coord)) {
-    sup_vars_coord <- sup_vars_coord %>%
-      dplyr::mutate(interactive_text = purrr::map_chr(
-        .data$interactive_text,
-        ~ stringr::str_c(., collapse = "\n")
-      ))
+  #Add linebreak at end if text finish by html </font>, otherwise no line breaks
+  vars_data <- vars_data %>%
+    dplyr::mutate(interactive_text = stringr::str_replace(.data$interactive_text,
+                                                          "</font>$", "</font>\\u202f") %>%
+                    stringi::stri_unescape_unicode())
 
-
-
-    # Set colors :
-    if (type[1] == "facets" | !is.null(ellipses)) {
-      sup_vars_coord <- sup_vars_coord %>%
-        dplyr::mutate(colorvar = dplyr::if_else(
-          condition = .data$sup_vars == sup_vars[1],
-          true      = paste0(.data$colorvar, "_", .data$lvs) %>% as.factor(),
-          false     = forcats::fct_expand(.data$colorvar,
-                                          levels(paste0(.data$colorvar, .data$lvs)))
-        ))
-    }
-
-    if (length(colornames_recode) > 0) sup_vars_coord <- sup_vars_coord %>%
-        dplyr::mutate(colorvar = forcats::fct_recode(.data$colorvar,
-                                                     !!!colornames_recode))
-    if (shift_colors != 0) sup_vars_coord <- sup_vars_coord %>%
-        dplyr::mutate(colorvar = forcats::fct_shift(.data$colorvar, shift_colors))
-    colorvar_recode <- sup_vars_coord %>%
-      dplyr::pull(.data$colorvar) %>% levels()
-    if (length(colorvar_recode) >= 2) {
-      message(stringr::str_c("colors based on: '",
-                                stringr::str_c(colorvar_recode, collapse = "', '"), "'",
-                                collapse = ""))
-    }
-
-    scale_color_points <- scale_color_light %>%
-      magrittr::set_names(colorvar_recode[1:length(scale_color_light)])
-
-    scale_color_names <- scale_color_dark %>%
-      magrittr::set_names(stringr::str_c("names_", colorvar_recode[1:length(scale_color_dark)]))
-
-    if(length(scale_color_light) > length(scale_color_dark)) {
-      scale_color_light <- scale_color_light[1:length(scale_color_dark)]
-    } else if (length(scale_color_light) < length(scale_color_dark)) {
-      scale_color_dark <- scale_color_dark[1:length(scale_color_light)]
-    }
-
-    if (length(colorvar_recode[-(1:length(scale_color_light))]) > 0) {
-      levels_in_more <- colorvar_recode[-(1:length(scale_color_light))]
-      scale_color_points <- scale_color_points %>%
-        append(rep(.[length(.)], length(levels_in_more)) %>%
-                 magrittr::set_names(levels_in_more))
-      scale_color_names <- scale_color_names %>%
-        append(rep(.[length(.)], length(levels_in_more)) %>%
-                 magrittr::set_names(levels_in_more))
-      warning(stringr::str_c("too much colors, all the last ones were set to last color. Max ", length(scale_color_light)))
-    }
-
-    if (is.null(base_profiles_color)) base_profiles_color <- "#ffffff"
-
-    scale_color_named_vector <- scale_color_points %>%
-      append(scale_color_names) %>% .[!is.na(names(.))] %>%
-      append(c("base_profiles_color" = base_profiles_color))
-
-    if (type[1] %in% c("points", "numbers"))  sup_vars_coord <- sup_vars_coord %>%
-      dplyr::mutate(colorvar_names = as.factor(stringr::str_c("names_", .data$colorvar)))
-    #} else { sup_vars_coord <- sup_vars_coord %>% dplyr::mutate(colorvar_names =  colorvar) }
+  # Set colors :
+  if (type[1] == "facets" | !is.null(ellipses)) {
+    vars_data <- vars_data %>%
+      dplyr::mutate(color_group = forcats::as_factor(dplyr::if_else(
+        condition = .data$vars == sup_vars[1],
+        true      = paste0(.data$color_group, "_", .data$lvs), #forcats::fct_expand(paste0(.data$color_group, "_", .data$lvs) %>% as.factor(),
+                    #                    levels(.data$color_group)),
+        false     = as.character(.data$color_group)
+      )))
   }
+
+  if (length(colornames_recode) > 0) vars_data <- vars_data %>%
+    dplyr::mutate(color_group = forcats::fct_recode(.data$color_group,
+                                                    !!!colornames_recode))
+  if (shift_colors != 0) vars_data <- vars_data %>%
+    dplyr::mutate(color_group = forcats::fct_shift(.data$color_group, shift_colors))
+  colorvar_recode <- levels(vars_data$color_group)
+  colorvar_recode <- colorvar_recode[!colorvar_recode %in% c("active_vars", "Central point")]
+  if (length(colorvar_recode) >= 2) {
+    message(stringr::str_c("colors based on the following categories (rename with colornames_recode): '",
+                           stringr::str_c(colorvar_recode, collapse = "', '"), "'",
+                           collapse = ""))
+  }
+
+  scale_color_points <- scale_color_light %>%
+    purrr::set_names(colorvar_recode[1:length(scale_color_light)])
+
+  scale_color_names <- scale_color_dark %>%
+    purrr::set_names(stringr::str_c("names_", colorvar_recode[1:length(scale_color_dark)]))
+
+  if(length(scale_color_light) > length(scale_color_dark)) {
+    scale_color_light <- scale_color_light[1:length(scale_color_dark)]
+  } else if (length(scale_color_light) < length(scale_color_dark)) {
+    scale_color_dark <- scale_color_dark[1:length(scale_color_light)]
+  }
+
+  if (length(colorvar_recode[-(1:length(scale_color_light))]) > 0) {
+    levels_in_more <- colorvar_recode[-(1:length(scale_color_light))]
+    scale_color_points <- scale_color_points %>%
+      append(rep(.[length(.)], length(levels_in_more)) %>%
+               purrr::set_names(levels_in_more))
+    scale_color_names <- scale_color_names %>%
+      append(rep(.[length(.)], length(levels_in_more)) %>%
+               purrr::set_names(levels_in_more))
+    warning(stringr::str_c("too much colors, all the last ones were set to last color. Max ", length(scale_color_light)))
+  }
+
+  if (is.null(base_profiles_color)) base_profiles_color <- "#ffffff"
+
+  scale_color_named_vector <- c(scale_color_points, scale_color_names)
+  scale_color_named_vector <- scale_color_named_vector[!is.na(names(scale_color_named_vector))]
+  scale_color_named_vector <- c(scale_color_named_vector,
+                                "base_profiles_color" = base_profiles_color,
+                                "active_vars"         = "black",
+                                "Central point"       = "black"
+  )
+
+  if (type[1] %in% c("points", "numbers"))  vars_data <- vars_data %>%
+    dplyr::mutate(colorvar_names = as.factor(stringr::str_c("names_", .data$color_group)))
+  #} else { sup_vars_data <- sup_vars_data %>% dplyr::mutate(colorvar_names =  color_group) }
+
+
+
+
 
 
   #Calculate limits of graph (arguments to be passed in ggi() to set htmlwidget size)
-  if (!is.null(sup_vars_coord) | length(sup_vars) != 0) {
-    min_max_lims <-
-      dplyr::bind_rows(dplyr::select(active_var_coord, !!dim1, !!dim2),
-                       dplyr::select(sup_vars_coord, !!dim1, !!dim2))
-  } else {
-    min_max_lims <- dplyr::select(active_var_coord, !!dim1, !!dim2)
-  }
+  min_max_lims <- dplyr::select(vars_data, !!dim1, !!dim2)
 
   if (!missing(xlim)) min_max_lims <- min_max_lims %>%
     tibble::add_row(!!dim1 := xlim[1]) %>% tibble::add_row(!!dim1 := xlim[2])
@@ -1034,28 +1040,23 @@ ggmca_plot <- function(data,
   }
 
   if (text_repel == FALSE | out_lims_move == FALSE) {
-    if (!missing(xlim)) {
-      active_var_coord <- active_var_coord %>% outlims(xlim, !!dim1)
-
-      if (length(sup_vars) != 0) sup_vars_coord <- sup_vars_coord %>%
-          outlims(xlim, !!dim1)
-    }
-    if (!missing(ylim)) {
-      active_var_coord <- active_var_coord %>% outlims(ylim, !!dim2)
-      if (length(sup_vars) != 0) sup_vars_coord <- sup_vars_coord %>%
-          outlims(ylim, !!dim2)
-    }
+    if (!missing(xlim)) vars_data <- vars_data %>% outlims(xlim, !!dim1)
+    if (!missing(ylim)) vars_data <- vars_data %>% outlims(ylim, !!dim2)
   }
 
 
-  #Profiles :
-  if (!is.null(ind_coord)) {
 
-    ind_coord <- ind_coord %>%
+
+
+  #Profiles :
+  if (!is.null(ind_data)) {
+    ind_data <- ind_data %>%
       dplyr::mutate(interactive_text = purrr::map_chr(
         .data$interactive_text,
-        ~ stringr::str_c(., collapse = "\n") %>% stringr::str_remove_all("\n#")
-      ))
+        ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
+      ) %>%
+        stringr::str_remove_all("\n#")
+      )
 
     if (length(cah) != 0) { #& type[1] != "facets"
 
@@ -1063,7 +1064,7 @@ ggmca_plot <- function(data,
         if (!is.null(base_profiles_color) ) {
 
           #Discard the points that are out of limits
-          profiles_coord <- ind_coord
+          profiles_coord <- ind_data
           if (!missing(xlim)) profiles_coord <- profiles_coord %>% outlims(xlim, !!dim1)
           if (!missing(ylim)) profiles_coord <- profiles_coord %>% outlims(ylim, !!dim2)
 
@@ -1080,19 +1081,19 @@ ggmca_plot <- function(data,
 
 
       } else {
-        ind_cah_levels <- ind_coord %>% dplyr::pull(cah) %>% unique() %>%
+        ind_cah_levels <- ind_data %>% dplyr::pull(cah) %>% unique() %>%
           purrr::discard(is.na(.)) %>% purrr::discard(. == "NA")
 
         not_in_color_profiles <- ind_cah_levels %>%
           purrr::discard(. %in% color_profiles) %>%
-          magrittr::set_names(rep("base_profiles_color", length(.) ))
+          purrr::set_names(rep("base_profiles_color", length(.) ))
 
         if (cah %in% sup_vars) {
-          sup_cah_colorvar <- sup_vars_coord %>%
-            dplyr::select(.data$lvs, .data$colorvar) %>%
-            dplyr::filter(stringr::str_detect(.data$colorvar, paste0("^", cah))) %>%
-            dplyr::mutate(colorvar = .data$lvs %>% magrittr::set_names(.data$colorvar)) %>%
-            dplyr::pull(.data$colorvar)
+          sup_cah_colorvar <- vars_data %>%
+            dplyr::select(.data$lvs, .data$color_group) %>%
+            dplyr::filter(stringr::str_detect(.data$color_group, paste0("^", cah))) %>%
+            dplyr::mutate(color_group = .data$lvs %>% purrr::set_names(.data$color_group)) %>%
+            dplyr::pull(.data$color_group)
 
           color_profiles_in_colorvar <- sup_cah_colorvar %>%
             purrr::keep(. %in% ind_cah_levels) %>%
@@ -1115,10 +1116,10 @@ ggmca_plot <- function(data,
 
           if (length(named_color_profiles) != 0 ) {
             new_colors_in_scale <- names(named_color_profiles) %>%
-              magrittr::set_names(named_color_profiles)
+              purrr::set_names(named_color_profiles)
 
             named_color_profiles <- named_color_profiles %>%
-              magrittr::set_names(., .)
+              purrr::set_names(., .)
 
             scale_color_named_vector <- scale_color_named_vector %>%
               append(new_colors_in_scale)
@@ -1133,10 +1134,10 @@ ggmca_plot <- function(data,
               purrr::discard(. %in% scale_color_named_vector)
 
             unnamed_color_profiles <- unnamed_color_profiles %>%
-              magrittr::set_names(., .)
+              purrr::set_names(., .)
 
             scale_color_named_vector <- scale_color_named_vector %>%
-              append(magrittr::set_names(remaining_colors[1:length(unnamed_color_profiles)], unnamed_color_profiles))
+              append(purrr::set_names(remaining_colors[1:length(unnamed_color_profiles)], unnamed_color_profiles))
 
             if  (length(remaining_colors) < length(unnamed_color_profiles)) {
               stop("Not enough colors in scale to color profiles.")
@@ -1153,13 +1154,13 @@ ggmca_plot <- function(data,
           append(color_profiles_in_colorvar)
 
 
-        ind_coord <- ind_coord %>%
-          dplyr::mutate(colorvar = forcats::fct_recode(.data$cah,
-                                                       !!!cah_colorvar_recode))
+        ind_data <- ind_data %>%
+          dplyr::mutate(color_group = forcats::fct_recode(.data$cah,
+                                                          !!!cah_colorvar_recode))
 
 
         #Discard the points that are out of limits
-        profiles_coord <- ind_coord
+        profiles_coord <- ind_data
         if (!missing(xlim)) profiles_coord <- profiles_coord %>% outlims(xlim, !!dim1)
         if (!missing(ylim)) profiles_coord <- profiles_coord %>% outlims(ylim, !!dim2)
 
@@ -1167,7 +1168,7 @@ ggmca_plot <- function(data,
           data = profiles_coord,
           ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
                        tooltip = .data$interactive_text,
-                       data_id = .data$cah_id + 10000, color = .data$colorvar),
+                       data_id = .data$cah_id + 10000, color = .data$color_group),
           na.rm = TRUE, inherit.aes = FALSE, show.legend = FALSE, stroke = 0 #, alpha = 0.5
         )
       }
@@ -1176,7 +1177,7 @@ ggmca_plot <- function(data,
       if (!is.null(base_profiles_color) ) {
 
         #Discard the points that are out of limits
-        profiles_coord <- ind_coord
+        profiles_coord <- ind_data
         if (!missing(xlim)) profiles_coord <- profiles_coord %>% outlims(xlim, !!dim1)
         if (!missing(ylim)) profiles_coord <- profiles_coord %>% outlims(ylim, !!dim2)
 
@@ -1194,31 +1195,30 @@ ggmca_plot <- function(data,
       }
     }
 
+
     if(type[1] == "facets" | !is.null(ellipses) ) {
 
-      ind_coord <- ind_coord %>%
+      ind_data <- ind_data %>%
         dplyr::mutate(sup_vars = purrr::map(.data$sup_vars,
                                             ~ dplyr::select(., !!rlang::sym(sup_vars[1])))) %>%
         tidyr::unnest(c(.data$sup_vars, .data$row.w))
 
       supvar1_lvs <-
-        dplyr::filter(sup_vars_coord, sup_vars == sup_vars[1]) %>%
-        dplyr::pull(.data$lvs) %>% purrr::set_names(.)
+        dplyr::filter(vars_data, .data$vars == sup_vars[1]) %>%
+        dplyr::pull(.data$lvs) %>% as.character() %>% purrr::set_names(.)
 
-      supvar1_colorvar <- dplyr::filter(sup_vars_coord, sup_vars == sup_vars[1]) %>%
-        dplyr::select(.data$lvs, .data$colorvar)
+      supvar1_colorvar <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) %>%
+        dplyr::select(.data$lvs, .data$color_group)
+      supvar1_colorvar <- as.character(supvar1_colorvar$color_group) %>% purrr::set_names(supvar1_colorvar$lvs)
 
-      supvar1_colorvar <- supvar1_colorvar$colorvar %>% purrr::set_names(supvar1_colorvar$lvs)
-
-      supvar1_infos <- dplyr::filter(sup_vars_coord, sup_vars == sup_vars[1]) %>%
+      supvar1_infos <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) %>%
         dplyr::mutate(nam = .data$lvs) %>%
-        dplyr::select(.data$nam, .data$lvs, .data$colorvar, .data$id) %>%
-        tidyr::nest(infos = c(.data$lvs, .data$colorvar, .data$id))
-
+        dplyr::select(.data$nam, .data$lvs, .data$color_group, .data$id) %>%
+        tidyr::nest(infos = c(.data$lvs, .data$color_group, .data$id))
       supvar1_infos <- supvar1_infos$infos %>% purrr::set_names(supvar1_infos$nam)
 
       if (!is.null(ellipses)) {
-        ellipses_coord <- ind_coord %>%
+        ellipses_coord <- ind_data %>%
           dplyr::select(!!dim1, !!dim2, .data$row.w, tidyselect::all_of(sup_vars[1])) %>%
           dplyr::mutate(infos = supvar1_infos[as.character(!!rlang::sym(sup_vars[1]))]) %>%
           tidyr::unnest(cols = c(.data$infos)) %>%
@@ -1237,13 +1237,13 @@ ggmca_plot <- function(data,
             ggplot2::geom_path(data = ellipses_coord,
                                ggplot2::aes(x = !!dim1, y = !!dim2,
                                             group = .data$lvs,
-                                            color = .data$colorvar),
+                                            color = .data$color_group),
                                stat = "ellipse",
                                type = "t", level = ellipses, size = 1,
                                segments = 360, alpha = 1, inherit.aes = FALSE)
           }
 
-        # ggplot2::stat_ellipse(data = ind_coord,
+        # ggplot2::stat_ellipse(data = ind_data,
         #                       ggplot2::aes(x = !!dim1, y = !!dim2,
         #                                    group = !!rlang::sym(sup_vars[1]),
         #                                    color = !!rlang::sym(sup_vars[1]) ),
@@ -1255,7 +1255,7 @@ ggmca_plot <- function(data,
       }
 
       if(type[1] == "facets") {
-        ind_coord <- ind_coord %>%
+        ind_data <- ind_data %>%
           tidyr::nest(row.w = .data$row.w) %>%
           dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
                         wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
@@ -1266,8 +1266,8 @@ ggmca_plot <- function(data,
                                          ~ supvar1_lvs[as.character(.)]
           ) %>% unlist(),
 
-          colorvar = purrr::map(!!rlang::sym(sup_vars[1]),
-                                ~ supvar1_colorvar[as.character(.)]
+          color_group = purrr::map(!!rlang::sym(sup_vars[1]),
+                                   ~ supvar1_colorvar[as.character(.)]
           ) %>% unlist()
           ) %>%
           dplyr::filter(!is.na(.data$lvs))
@@ -1283,68 +1283,34 @@ ggmca_plot <- function(data,
 
 
 
+
   #Draw plot  -----------------------------------------------------
 
-  #Active variables graph
-  if (text_repel == FALSE) {
-    active_graph <-
-      ggiraph::geom_text_interactive(
-        data = active_var_coord,
-        ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
-                     tooltip = .data$interactive_text, data_id = .data$id + 1000),
-        color = "black",
-        fontface = dplyr::if_else(type[1] == "active_vars_only" | actives_in_bold,
-                                  "bold", "plain"), # alpha = ifelse(type[1] == "points", 0.8, 1)
-        size = text_size, na.rm = TRUE, inherit.aes = FALSE
-      )
-  } else {
-    active_graph <-
-      ggrepel::geom_text_repel(
-        data = active_var_coord,
-        ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs),
-        color = "black", alpha = dplyr::if_else(type[1] == "points", 0.8, 1),
-        fontface = dplyr::if_else(type[1] == "active_vars_only" | actives_in_bold, "bold", "plain"), # alpha = ifelse(type[1] == "points", 0.8, 1)
-        size = text_size,
-        direction = "both", force = 0.5, force_pull = 1, point.padding = 0, box.padding = 0, point.size = NA,
-        arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
-        min.segment.length = 0.01, #0.4,
-        na.rm = TRUE, inherit.aes = FALSE
-      ) #, box.padding = 0
-  }
-
   # If type is text, put the active_vars on the same base than suplementary vars, to avoid overlapping of the two.
-  if (text_repel == TRUE & type[1] == "text" & length(sup_vars) != 0) {
-
-
-    #sup_vars_coord <- sup_vars_coord %>% dplyr::mutate(wcount = as.double(wcount))
-
-    sup_vars_coord <-
-      dplyr::bind_rows(
-        dplyr::mutate(
-          dplyr::select(active_var_coord, -.data$contrib1, -.data$contrib2,
-                        -.data$interactive_text),
-          colorvar = factor("active_vars"), wcount = 0,
-          face = dplyr::if_else(actives_in_bold, "bold", "plain") #"plain"
-        ),
-        dplyr::mutate(sup_vars_coord,
-                      face = dplyr::if_else(!actives_in_bold, "bold", "plain"))
-      ) #colorvar_names = factor("active_vars")
-    scale_color_named_vector <- scale_color_named_vector %>%
-      append(c("active_vars" = "black"))
-    active_graph <- NULL
-  }
-
+  #if (type[1] == "text" & length(sup_vars) != 0) {
+    vars_data <- vars_data %>%
+      dplyr::mutate(
+        face = dplyr::case_when(
+          color_group == "active_vars" & actives_in_bold ~ "bold" ,
+          color_group == "active_vars"                   ~ "plain",
+          actives_in_bold                                ~ "plain",
+          TRUE                                           ~ "bold" ,
+        ))
+  #}
 
   #Mean point:
+  mean_point_data  <- dplyr::filter(vars_data, .data$lvs == "Central point")
   mean_point_graph <-
     ggiraph::geom_point_interactive(
-      data = mean_point_coord,
+      data = mean_point_data,
       ggplot2::aes(x = !!dim1, y = !!dim2, tooltip = .data$interactive_text),
       color = "black", fill = "#eeeeee",
       shape = 3, size = 5, stroke = 1.5,
       na.rm = TRUE, inherit.aes = FALSE
     )
+  vars_data <- vars_data %>% dplyr::filter(.data$lvs != "Central point")
 
+  #Theme
   if (!missing(title)) {
     title_graph <- ggplot2::labs(title = title) #stringr::str_c("Les Active variables de l'ACM sur les axes ",axes[1], " et ", axes[2] )
   } else {
@@ -1360,37 +1326,88 @@ ggmca_plot <- function(data,
          title_graph)
 
 
+  #Separate graph for active_vars with type != "text"
+  if (type[1] %in% c("points", "labels", "numbers")) {
+    active_graph <-
+      if (text_repel == FALSE) {
+        ggiraph::geom_text_interactive(
+          data = dplyr::filter(vars_data, .data$color_group == "active_vars"),
+          ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs, fontface = .data$face,
+                       tooltip = .data$interactive_text, data_id = .data$id),
+          color = "black",
+          size = text_size, na.rm = TRUE, inherit.aes = FALSE
+        )
+      } else {
+        ggiraph::geom_text_repel_interactive(
+          data = dplyr::filter(vars_data, .data$color_group == "active_vars"),
+          ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs, fontface = .data$face,
+                       tooltip = .data$interactive_text, data_id = .data$id),
+          color = "black", alpha = dplyr::if_else(type[1] == "points", 0.8, 1),
+          size = text_size,
+          direction = "both", force = 0.5, force_pull = 1, point.padding = 0, box.padding = 0, point.size = NA,
+          arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
+          min.segment.length = 0.01, #0.4,
+          na.rm = TRUE, inherit.aes = FALSE
+        ) #, box.padding = 0
+      }
+  }
 
-  if (type[1] == "points") {
+
+
+
+  #The final plots
+  if (type[1] == "text") {
+    if (text_repel == FALSE) {
+      graph_text <-
+        ggiraph::geom_text_interactive(
+          ggplot2::aes(fontface = .data$face, tooltip = .data$interactive_text),
+          size = text_size, na.rm = TRUE
+        )
+    } else {
+      graph_text <-
+        ggiraph::geom_text_repel_interactive(
+          ggplot2::aes(fontface = .data$face, tooltip = .data$interactive_text),
+          size = text_size, na.rm = TRUE, #fontface = "bold"
+          direction = "both", # segment.alpha = 0.5,
+          min.segment.length = 0.01, #0.4,
+          force = 0.5, force_pull = 1, point.padding = 0,  box.padding = 0, point.size = NA,
+          arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines"))
+        ) # point.padding = 0.25, segment.colour = "black",
+    }
     plot_output <-
-      ggplot2::ggplot(sup_vars_coord,
+      ggplot2::ggplot(vars_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
-                                   color = .data$colorvar, data_id = .data$id)) +
-      graph_theme_acm + profiles + active_graph + ellipses +
-      ggrepel::geom_text_repel(
-        ggplot2::aes(color = .data$colorvar_names),  #data = sup_vars_coord,
-        size = text_size, hjust = "left",  segment.alpha = 0.2, #segment.colour = "black",
-        direction = "y", nudge_x = dist_labels[1], point.padding = 0.25,
-        na.rm = TRUE, fontface = "plain"
-      ) + # ifelse(names_darker == TRUE, "plain", "bold")
-      ggiraph::geom_point_interactive(
-        ggplot2::aes(size = .data$wcount, fill = .data$colorvar,
-                     tooltip = .data$interactive_text), #data = sup_vars_coord, ggplot2::aes(x = !!dim1, y = !!dim2, color = colorvar)
-        shape = 18, na.rm = TRUE
-      ) +
+                                   color = .data$color_group, data_id = .data$id)) +
+      graph_theme_acm + profiles  + ellipses + graph_text +
       mean_point_graph
 
 
 
-    css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
-                                     text = "color:gold4;stroke:none;")
-    plot_output <- plot_output %>%
-      append(c("css_hover" = css_hover)) #retrieves class ggplot2::ggplot after
 
+  } else if (type[1] == "points") {
+    #If active vars too, points in gray
 
-  } else if (type[1] == "active_vars_only") {
-    plot_output <- ggplot2::ggplot() + graph_theme_acm + profiles +
-      active_graph + mean_point_graph
+    plot_output <-
+      ggplot2::ggplot(dplyr::filter(vars_data, .data$color_group != "active_vars"),
+                      ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
+                                   color = .data$color_group, data_id = .data$id)) +
+      graph_theme_acm + profiles + active_graph + ellipses +
+      ggiraph::geom_text_repel_interactive(
+        ggplot2::aes(color = .data$colorvar_names, tooltip = .data$interactive_text),
+        size = text_size, hjust = "left",  segment.alpha = 0.2, #segment.colour = "black",
+        direction = "both", nudge_x = dist_labels[1], point.padding = 0.25,
+        na.rm = TRUE, fontface = "plain"
+      ) + # ifelse(names_darker == TRUE, "plain", "bold")
+      ggiraph::geom_point_interactive(
+        ggplot2::aes(size = .data$wcount, fill = .data$color_group,
+                     tooltip = .data$interactive_text),
+        shape = 18, na.rm = TRUE
+      ) +
+      mean_point_graph
+
+    # css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
+    #                                  text = "color:gold4;stroke:none;")
+    # plot_output <- plot_output %>% append(c("css_hover" = css_hover)) #retrieves class ggplot2::ggplot after
 
 
 
@@ -1398,12 +1415,13 @@ ggmca_plot <- function(data,
     if (text_repel == FALSE) {
       graph_labels <-
         ggiraph::geom_label_interactive(
-          ggplot2::aes(tooltip = .data$interactive_text), #data = sup_vars_coord, ggplot2::aes(color = colorvar_names),
+          ggplot2::aes(fontface = .data$face, tooltip = .data$interactive_text),
           size = text_size, fontface = "bold", na.rm = TRUE
         )
     } else {
-      graph_labels <-                               # data = sup_vars_coord,ggplot2::aes(color = colorvar_names)
-        ggrepel::geom_label_repel(
+      graph_labels <-
+        ggiraph::geom_label_repel_interactive(
+          ggplot2::aes(fontface = .data$face, tooltip = .data$interactive_text),
           size = text_size, fontface = "bold", na.rm = TRUE,
           direction = "both", #segment.alpha = 0.5,
           min.segment.length = 0.01,
@@ -1412,73 +1430,50 @@ ggmca_plot <- function(data,
         ) #point.padding = 0, segment.colour = "black"
     }
     plot_output <-
-      ggplot2::ggplot(sup_vars_coord,
+      ggplot2::ggplot(dplyr::filter(vars_data, .data$color_group != "active_vars"),
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
-                                   color = .data$colorvar, data_id = .data$id)) +
+                                   color = .data$color_group, data_id = .data$id)) +
       graph_theme_acm + profiles + active_graph + ellipses + graph_labels +
       mean_point_graph
 
 
-  } else if (type[1] == "text") {
-    if (text_repel == FALSE) {
-      graph_text <-
-        ggiraph::geom_text_interactive(
-          ggplot2::aes(tooltip = .data$interactive_text), #data = sup_vars_coord, colorvar_names
-          size = text_size, fontface = dplyr::if_else(!actives_in_bold, "bold", "plain"), na.rm = TRUE
-        )
-    } else {
-      graph_text <-
-        ggrepel::geom_text_repel(
-          ggplot2::aes(fontface = .data$face), size = text_size, na.rm = TRUE, #fontface = "bold"
-          direction = "both", # segment.alpha = 0.5,
-          min.segment.length = 0.01, #0.4,
-          force = 0.5, force_pull = 1, point.padding = 0,  box.padding = 0, point.size = NA,
-          arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines"))
-        ) # point.padding = 0.25, segment.colour = "black",
-    }
-    plot_output <-
-      ggplot2::ggplot(sup_vars_coord,
-                      ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
-                                   color = .data$colorvar, data_id = .data$id)) +
-      graph_theme_acm + profiles + active_graph + ellipses + graph_text +
-      mean_point_graph
-
 
   } else if (type[1] == "numbers") {
     plot_output <-
-      ggplot2::ggplot(sup_vars_coord,
+      ggplot2::ggplot(dplyr::filter(vars_data, .data$color_group != "active_vars"),
                       ggplot2::aes(x = !!dim1, y = !!dim2,
                                    tooltip = .data$interactive_text,
                                    data_id = .data$id)) +
       graph_theme_acm + profiles + ellipses +
       ggiraph::geom_label_interactive(
-        data = active_var_coord,
+        data = dplyr::filter(vars_data, .data$color_group == "active_vars"),
         ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
                      tooltip = .data$interactive_text, data_id = .data$id + 1000),
         size = text_size, color = "black", na.rm = TRUE, inherit.aes = FALSE
       ) +
       ggiraph::geom_text_interactive(
-        ggplot2::aes(label = .data$lvs, color = .data$colorvar),  #colorvar_names
+        ggplot2::aes(label = .data$lvs, color = .data$color_group),  #colorvar_names
         size = text_size/1.2, hjust = "left", nudge_x = dist_labels[1],
         na.rm = TRUE
       ) + #fontface = "bold"
       ggiraph::geom_label_interactive(
-        ggplot2::aes(label = .data$numbers, color = .data$colorvar),
+        ggplot2::aes(label = .data$numbers, color = .data$color_group),
         size = text_size*1.2, fontface = "bold", na.rm = TRUE
       ) +
       mean_point_graph
+
 
   } else if(type[1] == "facets") {
     #facets : profiles by sup_vars, no active vars
     #for each sup_var, for the first ?
 
     plot_output <-
-      ggplot2::ggplot(data = ind_coord,
+      ggplot2::ggplot(data = ind_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
-                                   color = .data$colorvar, group = .data$lvs)) +
+                                   color = .data$color_group, group = .data$lvs)) +
       ggplot2::geom_point(na.rm = TRUE, show.legend = FALSE) +
       ggiraph::geom_point_interactive(
-        data = dplyr::filter(sup_vars_coord, sup_vars == sup_vars[1]),
+        data = dplyr::filter(vars_data, .data$vars == sup_vars[1]),
         ggplot2::aes(x = !!dim1, y = !!dim2, group = .data$lvs,
                      data_id = .data$id, tooltip = .data$interactive_text),
         color = "black", shape = 17, size = 0, stroke = 10,
@@ -1487,13 +1482,12 @@ ggmca_plot <- function(data,
       ggplot2::facet_wrap(ggplot2::vars(.data$lvs), scales = "fixed") +
       graph_theme_acm + ellipses
 
+
     css_hover <- ggiraph::girafe_css("stroke:orange;stroke-width:2;",
                                      text = "color:gold4;stroke:none;")
 
-    css_tooltip <- "text-align:right;padding:4px;border-radius:5px;color:white;"
-
     plot_output <- plot_output %>%
-      append(c("css_hover" = css_hover, "css_tooltip" = css_tooltip))
+      append(c("css_hover" = css_hover))
 
   } else { stop('unknown type of graph') }
 
@@ -1585,7 +1579,7 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 #' @export
 #' @examples \donttest{
 #' data(tea, package = "FactoMineR")
-#' res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+#' res.mca <- MCA2(tea, active_vars = 1:18)
 #' mca_interpret(res.mca)
 #' }
 mca_interpret <- function(res.mca = res.mca,
@@ -2069,7 +2063,7 @@ ggca <-
       tidyr::unite("col_freq", sep = ": ") %>% dplyr::pull(.data$col_freq) %>%
       stringr::str_c(collapse = "\n")
 
-    mean_point_coord <- row_coord %>% dplyr::slice(1) %>%
+    mean_point_data <- row_coord %>% dplyr::slice(1) %>%
       dplyr::mutate_at(dplyr::vars(tidyselect::starts_with("Dim")), ~ 0) %>%
       dplyr::mutate(lvs = NA_character_, freq = 1, colorvar = "Central_point",
                     numbers = NA_character_) %>%
@@ -2077,7 +2071,7 @@ ggca <-
         "<b>Central point</b>\nFrequency: ", stringr::str_c(.data$freq*100, "%")))
 
     #if ("row" %in% tooltips) {     }     if ("col" %in% tooltips) {        }
-    mean_point_coord <- mean_point_coord %>%
+    mean_point_data <- mean_point_data %>%
       dplyr::mutate(interactive_text = stringr::str_c(.data$interactive_text, "\n\n",
                                                       rowtips_subtitle, " :\n",
                                                       row_freq_text,
@@ -2198,7 +2192,7 @@ ggca <-
 
     graph_mean_point <-
       ggiraph::geom_point_interactive(
-        data = mean_point_coord,
+        data = mean_point_data,
         ggplot2::aes(x = !!dim1, y = !!dim2, tooltip = .data$interactive_text),
         color = "black", shape = 3, size = 5, stroke = 1.5, fill = "black", na.rm = TRUE
       )
@@ -2524,11 +2518,12 @@ ggi <- function(plot = ggplot2::last_plot(),
   if ("css_hover" %in% names(plot)) {
     css_hover <- plot$css_hover
   } else {
-    css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
-                                     text = "color:gold4;stroke:none;",
+    css_hover <- ggiraph::girafe_css("fill:#d2b200;stroke:orange;",
+                                     text  = "color:gold4;stroke:none;",
                                      point = "fill:gold;stroke:orange;",
-                                     area = "fill:white")
+                                     area  = "fill:#ffe348")
   }
+
 
   if ("css_tooltip" %in% names(plot)) {
     css_tooltip <- plot$css_tooltip
@@ -2574,7 +2569,7 @@ ggi <- function(plot = ggplot2::last_plot(),
                     # ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
                     ...
     ) %>%
-    ggiraph::girafe_options(ggiraph::opts_tooltip(use_fill = TRUE, css = css_tooltip), #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
+    ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip), #use_fill = TRUE, #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
                             ggiraph::opts_hover(css = css_hover)
                             # ggiraph::opts_zoom(max = 5) # bugue pas mal
                             # ggiraph::opts_hover(css = girafe_css(css = "fill:purple;stroke:black;", text = "stroke:none;fill:red;font-style:bold;")) #    point = NULL, line, area, image
@@ -2953,7 +2948,7 @@ pers_or_plot <-
 
 
 
-# Internal functinos ---------------------------------------------------------------------
+# Internal functions ---------------------------------------------------------------------
 
 
 
@@ -2997,6 +2992,337 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
   return(path)
 }
 
+#Code taken from function varsup() of package GDAtools 1.7.2 : thanks to Nicolas Robette
+#' @keywords internal
+varsup <- function (resmca, var){
+  dichotom <- function (data, out = "numeric") {
+    if (!is.data.frame(data))
+      data <- data.frame(data)
+    res <- matrix(nrow = nrow(data), ncol = length(levels(data[,
+                                                               1])))
+    for (i in 1:ncol(data)) {
+      if (is.factor(data[, i]) == FALSE)
+        data[, i] <- factor(data[, i])
+      nlevels <- length(levels(data[, i]))
+      temp <- matrix(nrow = nrow(data), ncol = nlevels)
+      for (j in 1:nlevels) {
+        temp[, j] <- 0
+        temp[data[, i] == levels(data[, i])[j], j] <- 1
+      }
+      colnames(temp) <- paste(names(data)[i], levels(data[, i]), sep = ".")
+      if (i == 1)
+        res <- temp
+      else res <- cbind(res, temp)
+    }
+    res <- as.data.frame(res)
+    if (out == "factor")
+      for (i in 1:ncol(res)) res[, i] <- as.factor(res[, i])
+    res
+  }
 
+  type <- attr(resmca, "class")[1]
+  if (type %in% c("MCA", "stMCA", "multiMCA"))
+    eigen <- resmca$eig[, "eigenvalue"]
+  if (type %in% c("speMCA", "csMCA"))
+    eigen <- resmca$eig$eigen
+  if (type == "stMCA") {
+    if (resmca$call$input.mca %in% c("MCA", "speMCA",
+                                     "csMCA"))
+      type <- resmca$call$input.mca
+  }
+  if (type == "multiMCA") {
+    classe_afm <- class(resmca$my.mca[[1]])[1]
+    if (classe_afm %in% c("MCA", "speMCA", "csMCA"))
+      type <- classe_afm
+    if (classe_afm == "csMCA") {
+      resmca$call$row.w <- resmca$my.mca[[1]]$call$row.w
+      resmca$call$subcloud <- resmca$my.mca[[1]]$call$subcloud
+    }
+  }
+  if (type %in% c("MCA", "speMCA")) {
+    wt <- resmca$call$row.w
+    v <- factor(var)
+    n <- sum(wt)
+    FK <- colSums(wt * (dichotom(as.data.frame(v), out = "numeric")))/n
+    ind <- resmca$ind$coord
+    coord <- stats::aggregate(wt * ind, list(v), sum)[, -1]/n/FK
+    vrc <- stats::aggregate(wt * ind * ind, list(v), sum)[, -1]/n/FK -
+      coord * coord
+    for (i in 1:resmca$call$ncp) coord[, i] <- coord[, i]/resmca$svd$vs[i]
+    cos2 <- coord * coord/((1/FK) - 1)
+    weight = n * FK
+  }
+  if (type == "csMCA") {
+    wt <- resmca$call$row.w
+    n <- sum(wt)
+    v <- factor(var)
+    FK <- colSums(wt * (dichotom(as.data.frame(v), out = "numeric")))/n
+    wt <- wt[resmca$call$subcloud]
+    n.w <- sum(wt)
+    v <- factor(var[resmca$call$subcloud])
+    fK <- colSums(wt * (dichotom(as.data.frame(v), out = "numeric")))/n.w
+    ind <- resmca$ind$coord
+    coord <- stats::aggregate(wt * ind, list(v), sum)[-1]/n.w/fK
+    vrc <- stats::aggregate(wt * ind * ind, list(v), sum)[, -1]/n.w/fK -
+      coord * coord
+    for (i in 1:resmca$call$ncp) coord[, i] <- coord[, i]/resmca$svd$vs[i]
+    cos2 <- coord * coord * FK * FK/fK/(1 - fK)
+    weight <- length(wt) * fK
+  }
+  names(weight) <- levels(v)
+  rownames(coord) <- levels(v)
+  rownames(cos2) <- levels(v)
+  wi <- apply(vrc, 2, stats::weighted.mean, w = weight)
+  be <- eigen[1:resmca$call$ncp] - wi
+  eta2 <- be/eigen[1:resmca$call$ncp]
+  vrc <- rbind(vrc, wi, be, eigen[1:resmca$call$ncp], eta2)
+  vrc <- round(vrc, 6)
+  rownames(vrc) <- c(levels(v), "within", "between",
+                     "total", "eta2")
+  coord <- round(coord, 6)
+  typic <- sqrt(cos2) * sqrt(length(v) - 1)
+  typic <- (((abs(coord) + coord)/coord) - 1) * typic
+  pval <- 2 * (1 - stats::pnorm(abs(as.matrix(typic))))
+  #cor <- sapply(as.data.frame(ind), function(x) assoc.catcont(v, x, wt, nperm = NULL)$cor)
+  list(weight = round(weight, 1), coord = coord, cos2 = round(cos2, 6),
+       var = round(vrc, 6), typic = round(typic, 6), pval = round(pval, 6)#,
+       #cor = cor
+  )
+}
+
+
+#' @keywords internal
+interactive_tooltips <- function(dat,
+                                 sup_vars         = character(),
+                                 active_tables    = character(),
+                                 active_vars,
+                                 #active_vars_data,
+                                 tooltip_vars_1lv = character(),
+                                 tooltip_vars     = character()#,
+                                 #excl             = character(),
+                                 #cleannames       = FALSE
+                                 ) {
+  sup_list <- c(tooltip_vars_1lv, active_vars, tooltip_vars)
+  vars <- c(active_tables[!active_tables %in% sup_vars], sup_vars)
+  #c(sup_vars[!sup_vars %in% active_tables], sup_vars) #vars <- c(active_vars, sup_vars)
+
+
+  #Tooltip vars with only the first level kept
+  if (length(tooltip_vars_1lv) != 0) {
+    tooltip_vars_1lv_3levels <-
+      purrr::map_lgl(dat, ~ nlevels(.) >= 3) &
+      colnames(dat) %in% tooltip_vars_1lv
+    if (any(tooltip_vars_1lv_3levels)) dat <- dat %>%
+        dplyr::mutate_if(tooltip_vars_1lv_3levels,
+                         ~ forcats::fct_other(
+                           .,
+                           keep = levels(.)[1],
+                           other_level = "Other_levels"
+                         ))
+    dat <- dat %>%
+      dplyr::mutate(dplyr::across(
+        tidyselect::all_of(tooltip_vars_1lv),
+        ~ forcats::fct_recode(., rlang::splice(purrr::set_names(levels(.)[-1], "Remove_levels")))
+      ))
+  }
+
+
+  #To remove the second level when active vars just have two
+  active_vars_2levels <-
+    purrr::map_lgl(dat[active_vars],
+                   ~ is.factor(.) & length(levels(.)[levels(.) != "Remove_levels"]) == 2)
+
+  active_vars_2levels <- names(active_vars_2levels[active_vars_2levels])
+
+  active_vars_2levels <- dplyr::select(dat, tidyselect::all_of(active_vars_2levels)) %>%
+    purrr::map(~ levels(.)[2]) %>%
+    purrr::imap(~ c(.x, paste0(.y, "_", .x))) |>
+    purrr::flatten_chr()
+
+
+  tabs <- purrr::map_if(
+    vars, vars %in% active_tables,
+    ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
+      tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
+                         na = "drop", wt = "row.w", pct = "row", color = "diff") %>%
+        dplyr::rename_with(~ "lvs", 1) %>%
+        dplyr::select(-tidyselect::starts_with("Remove_levels"),
+                      -tidyselect::any_of(active_vars_2levels)) %>%
+        dplyr::filter(!.data$lvs == "Remove_levels")
+    }),
+
+    .else =
+      ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
+        tabxplor::tab(dat, !!rlang::sym(.), na = "drop", wt = "row.w", pct = "col") %>% #tot = c("row", "col")
+          dplyr::rename_with(~ "lvs", 1) %>%
+          dplyr::select(-any_of("n")) %>%
+          dplyr::filter(!.data$lvs == "Remove_levels")
+      })
+
+  ) %>%
+    purrr::set_names(vars)
+
+  # sup_vars_count <-
+  #   purrr::map(tabs, ~ dplyr::mutate(dplyr::select(., lvs, Total),
+  #                                    Total = vctrs::field(.data$Total, "wn") ))
+
+  #col_vars_levels <- purrr::map(tabs, ~ tabxplor::tab_get_vars(.)$col_vars_levels)
+
+  # tooltip_first_levels <- col_vars_levels %>%
+  #   purrr::map(~ .[names(.) %in% tooltip_vars] %>% purrr::map(dplyr::first) %>%
+  #                purrr::flatten_chr()
+  #   )
+
+
+  # active_first_variable <- col_vars_levels %>%
+  #   purrr::map(~ .[names(.) %in% active_vars] %>%
+  #                dplyr::first() %>% dplyr::first()
+  #   )
+
+  color_code_vector <- function(var) {
+    color_selection <- tabxplor:::fmt_color_selection(var) %>% purrr::map(which)
+
+    color_styles <- tabxplor:::select_in_color_style(length(color_selection))
+    color_styles <- tabxplor:::get_color_style("color_code", type = "text", theme = "light")[color_styles]
+
+    color_positions <- color_selection %>%
+      purrr::map2(color_styles, ~ purrr::set_names(.x, stringr::str_to_upper(.y))) %>%
+      purrr::flatten_int()
+
+    no_color <- 1:length(var)
+    no_color <- purrr::set_names(no_color[!no_color %in% color_positions], NA_character_)
+
+    names(sort(c(color_positions, no_color)))
+  }
+
+  format_pct <- function(diff, pct, colname, color_code) {
+    pct <- stringr::str_pad(pct, 3, pad = "@")
+
+    pct[!is.na(color_code)] <-
+      stringr::str_c("<font color=\"",
+                     color_code[!is.na(color_code)],
+                     "\">",
+                     "<b>",
+                     pct[!is.na(color_code)],
+                     "</b>",
+                     "</font>"
+      )
+
+    pct[is.na(color_code)] <- paste0("\\u202f", pct[is.na(color_code)])
+
+    #pct <- paste0("\t", pct)
+
+    dplyr::case_when(
+      diff == 0 ~ paste0(colname, ": ", pct), #"\n"
+
+      diff >  0 ~ paste0(
+        colname, ": ", #"\n",
+        "(", stringr::str_pad(paste0(
+          "+" , abs(diff)), 3, pad = "@"),"%) ",
+        pct),
+
+      diff <  0 ~ paste0(
+        colname, ": ", #"\n",
+        "(", stringr::str_pad(paste0(
+          "-" , abs(diff)), 4, pad = "@"),"%) ",
+        pct)
+    ) %>%
+      stringr::str_replace_all(
+        "@",
+        "\\u202f\\u202f"
+      ) %>%
+      stringi::stri_unescape_unicode()
+  }
+
+
+  tooltip_vars_1lv_levels <- purrr::map_chr(tooltip_vars_1lv, ~ levels(dat[[.]])[1])
+
+  first_active <- levels(dat[[active_vars[[1]]]])
+  first_active <- purrr::map(first_active, ~ c(., paste0(., "_", active_vars[[1]]))) %>%
+    purrr::flatten_chr()
+
+  last_var_with_active_tables <- tidyr::replace_na(
+    1:length(vars) != dplyr::last(which(vars %in% active_tables)),
+    FALSE
+  )
+
+  if (length(tooltip_vars) != 0) {
+    tooltip_first_levels <-
+      purrr::imap_dfr(dplyr::select(dat, tidyselect::all_of(tooltip_vars)),
+                      ~ tibble::tibble(vars = .y, lvs = c(levels(.x)[1], paste0(levels(.x)[1], "_", .y) )))
+    tooltip_first_levels <- purrr::set_names(tooltip_first_levels$vars, tooltip_first_levels$lvs)
+
+  } else {
+    tooltip_first_levels <- character()
+  }
+
+
+  interactive_text <-
+    purrr::imap(tabs,
+                ~ dplyr::mutate(.x, vars = factor(.y)) %>%
+                  dplyr::relocate(.data$vars, .before = 1)
+    ) %>%
+    purrr::map_if(last_var_with_active_tables, ~ dplyr::filter(., lvs != "Total")) %>%
+    dplyr::bind_rows()
+
+
+
+  # interactive_text %>%
+  #   dplyr::mutate(dplyr::across(
+  #     where(tabxplor::is_fmt),
+  #     ~ format_pct(diff       = round(vctrs::field(., "diff") * 100, 0),
+  #                  pct        = format(.),
+  #                  colname    = dplyr::cur_column(),
+  #                  color_code = color_code_vector(.))
+  #   )) %>%
+  #   dplyr::select(1:4)
+  #
+
+  interactive_text <- interactive_text %>%
+    dplyr::mutate(vars = dplyr::if_else(stringr::str_detect(.data$lvs, "^Total"),
+                                        true  = factor("All", c(levels(.data$vars), "All")),
+                                        false = .data$vars),
+
+                  lvs  = dplyr::if_else(stringr::str_detect(.data$lvs, "^Total"),
+                                        true  = factor("Central point", c(levels(.data$lvs), "Central point")),
+                                        false = .data$lvs)
+    ) %>%
+    dplyr::mutate(n     = vctrs::field(.data$Total, "n"),
+                  Total = vctrs::field(.data$Total, "wn")) %>%
+    dplyr::rename("wcount" = "Total") %>%
+    dplyr::mutate(actives_text = dplyr::if_else(vars %in% active_tables,
+                                                true  = "\n<b>Active variables:</b>",
+                                                false = NA_character_)) %>%
+    dplyr::mutate(begin_text = paste0(
+      "<b>", .data$lvs,"</b>",
+      dplyr::if_else(.data$lvs != "Central point", true = paste0("\n", .data$vars), false = ""),
+      "\nFrequency (n=", .data$n, "): ",
+      paste0(format(round(.data$wcount / dplyr::last(.data$wcount) * 100, 0)), "%")
+    ) ) %>%
+    dplyr::select(-.data$n) %>%
+    dplyr::select(.data$vars, .data$lvs, .data$wcount, .data$begin_text,
+                  tidyselect::any_of(tooltip_vars_1lv_levels),
+                  tidyselect::any_of("actives_text"),
+                  tidyselect::any_of(first_active),
+                  tidyselect::everything()) %>%
+    dplyr::mutate(dplyr::across(
+      where(tabxplor::is_fmt),
+      ~ format_pct(diff       = round(vctrs::field(., "diff") * 100, 0),
+                   pct        = format(.),
+                   colname    = dplyr::cur_column(),
+                   color_code = color_code_vector(.))
+    )) %>%
+    dplyr::mutate(dplyr::across(
+      tidyselect::any_of(names(tooltip_first_levels)),
+      ~ dplyr::if_else(.data$vars %in% active_tables,
+                       true  = paste0("\n<b>Distribution by ",
+                                      tooltip_first_levels[dplyr::cur_column()],
+                                      ":</b>" , "\n"),
+                       false = NA_character_
+      )
+    ))
+
+  interactive_text
+}
 
 

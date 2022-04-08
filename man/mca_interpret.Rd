@@ -34,7 +34,7 @@ of the variance of the question/variable.
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")
-res.mca <- FactoMineR::MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+res.mca <- MCA2(tea, active_vars = 1:18)
 mca_interpret(res.mca)
 }
 }
