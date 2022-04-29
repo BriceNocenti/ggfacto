@@ -257,9 +257,18 @@ to draw the graph.
 data(tea, package = "FactoMineR")
 res.mca <- MCA2(tea, active_vars = 1:18)
 
+# Interactive graph for multiple correspondence analysis :
 res.mca \%>\%
   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) \%>\%
   ggi() #to make the graph interactive
+
+# Interactive graph with access to all crosstables between active variables (burt table).
+#  Spread from mean are colored and, usually, points near the middle will have less
+#  colors, and points at the edges will have plenty. It may takes time to print, but
+#  helps to interpret the MCA in close proximity with the underlying data.
+res.mca \%>\%
+  ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) \%>\%
+  ggi()
 
 #Concentration ellipses for each levels of a supplementary variable :
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),

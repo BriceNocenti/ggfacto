@@ -37,8 +37,10 @@ globalVariables(c(":="))
 #' A regex pattern to clean the names of factors.
 #' @keywords internal
 # @export
-cleannames_condition <- function()
-  "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-| *\\(.+\\)"
+cleannames_condition <- function() {
+   "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-| *\\(.+\\)"
+}
+
 
 #Use fct_relabel instead of pers functions ! -----------------------------------
 #' Clean factor levels.

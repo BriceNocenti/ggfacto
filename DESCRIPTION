@@ -36,7 +36,7 @@ Imports:
     vctrs (>= 0.3.0),
     ggrepel (>= 0.9.0),
     gridExtra (>= 2.0),
-    tabxplor (>= 1.0.0),
+    tabxplor (>= 1.0.3),
     stats (>= 4.0.0),
     grDevices (>= 4.0.0),
     htmlwidgets (>= 1.4.0),

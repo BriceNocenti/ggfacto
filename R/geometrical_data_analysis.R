@@ -209,9 +209,18 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' data(tea, package = "FactoMineR")
 #' res.mca <- MCA2(tea, active_vars = 1:18)
 #'
+#' # Interactive graph for multiple correspondence analysis :
 #' res.mca %>%
 #'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) %>%
 #'   ggi() #to make the graph interactive
+#'
+#' # Interactive graph with access to all crosstables between active variables (burt table).
+#' #  Spread from mean are colored and, usually, points near the middle will have less
+#' #  colors, and points at the edges will have plenty. It may takes time to print, but
+#' #  helps to interpret the MCA in close proximity with the underlying data.
+#' res.mca %>%
+#'   ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) %>%
+#'   ggi()
 #'
 #' #Concentration ellipses for each levels of a supplementary variable :
 #' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
@@ -350,7 +359,7 @@ ggmca_data <-
       dplyr::mutate(lvs = stringr::str_remove(.data$lvs, stringr::str_c("^", .data$vars, "_")))
 
     if (cleannames == TRUE) active_vars_data <- active_vars_data %>%
-      dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., tabxplor:::cleannames_condition())))
+      dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., cleannames_condition())))
 
     active_vars_data <- active_vars_data %>%
       dplyr::mutate(color_group = factor("active_vars"),
@@ -405,7 +414,7 @@ ggmca_data <-
       if (cleannames) sup_vars_data <- sup_vars_data %>%
         purrr::map(~ dplyr::mutate(
           .,
-          lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., tabxplor:::cleannames_condition()))
+          lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., cleannames_condition()))
         ))
 
       dimensions <- names(sup_vars_data[[1]]) %>%
@@ -682,7 +691,7 @@ ggmca_data <-
       # if (cleannames == TRUE) ind_data <- ind_data %>%
       #   dplyr::mutate(dplyr::across(
       #     where(is.factor),
-      #     ~ forcats::fct_relabel(~ stringr::str_remove_all(., tabxplor:::cleannames_condition()))
+      #     ~ forcats::fct_relabel(~ stringr::str_remove_all(., cleannames_condition()))
       #     ))
 
       if (length(cah) != 0) {
@@ -2753,7 +2762,7 @@ pers_or_plot <-
       confint_type = "profile"
     }
     else if (is.null(confint_type) && (!is.null(random_effect) |
-                                       class(glmfit) == "glmerMod")) {
+                                       inherits(glmfit, "glmerMod"))) {
       confint_type = "default"
     }
     if (is.null(glmfit) && is.null(random_effect)) {
@@ -3139,28 +3148,81 @@ interactive_tooltips <- function(dat,
     purrr::imap(~ c(.x, paste0(.y, "_", .x))) |>
     purrr::flatten_chr()
 
+  tabs <- rep(list(NULL), length(vars))
 
-  tabs <- purrr::map_if(
-    vars, vars %in% active_tables,
-    ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
-      tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
-                         na = "drop", wt = "row.w", pct = "row", color = "diff") %>%
-        dplyr::rename_with(~ "lvs", 1) %>%
+
+  if (any(vars %in% active_tables)) {
+  tabs_active_tables <-
+    withr::with_options(list(tabxplor.output_kable = FALSE), {
+      tabxplor::tab_many(dat,
+                         row_vars = tidyselect::all_of(vars[vars %in% active_tables]),
+                         col_vars = tidyselect::all_of(sup_list),
+                         na       = "drop",
+                         wt       = "row.w",
+                         pct      = "row",
+                         color    = "diff"
+                         )
+    })
+
+
+    if (is.data.frame(tabs_active_tables)) tabs_active_tables <- list(tabs_active_tables)
+
+
+  tabs[vars %in% active_tables] <- tabs_active_tables %>%
+    purrr::map(
+      ~ dplyr::rename_with(., ~ "lvs", 1) %>%
+        dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "^Total_"), "Total", .)) %>%
         dplyr::select(-tidyselect::starts_with("Remove_levels"),
                       -tidyselect::any_of(active_vars_2levels)) %>%
         dplyr::filter(!.data$lvs == "Remove_levels")
-    }),
+    )
+  }
 
-    .else =
-      ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
-        tabxplor::tab(dat, !!rlang::sym(.), na = "drop", wt = "row.w", pct = "col") %>% #tot = c("row", "col")
-          dplyr::rename_with(~ "lvs", 1) %>%
-          dplyr::select(-any_of("n")) %>%
-          dplyr::filter(!.data$lvs == "Remove_levels")
+  if (any(!vars %in% active_tables)) {
+    tabs_no_active_tables <-
+      withr::with_options(list(tabxplor.output_kable = FALSE), {
+        tabxplor::tab_many(dat,
+                           row_vars = tidyselect::all_of(vars[!vars %in% active_tables]),
+                           na       = "drop",
+                           wt       = "row.w",
+                           pct      = "col"
+        )
       })
 
-  ) %>%
-    purrr::set_names(vars)
+    if (is.data.frame(tabs_no_active_tables)) tabs_no_active_tables <- list(tabs_no_active_tables)
+
+    tabs[!vars %in% active_tables] <- tabs_no_active_tables %>%
+      purrr::map(
+        ~ dplyr::rename_with(., ~ "lvs", 1) %>%
+          dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "^Total_"), "Total", .)) %>%
+          dplyr::select(-any_of("n")) %>%
+          dplyr::filter(!.data$lvs == "Remove_levels")
+      )
+  }
+
+  tabs <- purrr::set_names(tabs, vars)
+
+  # tabs <- purrr::map_if(
+  #   vars, vars %in% active_tables,
+  #   ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
+  #     tabxplor::tab_many(dat, !!rlang::sym(.), sup_list[sup_list != .],
+  #                        na = "drop", wt = "row.w", pct = "row", color = "diff") %>%
+  #       dplyr::rename_with(~ "lvs", 1) %>%
+  #       dplyr::select(-tidyselect::starts_with("Remove_levels"),
+  #                     -tidyselect::any_of(active_vars_2levels)) %>%
+  #       dplyr::filter(!.data$lvs == "Remove_levels")
+  #   }),
+  #
+  #   .else =
+  #     ~ withr::with_options(list(tabxplor.output_kable = FALSE), {
+  #       tabxplor::tab(dat, !!rlang::sym(.), na = "drop", wt = "row.w", pct = "col") %>% #tot = c("row", "col")
+  #         dplyr::rename_with(~ "lvs", 1) %>%
+  #         dplyr::select(-any_of("n")) %>%
+  #         dplyr::filter(!.data$lvs == "Remove_levels")
+  #     })
+  #
+  # ) %>%
+  #   purrr::set_names(vars)
 
   # sup_vars_count <-
   #   purrr::map(tabs, ~ dplyr::mutate(dplyr::select(., lvs, Total),
@@ -3179,21 +3241,22 @@ interactive_tooltips <- function(dat,
   #                dplyr::first() %>% dplyr::first()
   #   )
 
-  color_code_vector <- function(var) {
-    color_selection <- tabxplor:::fmt_color_selection(var) %>% purrr::map(which)
-
-    color_styles <- tabxplor:::select_in_color_style(length(color_selection))
-    color_styles <- tabxplor:::get_color_style("color_code", type = "text", theme = "light")[color_styles]
-
-    color_positions <- color_selection %>%
-      purrr::map2(color_styles, ~ purrr::set_names(.x, stringr::str_to_upper(.y))) %>%
-      purrr::flatten_int()
-
-    no_color <- 1:length(var)
-    no_color <- purrr::set_names(no_color[!no_color %in% color_positions], NA_character_)
-
-    names(sort(c(color_positions, no_color)))
-  }
+  # color_code_vector <- function(var) {
+  #   color_selection <- tabxplor:::fmt_color_selection(var) %>% purrr::map(which)
+  #
+  #   color_styles <- tabxplor:::select_in_color_style(length(color_selection))
+  #   color_styles <- tabxplor:::get_color_style("color_code", type = "text", theme = "light")[color_styles]
+  #
+  #   color_positions <- color_selection %>%
+  #     purrr::map2(color_styles, ~ purrr::set_names(.x, stringr::str_to_upper(.y))) %>%
+  #     purrr::flatten_int()
+  #
+  #   no_color <- 1:length(var)
+  #   no_color <- purrr::set_names(no_color[!no_color %in% color_positions], NA_character_)
+  #
+  #   names(sort(c(color_positions, no_color)))
+  # }
+  # #replace by tabxplor::fmt_get_color_code()
 
   format_pct <- function(diff, pct, colname, color_code) {
     pct <- stringr::str_pad(pct, 3, pad = "@")
@@ -3278,6 +3341,7 @@ interactive_tooltips <- function(dat,
   #   dplyr::select(1:4)
   #
 
+
   interactive_text <- interactive_text %>%
     dplyr::mutate(vars = dplyr::if_else(stringr::str_detect(.data$lvs, "^Total"),
                                         true  = factor("All", c(levels(.data$vars), "All")),
@@ -3310,7 +3374,7 @@ interactive_tooltips <- function(dat,
       ~ format_pct(diff       = round(vctrs::field(., "diff") * 100, 0),
                    pct        = format(.),
                    colname    = dplyr::cur_column(),
-                   color_code = color_code_vector(.))
+                   color_code = tabxplor::fmt_get_color_code(.))
     )) %>%
     dplyr::mutate(dplyr::across(
       tidyselect::any_of(names(tooltip_first_levels)),

@@ -63,15 +63,16 @@ ggi(graph_mca)
 
 ![](readme_plot.png)
 
-### See the correlations between active variables directly on the plot
-``` {r, fig.width = 6, fig.height = 6, results = "hide"}
+### See the crosstables of active variables directly on the plot
+It is possible to print all crosstables between active variables (burt table) into the interactive tooltips. Spread from mean are colored and, usually, points near the middle will have less colors, and points at the edges will have plenty. It may takes time to print, but really helps to interpret the MCA in close proximity with the underlying data.
+``` r
 ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "active", 
       ylim = c(NA, 1.2), text_repel = TRUE) %>%
   ggi()
 ```
 
 ### See the distribution of active variables for each level of a supplementary variable
-``` {r, fig.width = 6, fig.height = 6, results = "hide"}
+``` r
 ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "sup", 
       ylim = c(NA, 1.2), text_repel = TRUE) %>%
   ggi()

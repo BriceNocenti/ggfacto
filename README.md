@@ -66,128 +66,18 @@ ggi(graph_mca)
 
 ![](readme_plot.png)
 
-### See the correlations between active variables directly on the plot
+### See the crosstables of active variables directly on the plot
+
+It is possible to print all crosstables between active variables (burt
+table) into the interactive tooltips. Spread from mean are colored and,
+usually, points near the middle will have less colors, and points at the
+edges will have plenty. It may takes time to print, but really helps to
+interpret the MCA in close proximity with the underlying data.
 
 ``` r
 ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "active", 
       ylim = c(NA, 1.2), text_repel = TRUE) %>%
   ggi()
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-#> Warning in tab_add_totcol_if_no(.): no total column, one was added (from the
-#> last non-mean column)
-#> PhantomJS not found. You can install it with webshot::install_phantomjs(). If it is installed, please make sure the phantomjs executable can be found via the PATH variable.
 ```
 
 ### See the distribution of active variables for each level of a supplementary variable
@@ -196,44 +86,25 @@ ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "active",
 ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "sup", 
       ylim = c(NA, 1.2), text_repel = TRUE) %>%
   ggi()
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
 ```
 
 ### Concentration ellipses for each levels of a supplementary variable
 
 ``` r
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.95, text_repel = TRUE, profiles = TRUE)
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-#> Warning in tab_add_totcol_if_no(.): no total column, one was added (from the
-#> last non-mean column)
 #> colors based on the following categories (rename with colornames_recode): 'SPC_employee', 'SPC_middle', 'SPC_non-worker', 'SPC_other worker', 'SPC_senior', 'SPC_student', 'SPC_workman'
 ```
 
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-3-1.png" width="100%" />
 
 ### Graph of profiles of answer for each levels of a supplementary variable (with median ellipses containing half the population)
 
 ``` r
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5, profiles = TRUE)
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-#> Warning in tab_add_totcol_if_no(.): no total column, one was added (from the
-#> last non-mean column)
 #> colors based on the following categories (rename with colornames_recode): 'SPC_employee', 'SPC_middle', 'SPC_non-worker', 'SPC_other worker', 'SPC_senior', 'SPC_student', 'SPC_workman'
 ```
 
-<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
 
 <!-- ## Table to help to interpret MCA -->
 <!-- ``` {r} -->
@@ -266,7 +137,7 @@ ggca(res.ca,
      text_repel = TRUE, dist_labels = 0.02)
 ```
 
-<img src="man/figures/README-unnamed-chunk-8-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
 
 ## Personnalize plots
 
@@ -278,13 +149,6 @@ library(dplyr)
 library(ggplot2)
 
 plot_data <- ggmca_data(res.mca, tea, sup_vars = "SPC")
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-
-#> Warning: data frame results in `filter()` are deprecated, use `if_any()` or
-#> `if_all()`.
-#> Warning in tab_add_totcol_if_no(.): no total column, one was added (from the
-#> last non-mean column)
 
 plot_data$vars_data <- plot_data$vars_data %>% 
   filter(!lvs %in% c("other worker", "non-worker"))
@@ -292,7 +156,7 @@ plot_data$vars_data <- plot_data$vars_data %>%
 ggmca_plot(plot_data, ylim = c(NA, 1.2), text_repel = TRUE)
 ```
 
-<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
 
 The plot can always be modified using the `ggplot2` `+` operator :
 
@@ -302,7 +166,7 @@ ggmca_plot(plot_data, ylim = c(NA, 1.2)) +
   theme(axis.line = element_line(linetype = "solid") )
 ```
 
-<img src="man/figures/README-unnamed-chunk-10-1.png" width="100%" /> You
+<img src="man/figures/README-unnamed-chunk-8-1.png" width="100%" /> You
 can then pass to plot to `ggi()` to make it interactive.
 
 Set `use_theme = FALSE` to use you own ggplot2 theme :
@@ -312,4 +176,4 @@ ggmca_plot(plot_data, ylim = c(NA, 1.2), use_theme = FALSE) +
   theme_classic()
 ```
 
-<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
