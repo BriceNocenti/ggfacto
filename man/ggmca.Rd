@@ -42,7 +42,8 @@ ggmca(
   size_scale_max = 4,
   dist_labels = c("auto", 0.04),
   right_margin = 0,
-  use_theme = TRUE
+  use_theme = TRUE,
+  get_data = FALSE
 )
 
 ggmca_data(
@@ -85,7 +86,8 @@ ggmca_plot(
   size_scale_max = 4,
   dist_labels = c("auto", 0.04),
   right_margin = 0,
-  use_theme = TRUE
+  use_theme = TRUE,
+  get_data = FALSE
 )
 }
 \arguments{
@@ -97,11 +99,11 @@ ggmca_plot(
 to print. They must have been passed in \code{\link[FactoMineR]{MCA}} before.}
 
 \item{active_tables}{Should colored crosstables be added in interactive tooltips ?
-`active_tables == "sup"` crosses each `sup_vars` with active variables.
-`active_tables == "active"` crosses each active_variables with the other ones,
+`active_tables = "sup"` crosses each `sup_vars` with active variables.
+`active_tables = "active"` crosses each active_variables with the other ones,
 giving results closely related with the burt table used to calculate multiple
 correspondance analysis. It may take time to calculate with many variables.
-`active_tables == c("active", "sup")` do both. In tooltips, percentages are colored
+`active_tables = c("active", "sup")` do both. In tooltips, percentages are colored
 in blue when spread from mean is positive (over-representations), and in red when
 spread from mean is negative (under-representations), like in
 \code{\link[tabxplor]{tab}} with `color = "diff"`.}
@@ -217,6 +219,8 @@ over points placed at the right of the graph without formatting problems.}
 
 \item{use_theme}{By default, a specific \pkg{ggplot2} theme is used.
 Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
+
+\item{get_data}{Returns the data frame to create the plot instead of the plot itself.}
 
 \item{data}{A list of data frames made with \link{ggmca_data}.}
 }

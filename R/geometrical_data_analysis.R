@@ -113,11 +113,11 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @param tooltip_vars A character vector of variables (character/factors),
 #' whose complete levels will be added at the bottom of interactive tooltips.
 #' @param active_tables Should colored crosstables be added in interactive tooltips ?
-#' `active_tables == "sup"` crosses each `sup_vars` with active variables.
-#' `active_tables == "active"` crosses each active_variables with the other ones,
+#' `active_tables = "sup"` crosses each `sup_vars` with active variables.
+#' `active_tables = "active"` crosses each active_variables with the other ones,
 #' giving results closely related with the burt table used to calculate multiple
 #' correspondance analysis. It may take time to calculate with many variables.
-#' `active_tables == c("active", "sup")` do both. In tooltips, percentages are colored
+#' `active_tables = c("active", "sup")` do both. In tooltips, percentages are colored
 #' in blue when spread from mean is positive (over-representations), and in red when
 #' spread from mean is negative (under-representations), like in
 #' \code{\link[tabxplor]{tab}} with `color = "diff"`.
@@ -197,6 +197,7 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @param scale_color_dark A scale color for sup vars texts
 #' @param use_theme By default, a specific \pkg{ggplot2} theme is used.
 #' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
+#' @param get_data Returns the data frame to create the plot instead of the plot itself.
 #'
 #' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
@@ -249,7 +250,7 @@ ggmca <-
            scale_color_light = material_colors_light(),
            scale_color_dark  = material_colors_dark(),
            text_size = 3, size_scale_max = 4, dist_labels = c("auto", 0.04),
-           right_margin = 0, use_theme = TRUE
+           right_margin = 0, use_theme = TRUE, get_data = FALSE
   ) {
 
     data <- ggmca_data(
@@ -275,7 +276,7 @@ ggmca <-
                scale_color_dark  = scale_color_dark,
                text_size = text_size, size_scale_max = size_scale_max,
                dist_labels = dist_labels, right_margin = right_margin,
-               use_theme = use_theme
+               use_theme = use_theme, get_data = get_data
     )
 
   }
@@ -300,9 +301,10 @@ ggmca_data <-
     if (missing(discard_levels))    discard_levels    <- character()
     if (missing(cah) ) {
       cah <- character()
-    } else if(! cah %in% names(res.mca$call$X)[res.mca$call$quali.sup]) {
-      warning(cah, " was not found among the supplementary variables of the mca")
-      cah <- character()
+    } else if(! cah %in% sup_vars) {
+     # warning(cah, " was not found among the supplementary variables of the mca")
+      #cah <- character()
+       sup_vars <- c(sup_vars, cah)
     }
     stopifnot(length(max_profiles) < 2)
 
@@ -359,7 +361,7 @@ ggmca_data <-
       dplyr::mutate(lvs = stringr::str_remove(.data$lvs, stringr::str_c("^", .data$vars, "_")))
 
     if (cleannames == TRUE) active_vars_data <- active_vars_data %>%
-      dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., cleannames_condition())))
+      dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove_all(., cleannames_condition())))
 
     active_vars_data <- active_vars_data %>%
       dplyr::mutate(color_group = factor("active_vars"),
@@ -414,7 +416,7 @@ ggmca_data <-
       if (cleannames) sup_vars_data <- sup_vars_data %>%
         purrr::map(~ dplyr::mutate(
           .,
-          lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove(., cleannames_condition()))
+          lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove_all(., cleannames_condition()))
         ))
 
       dimensions <- names(sup_vars_data[[1]]) %>%
@@ -540,7 +542,7 @@ ggmca_data <-
 
     if (cleannames == TRUE) dat <- dat %>%
       dplyr::mutate(dplyr::across(
-        where(is.factor),
+        where(~is.factor(.) | is.character(.)),
         ~ forcats::fct_relabel(., ~stringr::str_remove_all(., cleannames_condition()))
       ))
 
@@ -564,17 +566,12 @@ ggmca_data <-
     tables_to_do <- c(active_tables[!active_tables %in% sup_vars], sup_vars)
     if(length(tables_to_do) != 0) {
 
-
-
       interactive_text <- interactive_tooltips(dat,
                                                sup_vars         = sup_vars,
                                                active_vars      = active_vars,
-                                               #active_vars_data = active_vars_data,
                                                active_tables    = active_tables,
                                                tooltip_vars_1lv = tooltip_vars_1lv,
-                                               tooltip_vars     = tooltip_vars#,
-                                               #excl             = excl,
-                                               #cleannames       = cleannames
+                                               tooltip_vars     = tooltip_vars
                                                )
 
       text_vars <- names(interactive_text)[purrr::map_lgl(interactive_text, is.character)]
@@ -676,7 +673,8 @@ ggmca_data <-
     #; weighted : nb of individuals * weight variable
     if (profiles) {
       ind_data <- dplyr::bind_cols(
-        dplyr::select(dat, -tidyselect::any_of(c(tooltip_vars_1lv, tooltip_vars))),
+        dplyr::select(dat, -tidyselect::any_of(c(tooltip_vars_1lv[!tooltip_vars_1lv %in% sup_vars],
+                                                 tooltip_vars[!tooltip_vars %in% sup_vars]))),
         tibble::as_tibble(res.mca$ind$coord)
       )
 
@@ -846,7 +844,7 @@ ggmca_plot <- function(data,
                        scale_color_light = material_colors_light(),
                        scale_color_dark  = material_colors_dark(),
                        text_size = 3, size_scale_max = 4, dist_labels = c("auto", 0.04),
-                       right_margin = 0, use_theme = TRUE) {
+                       right_margin = 0, use_theme = TRUE, get_data = FALSE) {
 
   vars_data        <- data$vars_data
   ind_data         <- data$ind_data
@@ -1227,11 +1225,13 @@ ggmca_plot <- function(data,
       supvar1_infos <- supvar1_infos$infos %>% purrr::set_names(supvar1_infos$nam)
 
       if (!is.null(ellipses)) {
-        ellipses_coord <- ind_data %>%
-          dplyr::select(!!dim1, !!dim2, .data$row.w, tidyselect::all_of(sup_vars[1])) %>%
-          dplyr::mutate(infos = supvar1_infos[as.character(!!rlang::sym(sup_vars[1]))]) %>%
+          ellipses_coord <- ind_data %>%
+          dplyr::select(!!dim1, !!dim2, .data$row.w, tidyselect::all_of(sup_vars[1]), tidyselect::any_of("lvs")) %>%
+          dplyr::mutate(infos = supvar1_infos[as.character(!!rlang::sym(sup_vars[1]))],
+          ) %>%
           tidyr::unnest(cols = c(.data$infos)) %>%
           dplyr::filter(!is.na(.data$lvs))
+
 
         ellipses <-
           if (type[1] == "facets") {
@@ -1362,9 +1362,16 @@ ggmca_plot <- function(data,
   }
 
 
+  if (get_data) return(
+    list(vars_data = vars_data, mean_point_data = mean_point_data,
+         profiles_coord = if (length(profiles) != 0) {profiles_coord} else {NULL},
+         ellipses_coord = if (length(ellipses) != 0) {ellipses_coord} else {NULL},
+         graph_theme_acm = graph_theme_acm)
+  )
 
 
-  #The final plots
+
+#The final plots
   if (type[1] == "text") {
     if (text_repel == FALSE) {
       graph_text <-
@@ -2298,7 +2305,7 @@ ggca <-
     }
 
     #Add informations in the ggplot2::ggplot object, to be used into ggi() (without losing ggplot2::ggplot class)
-    css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;color:white;"
+    css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;color:white;" #
     plot_output <- plot_output %>% append(c("css_tooltip" = css_tooltip)) %>%
       append(c("heigth_width_ratio" = heigth_width_ratio)) %>%
       `attr<-`("class", c("gg", "ggplot"))
@@ -2537,6 +2544,7 @@ ggi <- function(plot = ggplot2::last_plot(),
   if ("css_tooltip" %in% names(plot)) {
     css_tooltip <- plot$css_tooltip
   } else {
+    cat("no_css_in_object")
     css_tooltip <- "color:#000000;text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
   }
 
@@ -2578,7 +2586,7 @@ ggi <- function(plot = ggplot2::last_plot(),
                     # ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
                     ...
     ) %>%
-    ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip), #use_fill = TRUE, #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
+    ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip, use_fill = TRUE), #, #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
                             ggiraph::opts_hover(css = css_hover)
                             # ggiraph::opts_zoom(max = 5) # bugue pas mal
                             # ggiraph::opts_hover(css = girafe_css(css = "fill:purple;stroke:black;", text = "stroke:none;fill:red;font-style:bold;")) #    point = NULL, line, area, image
@@ -3195,7 +3203,7 @@ interactive_tooltips <- function(dat,
       purrr::map(
         ~ dplyr::rename_with(., ~ "lvs", 1) %>%
           dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "^Total_"), "Total", .)) %>%
-          dplyr::select(-any_of("n")) %>%
+          dplyr::select(-tidyselect::any_of("n")) %>%
           dplyr::filter(!.data$lvs == "Remove_levels")
       )
   }
@@ -3381,7 +3389,7 @@ interactive_tooltips <- function(dat,
       ~ dplyr::if_else(.data$vars %in% active_tables,
                        true  = paste0("\n<b>Distribution by ",
                                       tooltip_first_levels[dplyr::cur_column()],
-                                      ":</b>" , "\n"),
+                                      ":</b>" , "\n", .),
                        false = NA_character_
       )
     ))
