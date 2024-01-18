@@ -1,6 +1,4 @@
-# ggfacto (development version)
-
-# ggfacto development version
+# ggfacto 0.2.3
 
 ## Added : 
 * New argument `reverse_axes` in `ggmca()` to invert left and right or up and down. 

@@ -166,8 +166,8 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #'  possible to color `sup_vars` with groups created upon their levels with
 #'  \code{\link[stringr]{str_extract}} and regexes. For exemple, `color_groups = "^."`
 #'   makes the groups upon the first character of each levels (uselful when their begin
-#'   by numbers). `color_groups = "^.{3}"` upon the first three characters.
-#'  `color_groups = "NB.+$"`takes anything between the `"NB"` and the end of levels
+#'   by numbers). \code{color_groups = "^.{3}"} upon the first three characters.
+#'  \code{color_groups = "NB.+$"} takes anything between the `"NB"` and the end of levels
 #'  names, etc.
 #' @param shift_colors Change colors of the \code{sup_vars} points.
 #' @param colornames_recode A named character vector with
@@ -2236,7 +2236,7 @@ ggca <-
           data = all_coord,
           ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$freq,
                        color = .data$colorvar, shape = .data$colorvar,
-                       tooltip = .data$interactive_text, fill = .data$colorvar,
+                       tooltip = .data$interactive_text, #fill = .data$colorvar,
                        data_id = .data$id),
           stroke = 1.5, na.rm = TRUE
         ) +
@@ -2305,7 +2305,7 @@ ggca <-
     }
 
     #Add informations in the ggplot2::ggplot object, to be used into ggi() (without losing ggplot2::ggplot class)
-    css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;color:white;" #
+    css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;color:black;" #
     plot_output <- plot_output %>% append(c("css_tooltip" = css_tooltip)) %>%
       append(c("heigth_width_ratio" = heigth_width_ratio)) %>%
       `attr<-`("class", c("gg", "ggplot"))
@@ -2544,7 +2544,6 @@ ggi <- function(plot = ggplot2::last_plot(),
   if ("css_tooltip" %in% names(plot)) {
     css_tooltip <- plot$css_tooltip
   } else {
-    cat("no_css_in_object")
     css_tooltip <- "color:#000000;text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
   }
 
@@ -2586,7 +2585,7 @@ ggi <- function(plot = ggplot2::last_plot(),
                     # ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
                     ...
     ) %>%
-    ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip, use_fill = TRUE), #, #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
+    ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip), #, use_fill = TRUE, #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
                             ggiraph::opts_hover(css = css_hover)
                             # ggiraph::opts_zoom(max = 5) # bugue pas mal
                             # ggiraph::opts_hover(css = girafe_css(css = "fill:purple;stroke:black;", text = "stroke:none;fill:red;font-style:bold;")) #    point = NULL, line, area, image

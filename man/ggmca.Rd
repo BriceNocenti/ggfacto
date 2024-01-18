@@ -139,8 +139,8 @@ a numeric vector : `1` to invert left and right ; `2` to invert up and down ;
 possible to color `sup_vars` with groups created upon their levels with
 \code{\link[stringr]{str_extract}} and regexes. For exemple, `color_groups = "^."`
  makes the groups upon the first character of each levels (uselful when their begin
- by numbers). `color_groups = "^.{3}"` upon the first three characters.
-`color_groups = "NB.+$"`takes anything between the `"NB"` and the end of levels
+ by numbers). \code{color_groups = "^.{3}"} upon the first three characters.
+\code{color_groups = "NB.+$"} takes anything between the `"NB"` and the end of levels
 names, etc.}
 
 \item{keep_levels}{A character vector of variables levels to keep : others
@@ -251,11 +251,11 @@ to draw the graph.
 }
 \section{Functions}{
 \itemize{
-\item \code{ggmca_data}: get the data frames with all parameters to print a MCA graph
+\item \code{ggmca_data()}: get the data frames with all parameters to print a MCA graph
 
-\item \code{ggmca_plot}: print MCA graph from data frames with parameters
+\item \code{ggmca_plot()}: print MCA graph from data frames with parameters
+
 }}
-
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")

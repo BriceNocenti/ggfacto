@@ -1,10 +1,6 @@
-## Third submission 
-Thanks to Julia Haider, I did enhance the following points : 
-- Package names and API in DESCRIPTION where single quoted (or put into \pkg{} in documentation).
-- Ensured that functions do not write by default or in examples/vignettes/tests in the user's home filespace. I thought I had corrected that one, and I am not sure what the problem is, so sorry if I miss it again. Saving functions, `ggsave2` and `ggi`, already write to `tempdir()` by default (using `plot_path` internal function, with options to save in a directory chosen by the user). Examples don't create files I can detect. Readme creates images : it seems ok, but is that in fact the problematic point ? I also removed forgotten readme files which where not used anymore (directory "docs").
+## First submission 
 
-## Second submission
-Message was : "package ggfacto_0.2.2.tar.gz does not pass the incoming checks automatically, please see the following pre-tests" (2 NOTEs on Windows and Debian). Since one note is "New submission", the real one is "Examples with CPU (user + system) or elapsed time > 5s". To make it disappear, I passed most of examples to "don't test" (since they need to calculate correspondence analysis with the package FactoMineR, which is always too long). 
+
 
 ## Test environments
 * local Windows 10 install, R 4.1.1 and R devel (4.2.0)
