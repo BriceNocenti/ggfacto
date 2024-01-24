@@ -5,7 +5,6 @@
 
 <!-- badges: start -->
 
-[![R-CMD-check](https://github.com/BriceNocenti/ggfacto/workflows/R-CMD-check/badge.svg)](https://github.com/BriceNocenti/ggfacto/actions)
 [![R-CMD-check](https://github.com/BriceNocenti/ggfacto/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/BriceNocenti/ggfacto/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 

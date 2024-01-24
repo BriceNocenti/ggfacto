@@ -2496,6 +2496,20 @@ material_colors_dark <- function() {
 
 
 
+# data(tea, package = "FactoMineR")
+# res.mca <- MCA2(tea, active_vars = 1:18)
+# plot <- res.mca %>%
+#   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE)
+# width = NULL
+# height = NULL
+# keep_ratio = TRUE
+# savewidget = FALSE
+# dir = NULL
+# name = "Plot"
+# replace = FALSE
+# open = rlang::is_interactive()
+# iframe = NULL
+# # pixel_width
 
 #' Pass a MCA plot into a html interactive plot
 #' @param plot The plot, created with \link{ggmca} or \link{ggca}.
@@ -2553,7 +2567,7 @@ ggi <- function(plot = ggplot2::last_plot(),
   #   #stringr::str_replace("DejaVu Sans Condensed", "DejaVu Sans")
   # }
 
-  if (missing(width)) {
+  if (is.null(width)) { #   if (missing(width)) {
     width <- grDevices::dev.size("in")[1]
 
   } else {
@@ -2564,7 +2578,7 @@ ggi <- function(plot = ggplot2::last_plot(),
     height <- width * plot$heigth_width_ratio
 
   } else {
-    if (missing(height)) {
+    if (is.null(height)) { #     if (missing(height)) {
       height <- grDevices::dev.size("in")[2]
     } else {
       height = height/2.54
