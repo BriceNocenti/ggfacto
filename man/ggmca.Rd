@@ -18,6 +18,7 @@ ggmca(
   axes_reverse = NULL,
   type = c("text", "labels", "points", "numbers", "facets"),
   color_groups = "^.{0}",
+  cah_color_groups = "^.+$",
   keep_levels,
   discard_levels,
   cleannames = TRUE,
@@ -25,20 +26,22 @@ ggmca(
   profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
   cah,
   max_profiles = 5000,
+  alpha_profiles = 0.7,
+  color_profiles = TRUE,
+  base_profiles_color = "#aaaaaa",
   text_repel = FALSE,
   title,
   actives_in_bold = NULL,
+  sup_in_italic = FALSE,
   ellipses = NULL,
   xlim,
   ylim,
   out_lims_move = FALSE,
-  color_profiles,
-  base_profiles_color = "#dddddd",
   shift_colors = 0,
   colornames_recode,
   scale_color_light = material_colors_light(),
   scale_color_dark = material_colors_dark(),
-  text_size = 3,
+  text_size = 3.5,
   size_scale_max = 4,
   dist_labels = c("auto", 0.04),
   right_margin = 0,
@@ -54,6 +57,7 @@ ggmca_data(
   tooltip_vars_1lv,
   tooltip_vars,
   color_groups = "^.{0}",
+  cah_color_groups = "^.+$",
   keep_levels,
   discard_levels,
   cleannames = TRUE,
@@ -71,18 +75,20 @@ ggmca_plot(
   type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
   text_repel = FALSE,
   title,
-  actives_in_bold = NULL,
   ellipses = NULL,
+  actives_in_bold = NULL,
+  sup_in_italic = FALSE,
   xlim,
   ylim,
   out_lims_move = FALSE,
-  color_profiles,
-  base_profiles_color = "#dddddd",
+  color_profiles = TRUE,
+  base_profiles_color = "#aaaaaa",
+  alpha_profiles = 0.7,
   shift_colors = 0,
   colornames_recode,
   scale_color_light = material_colors_light(),
   scale_color_dark = material_colors_dark(),
-  text_size = 3,
+  text_size = 3.5,
   size_scale_max = 4,
   dist_labels = c("auto", 0.04),
   right_margin = 0,
@@ -135,13 +141,16 @@ a numeric vector : `1` to invert left and right ; `2` to invert up and down ;
   first \code{sup_vars}. A different color is used for each.
 }}
 
-\item{color_groups}{By default, their is one color group by `sup_vars`. It is otherwise
-possible to color `sup_vars` with groups created upon their levels with
-\code{\link[stringr]{str_extract}} and regexes. For exemple, `color_groups = "^."`
- makes the groups upon the first character of each levels (uselful when their begin
- by numbers). \code{color_groups = "^.{3}"} upon the first three characters.
-\code{color_groups = "NB.+$"} takes anything between the `"NB"` and the end of levels
-names, etc.}
+\item{color_groups}{By default, there is one color group for all the levels
+of each `sup_vars`. It is  possible to color `sup_vars` with groups created
+upon their levels with \code{\link[stringr]{str_extract}} and regexes.
+For exemple, `color_groups = "^."`  makes the groups upon the first character
+ of each levels (uselful when their begin by numbers).
+ \code{color_groups = "^.{3}"} upon the first three characters.
+ \code{color_groups = "NB.+$"} takes anything between the `"NB"` and the end of levels
+ names, etc.}
+
+\item{cah_color_groups}{Color groups for the `cah` variable (HCPC clusters).}
 
 \item{keep_levels}{A character vector of variables levels to keep : others
 will be discarded.}
@@ -161,11 +170,22 @@ points of the same \code{\link[FactoMineR]{HCPC}} class.}
 among interactive tooltips for profiles of answers (ex. : levels expressing
 "no" answers).}
 
-\item{cah}{A variable made with \code{\link[FactoMineR]{HCPC}}, to link
-the answers-profiles points who share the same ICPC class (will be colored
-together at mouse hover).}
+\item{cah}{A HCPC clusters variable made with \code{\link[FactoMineR]{HCPC}}
+on `res.mca`, to link the answers-profiles points who share the same HCPC class
+(will be colored the same color and linked at mouse hover).}
 
 \item{max_profiles}{The maximum number of profiles points to print. Default to 5000.}
+
+\item{alpha_profiles}{The alpha (transparency, between 0 and 1) for profiles of answer.}
+
+\item{color_profiles}{By default, if \code{cah} is provided, profiles are
+colored based on cah levels (HCPC clusters). Set do \code{FALSE} to avoid this behaviour.
+You can also give a character vector with only some of the levels of
+the `cah` variable .}
+
+\item{base_profiles_color}{The base color for answers profiles. Default to gray.
+Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
+non-colored profiles.}
 
 \item{text_repel}{When \code{TRUE} the graph is not interactive anymore,
 but the resulting image is better to print because points and labels don't
@@ -173,7 +193,10 @@ overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
 
 \item{title}{The title of the graph.}
 
-\item{actives_in_bold}{Should active variables be in bold font, or sup variables ?}
+\item{actives_in_bold}{Set to `TRUE` to set active variables in bold font
+(and sup variables in plain).}
+
+\item{sup_in_italic}{Set to `TRUE` to set sup variables in italics.}
 
 \item{ellipses}{Set to a number between 0 and 1 to draw a concentration ellipse for
 each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
@@ -186,15 +209,6 @@ as double vectors of length 2.}
 
 \item{out_lims_move}{When \code{TRUE}, the points out of \code{xlim} or
 \code{ylim} are not removed, but moved at the edges of the graph.}
-
-\item{color_profiles}{If \code{cah} is provided, you can give a character vector of
-levels name of this `cah` variable to color profiles of answers on that basis.
-You can also set `color_profiles = TRUE`, but the result is usually difficult to read :
-better to draw the profiles of the CAH classes one by one.}
-
-\item{base_profiles_color}{The base color for answers profiles. Default to gray.
-Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
-non-colored profiles.}
 
 \item{shift_colors}{Change colors of the \code{sup_vars} points.}
 
@@ -262,25 +276,29 @@ data(tea, package = "FactoMineR")
 res.mca <- MCA2(tea, active_vars = 1:18)
 
 # Interactive graph for multiple correspondence analysis :
-res.mca \%>\%
-  ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) \%>\%
+res.mca |>
+  ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) |>
   ggi() #to make the graph interactive
 
 # Interactive graph with access to all crosstables between active variables (burt table).
 #  Spread from mean are colored and, usually, points near the middle will have less
 #  colors, and points at the edges will have plenty. It may takes time to print, but
 #  helps to interpret the MCA in close proximity with the underlying data.
-res.mca \%>\%
-  ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) \%>\%
+res.mca |>
+  ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) |>
   ggi()
 
-#Concentration ellipses for each levels of a supplementary variable :
+# Graph with colored HCPC clusters
+cah <- FactoMineR::HCPC(res.mca, nb.clust = 6, graph = FALSE)
+tea$clust <- cah$data.clust$clust
+ggmca(res.mca, tea, cah = "clust", profiles = TRUE, text_repel = TRUE)
+
+# Concentration ellipses for each levels of a supplementary variable :
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
   ellipses = 0.5, text_repel = TRUE, profiles = TRUE)
 
-#Graph of profiles of answer for each levels of a supplementary variable :
+# Graph of profiles of answer for each levels of a supplementary variable :
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
   type = "facets", ellipses = 0.5, profiles = TRUE)
-
 }
 }

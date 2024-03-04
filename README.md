@@ -6,6 +6,7 @@
 <!-- badges: start -->
 
 [![R-CMD-check](https://github.com/BriceNocenti/ggfacto/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/BriceNocenti/ggfacto/actions/workflows/R-CMD-check.yaml)
+
 <!-- badges: end -->
 
 Readable, complete and pretty graphs for correspondence analysis made
@@ -146,7 +147,9 @@ necessary data, modify it, then use it to draw the plot :
 
 ``` r
 library(dplyr)
+#> Warning: package 'dplyr' was built under R version 4.3.2
 library(ggplot2)
+#> Warning: package 'ggplot2' was built under R version 4.3.2
 
 plot_data <- ggmca_data(res.mca, tea, sup_vars = "SPC")
 

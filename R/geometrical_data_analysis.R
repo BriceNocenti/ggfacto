@@ -1,3 +1,11 @@
+#Import data.table in NAMESPACE :
+#' Internal data.table methods
+#' @import data.table
+#' @keywords internal
+#' @name tabxplor-data.table
+NULL
+
+
 
 
 # Geometrical data analysis AC/ACM -------------------------------------------------------
@@ -50,7 +58,7 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
     if (any(is.na(excl))) {
       data <- data %>%
         dplyr::mutate(dplyr::across(tidyselect::all_of(names(active_vars)),
-                                    ~ forcats::fct_explicit_na(., "NA")
+                                    ~ forcats::fct_na_value_to_level(., "NA")
         ))
       new_excl <- c("NA", paste0(names(active_vars), "_NA"))
       excl     <- c(excl[!is.na(excl)])
@@ -158,17 +166,19 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @param profiles_tooltip_discard A regex pattern to remove useless levels
 #' among interactive tooltips for profiles of answers (ex. : levels expressing
 #' "no" answers).
-#' @param cah A variable made with \code{\link[FactoMineR]{HCPC}}, to link
-#' the answers-profiles points who share the same ICPC class (will be colored
-#' together at mouse hover).
+#' @param cah A HCPC clusters variable made with \code{\link[FactoMineR]{HCPC}}
+#' on `res.mca`, to link the answers-profiles points who share the same HCPC class
+#' (will be colored the same color and linked at mouse hover).
 #' @param max_profiles The maximum number of profiles points to print. Default to 5000.
-#' @param color_groups By default, their is one color group by `sup_vars`. It is otherwise
-#'  possible to color `sup_vars` with groups created upon their levels with
-#'  \code{\link[stringr]{str_extract}} and regexes. For exemple, `color_groups = "^."`
-#'   makes the groups upon the first character of each levels (uselful when their begin
-#'   by numbers). \code{color_groups = "^.{3}"} upon the first three characters.
+#' @param color_groups By default, there is one color group for all the levels
+#' of each `sup_vars`. It is  possible to color `sup_vars` with groups created
+#' upon their levels with \code{\link[stringr]{str_extract}} and regexes.
+#' For exemple, `color_groups = "^."`  makes the groups upon the first character
+#'  of each levels (uselful when their begin by numbers).
+#'  \code{color_groups = "^.{3}"} upon the first three characters.
 #'  \code{color_groups = "NB.+$"} takes anything between the `"NB"` and the end of levels
 #'  names, etc.
+#' @param cah_color_groups Color groups for the `cah` variable (HCPC clusters).
 #' @param shift_colors Change colors of the \code{sup_vars} points.
 #' @param colornames_recode A named character vector with
 #' \code{\link[forcats]{fct_recode}} style to rename the levels of the color
@@ -180,19 +190,22 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' from points.
 #' @param right_margin A margin at the right, in cm. Useful to read tooltips
 #'  over points placed at the right of the graph without formatting problems.
-#' @param actives_in_bold Should active variables be in bold font, or sup variables ?
+#' @param actives_in_bold Set to `TRUE` to set active variables in bold font
+#' (and sup variables in plain).
+#' @param sup_in_italic Set to `TRUE` to set sup variables in italics.
 #' @param ellipses Set to a number between 0 and 1 to draw a concentration ellipse for
 #' each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
 #' individuals of each category. \code{0.5} draw median-ellipses, containing half
 #' the individuals of each category. Note that, if `max_profiles` is provided, ellipses
 #' won't be made with all individuals.
-#' @param color_profiles If \code{cah} is provided, you can give a character vector of
-#' levels name of this `cah` variable to color profiles of answers on that basis.
-#' You can also set `color_profiles = TRUE`, but the result is usually difficult to read :
-#' better to draw the profiles of the CAH classes one by one.
+#' @param color_profiles By default, if \code{cah} is provided, profiles are
+#' colored based on cah levels (HCPC clusters). Set do \code{FALSE} to avoid this behaviour.
+#' You can also give a character vector with only some of the levels of
+#' the `cah` variable .
 #' @param base_profiles_color The base color for answers profiles. Default to gray.
 #' Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
 #' non-colored profiles.
+#' @param alpha_profiles The alpha (transparency, between 0 and 1) for profiles of answer.
 #' @param scale_color_light A scale color for sup vars points
 #' @param scale_color_dark A scale color for sup vars texts
 #' @param use_theme By default, a specific \pkg{ggplot2} theme is used.
@@ -211,45 +224,51 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' res.mca <- MCA2(tea, active_vars = 1:18)
 #'
 #' # Interactive graph for multiple correspondence analysis :
-#' res.mca %>%
-#'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) %>%
+#' res.mca |>
+#'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) |>
 #'   ggi() #to make the graph interactive
 #'
 #' # Interactive graph with access to all crosstables between active variables (burt table).
 #' #  Spread from mean are colored and, usually, points near the middle will have less
 #' #  colors, and points at the edges will have plenty. It may takes time to print, but
 #' #  helps to interpret the MCA in close proximity with the underlying data.
-#' res.mca %>%
-#'   ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) %>%
+#' res.mca |>
+#'   ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) |>
 #'   ggi()
 #'
-#' #Concentration ellipses for each levels of a supplementary variable :
+#' # Graph with colored HCPC clusters
+#' cah <- FactoMineR::HCPC(res.mca, nb.clust = 6, graph = FALSE)
+#' tea$clust <- cah$data.clust$clust
+#' ggmca(res.mca, tea, cah = "clust", profiles = TRUE, text_repel = TRUE)
+#'
+#' # Concentration ellipses for each levels of a supplementary variable :
 #' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
 #'   ellipses = 0.5, text_repel = TRUE, profiles = TRUE)
 #'
-#' #Graph of profiles of answer for each levels of a supplementary variable :
+#' # Graph of profiles of answer for each levels of a supplementary variable :
 #' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
 #'   type = "facets", ellipses = 0.5, profiles = TRUE)
-#'
 #' }
 ggmca <-
   function(res.mca, dat, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
            axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
            type = c("text", "labels", "points", "numbers", "facets"),
 
-           color_groups = "^.{0}", keep_levels, discard_levels, cleannames = TRUE,
+           color_groups = "^.{0}", cah_color_groups =  "^.+$",
+           keep_levels, discard_levels, cleannames = TRUE,
 
            profiles = FALSE, profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
            cah, max_profiles = 5000,
+           alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#aaaaaa",
 
-
-           text_repel = FALSE, title, actives_in_bold = NULL, ellipses = NULL,
+           text_repel = FALSE, title, actives_in_bold = NULL, sup_in_italic = FALSE,
+           ellipses = NULL,
            xlim, ylim, out_lims_move = FALSE,
-           color_profiles, base_profiles_color = "#dddddd",
+
            shift_colors = 0, colornames_recode,
            scale_color_light = material_colors_light(),
            scale_color_dark  = material_colors_dark(),
-           text_size = 3, size_scale_max = 4, dist_labels = c("auto", 0.04),
+           text_size = 3.5, size_scale_max = 4, dist_labels = c("auto", 0.04),
            right_margin = 0, use_theme = TRUE, get_data = FALSE
   ) {
 
@@ -261,16 +280,18 @@ ggmca <-
       keep_levels = keep_levels, discard_levels = discard_levels,
       profiles = profiles, profiles_tooltip_discard = profiles_tooltip_discard,
       cah = cah, max_profiles = max_profiles,
-      color_groups = color_groups
+      color_groups = color_groups, cah_color_groups = cah_color_groups
     )
 
     ggmca_plot(data = data,
                axes = axes, axes_names = axes_names, axes_reverse = axes_reverse,
                type = type,
-               text_repel = text_repel, title = title, actives_in_bold = actives_in_bold,
+               text_repel = text_repel, title = title,
+               actives_in_bold = actives_in_bold, sup_in_italic = sup_in_italic,
                ellipses = ellipses,
                xlim = xlim, ylim = ylim, out_lims_move = out_lims_move,
                color_profiles = color_profiles, base_profiles_color = base_profiles_color,
+               alpha_profiles = alpha_profiles,
                shift_colors = shift_colors, colornames_recode = colornames_recode,
                scale_color_light = scale_color_light,
                scale_color_dark  = scale_color_dark,
@@ -288,7 +309,8 @@ ggmca <-
 ggmca_data <-
   function(res.mca, dat, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
 
-           color_groups = "^.{0}", keep_levels, discard_levels, cleannames = TRUE,
+           color_groups = "^.{0}", cah_color_groups =  "^.+$",
+           keep_levels, discard_levels, cleannames = TRUE,
 
            profiles = FALSE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
            cah, max_profiles = 5000
@@ -301,10 +323,12 @@ ggmca_data <-
     if (missing(discard_levels))    discard_levels    <- character()
     if (missing(cah) ) {
       cah <- character()
+    } else if (length(cah) == 0) {
+      cah <- character()
     } else if(! cah %in% sup_vars) {
-     # warning(cah, " was not found among the supplementary variables of the mca")
+      # warning(cah, " was not found among the supplementary variables of the mca")
       #cah <- character()
-       sup_vars <- c(sup_vars, cah)
+      sup_vars <- c(sup_vars, cah)
     }
     stopifnot(length(max_profiles) < 2)
 
@@ -328,7 +352,7 @@ ggmca_data <-
 
 
 
-    #Active variables --------------------------------------------------------------------
+    # Active variables --------------------------------------------------------------------
     active_var_levels <-
       purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) %>%
                    as.factor() %>% levels()) %>%
@@ -374,24 +398,41 @@ ggmca_data <-
 
 
 
-    #Supplementary variables -------------------------------------------------------------
+    # Supplementary variables -------------------------------------------------------------
     if (length(sup_vars) != 0) {
 
       sup_vars_data <- purrr::map(sup_vars, ~ varsup(res.mca, dat[[.]]) ) %>%
         purrr::set_names(sup_vars)
 
-      # Do something with "within" et "between" variance ? ($var) ----
+      # Do something with "within" et "between" variance ? ($var)
 
       sup_vars_data <-
         purrr::imap(sup_vars_data,
                     ~ tibble::as_tibble(.x$coord, rownames = "lvs") %>%
                       dplyr::mutate(vars = .y) %>%
-                      dplyr::select(.data$vars, tidyselect::everything())
+                      dplyr::select("vars", tidyselect::everything())
         )
 
       # color_group depending on nb of supplementary variables and nb of characters
       #  indicated in color_groups
-      color_groups <- vctrs::vec_recycle(color_groups, length(sup_vars))
+      if (length(cah) > 0 & length(color_groups) != 1 &
+          length(color_groups) == length(sup_vars) - 1L) {
+
+        color_groups_base <- rep(NA_character_, length(sup_vars))
+        color_groups_base[sup_vars != cah] <-
+          vctrs::vec_recycle(color_groups, length(sup_vars) - 1L)
+
+        color_groups <- color_groups_base
+
+      } else {
+        color_groups <- vctrs::vec_recycle(color_groups, length(sup_vars))
+      }
+
+      if (length(cah) > 0 ) {
+        color_groups[sup_vars == cah] <- cah_color_groups
+      }
+      # print(purrr::set_names(color_groups, sup_vars))
+
       sup_vars_data <- sup_vars_data %>%
         purrr::map2(color_groups,
                     ~ dplyr::mutate(.x, color_group = forcats::as_factor(stringr::str_c(
@@ -425,7 +466,7 @@ ggmca_data <-
         purrr::map_dfc(~ 0)
 
 
-      #Make that, if ICPC is in sup_vars AND in profiles, ggiraph data_id are the same :
+      #Make that, if HCPC is in sup_vars AND in profiles, ggiraph data_id are the same :
       # les deux seront colores lorsqu'on survolera l'un ou l'autre
       #sup_vars_data <- sup_vars_data %>% purrr::imap(~ dplyr::mutate(.x, sup_var = .y))
       if (length(cah) != 0) {
@@ -478,7 +519,7 @@ ggmca_data <-
                      color_group = factor("Central point")) %>%
       dplyr::mutate(dplyr::across(
         tidyselect::starts_with("Dim "),
-        ~ dplyr::if_else(lvs == "Central point", 0, .)
+        ~ dplyr::if_else(.data$lvs == "Central point", 0, .)
       ))
 
     #Reorder variables in vars_data
@@ -508,7 +549,9 @@ ggmca_data <-
 
     #Remove excluded levels (now, or after by renaming them here)
     excl_levels <-
-      purrr::imap_dfr(dat[active_vars], ~ tibble::tibble(active_vars = .y, lvs = levels(.x))) |>
+      purrr::imap_dfr(dat[active_vars],
+                      ~ tibble::tibble(active_vars = .y, lvs = levels(.x))
+                      ) |>
       #dplyr::mutate(lvs2 = stringr::str_c(.data$active_vars, "_",.data$ lvs)) |>
       dplyr::filter(.data$lvs %in% excl) #| .data$lvs2 %in% excl
 
@@ -551,7 +594,7 @@ ggmca_data <-
 
 
 
-    ### Interactive tooltips (sup/active) ----
+    # Interactive tooltips (sup/active) ----
     if ("active" %in% active_tables | "sup" %in% active_tables) {
       vars_to_keep <- character()
       if ("active" %in% active_tables) vars_to_keep <- c(vars_to_keep, active_vars)
@@ -572,7 +615,7 @@ ggmca_data <-
                                                active_tables    = active_tables,
                                                tooltip_vars_1lv = tooltip_vars_1lv,
                                                tooltip_vars     = tooltip_vars
-                                               )
+      )
 
       text_vars <- names(interactive_text)[purrr::map_lgl(interactive_text, is.character)]
 
@@ -592,12 +635,15 @@ ggmca_data <-
           false = .data$begin_text
         ))
     }
-
+    # If no active tables, we still want to calculate wcounts
 
     #If no entire table have been calculated, we don't have the data for mean point
     #   => we use the data available in res.mca
-    if (length(active_tables) == 0 ) {
+
+    # if(length(tables_to_do) == 0) {
+    if (length(active_tables) == 0) {
       mean_point_interactive_text <- vars_data %>%
+        dplyr::ungroup() |>
         dplyr::filter(.data$color_group == "active_vars") %>%
         dplyr::mutate(
           text = stringr::str_c("\n", .data$lvs, " : ", .data$freq,"%")
@@ -626,6 +672,12 @@ ggmca_data <-
       #                  interactive_text = mean_point_interactive_text)
       # scale_color_named_vector <- character()
       # type <- "active_vars_only"
+    }
+
+    if (sum(vars_data$lvs == "Central point", na.rm = TRUE) >= 2) {
+
+      vars_data <- vars_data |>
+        dplyr::filter(!(.data$lvs == "Central point" & duplicated(.data$lvs)))
     }
 
 
@@ -669,14 +721,17 @@ ggmca_data <-
 
 
 
-    ### Profiles of answers ----
+    ##  Profiles of answers ----
     #; weighted : nb of individuals * weight variable
     if (profiles) {
       ind_data <- dplyr::bind_cols(
         dplyr::select(dat, -tidyselect::any_of(c(tooltip_vars_1lv[!tooltip_vars_1lv %in% sup_vars],
                                                  tooltip_vars[!tooltip_vars %in% sup_vars]))),
         tibble::as_tibble(res.mca$ind$coord)
-      )
+      ) # |>
+      # # re put base active vars, without removing `excl = `
+      # dplyr::select(-tidyselect::all_of(active_vars)) |>
+      # dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]))
 
       # ind_data <-
       #   tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == cah),
@@ -692,12 +747,47 @@ ggmca_data <-
       #     ~ forcats::fct_relabel(~ stringr::str_remove_all(., cleannames_condition()))
       #     ))
 
+      # If NA in HCPC clust : for each combination of active_vars, we attribute
+      #  the majotity class (>50%)
+
       if (length(cah) != 0) {
         #cah_levels <- dplyr::pull(ind_data, !!rlang::sym(cah) ) %>% levels()
 
+        # ind_data_save <- ind_data
+        # ind_data <- ind_data_save
+
+        # # add false NAs to test
+        # samp <- ind_data |>
+        #   dplyr::mutate(rn = dplyr::row_number()) |>
+        #   dplyr::group_by(!!!rlang::syms(active_vars)) |>
+        #   dplyr::mutate(n = dplyr::n()) |>
+        #   dplyr::ungroup() |>
+        #   dplyr::select(rn, n) |>
+        #   dplyr::filter(n >=2 ) |>
+        #   dplyr::slice_sample(n = 15) |>
+        #   dplyr::pull(rn)
+        #
+        # ind_data <- ind_data |>
+        #   dplyr::mutate(
+        #        cah_culture = dplyr::if_else(!dplyr::row_number() %in% samp,
+        #                                  cah_culture, factor(NA))
+        #   )
+        # ind_data <- ind_data |> dplyr::mutate(sup1 = cah_culture)
+        # sup_vars <- c(sup_vars, "sup1")
+
+        cah_any_NA <- dplyr::pull(ind_data, cah) |> is.na() |> any()
+        if (cah_any_NA) {
+          ind_data <- ind_data |> complete_cah(cah = cah, active_vars = active_vars)
+        }
+        # data |> tibble::as_tibble() |> tabxplor::tab(cah_culture)
+        # data |> tabxplor::tab(cah, wt = count)
+
+        cah_levels <- dplyr::pull(ind_data, cah) |> levels()
+
         ind_data <- ind_data %>%
+          dplyr::mutate(!!rlang::sym(cah) := as.character(!!rlang::sym(cah) ) ) |>
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
-                      row.w    = .data$row.w,
+                      row.w    = "row.w",
                       coord    = tidyselect::all_of(coord_names),
                       cah      = !!rlang::sym(cah)
           ) %>%
@@ -706,26 +796,25 @@ ggmca_data <-
 
             wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE)),
 
-            cah    = purrr::map_if(
-              .data$cah,
-              purrr::map_lgl(.data$cah,
-                             ~ length(unique(dplyr::pull(., !!rlang::sym(cah)))) == 1),
-              ~ unique(dplyr::pull(., !!rlang::sym(cah))),
-              .else = ~ factor(NA_character_, levels(dplyr::pull(., !!rlang::sym(cah))))
-            ) %>% unlist()
-
+            cah    = purrr::map_chr(.data$cah, ~ dplyr::first(dplyr::pull(., 1))) |>
+              as.factor() |> forcats::fct_relevel(cah_levels)
           ) %>%
           dplyr::arrange(-.data$wcount)
+        # 0.661149 secs (much longer in data.table here)
+
+
 
         if (length(max_profiles) != 0) ind_data <- ind_data %>% dplyr::slice(1:max_profiles)
 
         ind_data <- ind_data %>%
-          dplyr::mutate(nb = dplyr::row_number(), cah_id = as.integer(.data$cah)) %>%
+          dplyr::mutate(nb = dplyr::row_number(),
+                        cah_id = as.integer(.data$cah)) %>%
           dplyr::group_by(.data$cah) %>%
-          dplyr::mutate(nb_in_cah = dplyr::row_number(), nb_tot_cah = dplyr::n()) %>%
+          dplyr::mutate(nb_in_cah = dplyr::row_number(),
+                        nb_tot_cah = dplyr::n()) %>%
           dplyr::ungroup() %>%
           dplyr::mutate(coord = purrr::map(.data$coord, ~ .[1,])) %>%
-          tidyr::unnest(.data$coord)
+          tidyr::unnest("coord")
 
 
       } else {
@@ -786,10 +875,10 @@ ggmca_data <-
             count_base  = .data$count,
             wcount_base = .data$wcount,
             profile_nb  = stringr::str_c("<b>Answer profile n",
-                                        stringi::stri_unescape_unicode("\\u00b0"),
-                                        nb = .data$nb,  "</b>"),
+                                         stringi::stri_unescape_unicode("\\u00b0"),
+                                         nb = .data$nb,  "</b>"),
             count       = stringr::str_c("n: ", format(round(.data$count, 0),
-                                                      trim = TRUE, big.mark = " ")),
+                                                       trim = TRUE, big.mark = " ")),
             wcount      = dplyr::if_else(
               condition = .data$count == .data$wcount,
               true      = "",
@@ -837,13 +926,15 @@ ggmca_data <-
 ggmca_plot <- function(data,
                        axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
                        type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
-                       text_repel = FALSE, title, actives_in_bold = NULL, ellipses = NULL,
+                       text_repel = FALSE, title, ellipses = NULL,
+                       actives_in_bold = NULL, sup_in_italic = FALSE,
                        xlim, ylim, out_lims_move = FALSE,
-                       color_profiles, base_profiles_color = "#dddddd",
+                       color_profiles = TRUE, base_profiles_color = "#aaaaaa",
+                       alpha_profiles = 0.7,
                        shift_colors = 0, colornames_recode,
                        scale_color_light = material_colors_light(),
                        scale_color_dark  = material_colors_dark(),
-                       text_size = 3, size_scale_max = 4, dist_labels = c("auto", 0.04),
+                       text_size = 3.5, size_scale_max = 4, dist_labels = c("auto", 0.04),
                        right_margin = 0, use_theme = TRUE, get_data = FALSE) {
 
   vars_data        <- data$vars_data
@@ -866,11 +957,21 @@ ggmca_plot <- function(data,
   contrib1 <- rlang::sym(stringr::str_c("contrib", axes[1]))
   contrib2 <- rlang::sym(stringr::str_c("contrib", axes[2]))
 
-  if (missing(color_profiles))    color_profiles    <- character()
-  if (is.logical(color_profiles)) if (! color_profiles) {
-    color_profiles <- character()
-  } else {
-    color_profiles <- levels(as.factor(dplyr::pull(ind_data, cah)))
+  # if (length(color_profiles) == 0) {
+  #   if (length(cah) != 0) {
+  #     color_profiles <- levels(as.factor(dplyr::pull(ind_data, cah)))
+  #   } else {
+  #     color_profiles <- character()
+  #   }
+  #
+  # } else {
+  if (length(cah) > 0 & !is.null(ind_data)) {
+    if (is.logical(color_profiles)) if (! color_profiles) {
+      color_profiles <- character()
+    } else {
+      color_profiles <- levels(as.factor(dplyr::pull(ind_data, cah)))
+    }
+    #}
   }
 
   if (missing(colornames_recode)) colornames_recode <- character()
@@ -889,6 +990,7 @@ ggmca_plot <- function(data,
     vars_data <- reverse_axe(vars_data)
     if (!is.null(ind_data)) ind_data <- reverse_axe(ind_data)
   }
+
 
 
   #Add contribs in tooltips for active_vars ----
@@ -914,12 +1016,18 @@ ggmca_plot <- function(data,
     dplyr::select(-.data$contribs)
 
 
+
   # Collapse the interactive tooltips dataframes
-  vars_data <- vars_data %>%
-    dplyr::mutate(interactive_text = purrr::map_chr(
-      .data$interactive_text,
-      ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
-    ))
+  vars_data <-  vars_data |>
+    dplyr::mutate(interactive_text = dplyr::bind_rows(.data$interactive_text) |>
+                    tidyr::unite("interactive_text", sep = "\n", na.rm = TRUE) |>
+                    dplyr::pull("interactive_text"),
+    )
+  # vars_data <- vars_data %>%
+  #   dplyr::mutate(interactive_text = purrr::map_chr(
+  #     .data$interactive_text,
+  #     ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
+  #   ))
 
   #Add linebreak at end if text finish by html </font>, otherwise no line breaks
   vars_data <- vars_data %>%
@@ -933,7 +1041,7 @@ ggmca_plot <- function(data,
       dplyr::mutate(color_group = forcats::as_factor(dplyr::if_else(
         condition = .data$vars == sup_vars[1],
         true      = paste0(.data$color_group, "_", .data$lvs), #forcats::fct_expand(paste0(.data$color_group, "_", .data$lvs) %>% as.factor(),
-                    #                    levels(.data$color_group)),
+        #                    levels(.data$color_group)),
         false     = as.character(.data$color_group)
       )))
   }
@@ -950,6 +1058,14 @@ ggmca_plot <- function(data,
                            stringr::str_c(colorvar_recode, collapse = "', '"), "'",
                            collapse = ""))
   }
+
+  if (length(scale_color_light) == 1 ) {
+    scale_color_light <- vctrs::vec_recycle(scale_color_light, length(colorvar_recode))
+  }
+  if (length(scale_color_dark) == 1 ) {
+    scale_color_dark <- vctrs::vec_recycle(scale_color_dark, length(colorvar_recode))
+  }
+
 
   scale_color_points <- scale_color_light %>%
     purrr::set_names(colorvar_recode[1:length(scale_color_light)])
@@ -1057,13 +1173,20 @@ ggmca_plot <- function(data,
 
   #Profiles :
   if (!is.null(ind_data)) {
-    ind_data <- ind_data %>%
-      dplyr::mutate(interactive_text = purrr::map_chr(
-        .data$interactive_text,
-        ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
-      ) %>%
-        stringr::str_remove_all("\n#")
+    ind_data <-  ind_data |>
+      dplyr::mutate(interactive_text = dplyr::bind_rows(.data$interactive_text) |>
+                      tidyr::unite("interactive_text", sep = "\n", na.rm = TRUE) |>
+                      dplyr::pull("interactive_text") |>
+                      stringr::str_remove_all("\n#"),
       )
+
+    # ind_data <- ind_data %>%
+    #   dplyr::mutate(interactive_text = purrr::map_chr(
+    #     .data$interactive_text,
+    #     ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
+    #   ) %>%
+    #     stringr::str_remove_all("\n#")
+    #   )
 
     if (length(cah) != 0) { #& type[1] != "facets"
 
@@ -1080,7 +1203,7 @@ ggmca_plot <- function(data,
             ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
                          tooltip = .data$interactive_text, data_id = .data$cah_id + 10000),
             color = base_profiles_color, na.rm = TRUE, inherit.aes = FALSE,
-            show.legend = FALSE
+            show.legend = FALSE, alpha = alpha_profiles
           )
         } else {
           profiles <- NULL
@@ -1097,10 +1220,11 @@ ggmca_plot <- function(data,
 
         if (cah %in% sup_vars) {
           sup_cah_colorvar <- vars_data %>%
-            dplyr::select(.data$lvs, .data$color_group) %>%
+            dplyr::select("lvs", "color_group") %>%
             dplyr::filter(stringr::str_detect(.data$color_group, paste0("^", cah))) %>%
             dplyr::mutate(color_group = .data$lvs %>% purrr::set_names(.data$color_group)) %>%
-            dplyr::pull(.data$color_group)
+            dplyr::pull("color_group") |>
+            forcats::fct_drop()
 
           color_profiles_in_colorvar <- sup_cah_colorvar %>%
             purrr::keep(. %in% ind_cah_levels) %>%
@@ -1176,7 +1300,8 @@ ggmca_plot <- function(data,
           ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
                        tooltip = .data$interactive_text,
                        data_id = .data$cah_id + 10000, color = .data$color_group),
-          na.rm = TRUE, inherit.aes = FALSE, show.legend = FALSE, stroke = 0 #, alpha = 0.5
+          na.rm = TRUE, inherit.aes = FALSE, show.legend = FALSE,
+          alpha = alpha_profiles, stroke = 0
         )
       }
 
@@ -1195,7 +1320,7 @@ ggmca_plot <- function(data,
                          tooltip = .data$interactive_text,
                          data_id = .data$nb + 10000),
             color = base_profiles_color, na.rm = TRUE, inherit.aes = FALSE,
-            show.legend = FALSE
+            show.legend = FALSE, alpha = alpha_profiles
           )
       } else {
         profiles <- NULL
@@ -1225,7 +1350,7 @@ ggmca_plot <- function(data,
       supvar1_infos <- supvar1_infos$infos %>% purrr::set_names(supvar1_infos$nam)
 
       if (!is.null(ellipses)) {
-          ellipses_coord <- ind_data %>%
+        ellipses_coord <- ind_data %>%
           dplyr::select(!!dim1, !!dim2, .data$row.w, tidyselect::all_of(sup_vars[1]), tidyselect::any_of("lvs")) %>%
           dplyr::mutate(infos = supvar1_infos[as.character(!!rlang::sym(sup_vars[1]))],
           ) %>%
@@ -1297,15 +1422,18 @@ ggmca_plot <- function(data,
 
   # If type is text, put the active_vars on the same base than suplementary vars, to avoid overlapping of the two.
   #if (type[1] == "text" & length(sup_vars) != 0) {
-    vars_data <- vars_data %>%
-      dplyr::mutate(
-        face = dplyr::case_when(
-          color_group == "active_vars" & actives_in_bold ~ "bold" ,
-          color_group == "active_vars"                   ~ "plain",
-          actives_in_bold                                ~ "plain",
-          TRUE                                           ~ "bold" ,
-        ))
+  vars_data <- vars_data %>%
+    dplyr::mutate(
+      face = dplyr::case_when(
+        color_group == "active_vars" & actives_in_bold ~ "bold" ,
+        color_group == "active_vars"                   ~ "plain",
+        sup_in_italic & actives_in_bold                ~ "italic" ,
+        sup_in_italic                                  ~ "bold.italic" ,
+        actives_in_bold                                ~ "plain",
+        TRUE                                           ~ "bold" ,
+      ))
   #}
+
 
   #Mean point:
   mean_point_data  <- dplyr::filter(vars_data, .data$lvs == "Central point")
@@ -1371,8 +1499,52 @@ ggmca_plot <- function(data,
 
 
 
-#The final plots
+  #The final plots
   if (type[1] == "text") {
+
+    if (length(cah) > 0 ) {
+      cah_data  <- vars_data |> dplyr::filter(.data$vars == cah)
+      vars_data <- vars_data |> dplyr::filter(.data$vars != cah)
+      if (text_repel == FALSE) {
+        graph_cah <-
+          ggiraph::geom_label_interactive(
+            data = cah_data,
+            ggplot2::aes(label = .data$lvs, color = .data$color_group,
+                         tooltip = .data$interactive_text),
+            fill = grDevices::rgb(1, 1, 1, alpha = 0.9),
+            fontface = "bold", size = text_size, na.rm = TRUE
+          )
+
+      } else {
+        graph_cah <-
+          # list(
+          # geom_segment(
+          #   data = acm_cah |>
+          #     mutate(!!dim1 = pmin(1.3, pmax(!!dim1, -0.9)),
+          #            !!dim2 = pmin(1.3, pmax(!!dim2, -0.85)),
+          #            start1  = pmin(0.95, pmax(!!dim1, -0.5)),
+          #            start2  = pmin(1.25, pmax(!!dim2, -0.775)),
+          #     ),
+          #   ggplot2::aes(x = start1, xend = !!dim1, y = start2, yend = !!dim2,
+          #                color = color_group),
+          #   arrow = ggplot2::arrow(length = ggplot2::unit(0.3, "lines")), na.rm = TRUE
+        # ),
+        ggiraph::geom_label_repel_interactive(
+          data = cah_data,
+          ggplot2::aes(label = .data$lvs, color = .data$color_group,
+                       tooltip = .data$interactive_text),
+          fill = grDevices::rgb(1, 1, 1, alpha = 0.9),
+          direction = "both", force = 0.5, force_pull = 1, point.padding = 0, point.size = NA,
+          arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
+          fontface = "bold", size = text_size, na.rm = TRUE #,
+          #box.padding = 0,
+        )
+        #)
+      }
+    } else {
+      graph_cah <- NULL
+    }
+
     if (text_repel == FALSE) {
       graph_text <-
         ggiraph::geom_text_interactive(
@@ -1390,11 +1562,13 @@ ggmca_plot <- function(data,
           arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines"))
         ) # point.padding = 0.25, segment.colour = "black",
     }
+
+
     plot_output <-
       ggplot2::ggplot(vars_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
                                    color = .data$color_group, data_id = .data$id)) +
-      graph_theme_acm + profiles  + ellipses + graph_text +
+      graph_theme_acm + profiles + ellipses + graph_text + graph_cah +
       mean_point_graph
 
 
@@ -1551,6 +1725,742 @@ ggmca_plot <- function(data,
 
 
 
+
+
+
+
+
+#' Plot Initial Dimensions (Active Variables) of Multiple Correspondence Analysis
+#'
+#' @description
+#' This function mostly have an educational value : it shows the
+#' initial dimensions of the Multiple Correspondence Analysis (active variables)
+#' in their initial reference frame. It shows the n dimensional space before the
+#' analysis is done. To see initial dimensions axes in the space built by the
+#' analysis (principal axes), use \code{\link[ggfacto]{ggmca_with_base_ref}}.
+#'
+#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param data The data in which to find the supplementary variables, etc.
+#' @param proj_just Horizontal justification of text of the coordinates on axes,
+#' as a character vector of length 2 (x and y).
+#' @param cleannames Set to \code{TRUE} to clean levels names, by removing
+#' prefix numbers like \code{"1-"}, and text in parentheses.
+#' @param keep A character vector of the name of active variables to keep.
+#'
+#' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
+#' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
+#' Sending the result through \code{\link{ggi}} will draw the
+#' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+#' @export
+#'
+#' @examples
+#' \donttest{
+#' data(tea, package = "FactoMineR")
+#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' ggmca_initial_dims(res.mca, data = tea)
+#' }
+ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
+                               cleannames = TRUE, keep = NULL) {
+
+  mca_excl_done <- names(res.mca$call$Xtot)[res.mca$call$excl]
+
+  row.w <- res.mca$call$row.w
+
+  active_vars <- stringr::str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
+
+  active_var_levels <- purrr::map(active_vars, ~ dplyr::pull(data, .) %>%
+                                    as.factor() %>%
+                                    forcats::fct_na_value_to_level("NA") |>
+                                    levels()
+  ) |>
+    purrr::set_names(active_vars) %>%
+    purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs2 = .x))  |>
+    dplyr::mutate(vars = forcats::as_factor(.data$vars))
+
+  active_var_levels_disordered <-
+    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) %>%
+                 as.factor() %>% levels()) %>%
+    purrr::set_names(active_vars) %>%
+    purrr::imap_dfr(~ tibble::tibble(
+      vars = .y,
+      lvs  = .x,
+      lvs2 = stringr::str_remove_all(.x, paste0("^", .y, "_") ),
+    )) |>
+    dplyr::mutate(vars = forcats::as_factor(.data$vars))
+
+  active_var_levels <- active_var_levels |>
+    dplyr::left_join(active_var_levels_disordered,
+                     by = c("vars", "lvs2"),
+                     relationship = "one-to-one") |>
+    dplyr::filter(!.data$lvs %in% mca_excl_done) |>
+    dplyr::group_by(.data$vars) |>
+    dplyr::group_split() %>%
+    purrr::set_names(purrr::map_chr(., ~ as.character(dplyr::first(.$vars)))) |>
+    purrr::map(~ .$lvs)
+
+
+  if(length(keep) > 0) active_var_levels <- active_var_levels |>
+    keep(names(active_var_levels) %in% keep)
+
+  active_var_levels_not_zero <-
+    active_var_levels |>
+    purrr::imap_dfr(~ tibble::tibble(vars = .y,
+                                     lvs = sort(.x, decreasing = TRUE),
+                                     #rn  = length(.x):1
+    )
+    ) |>
+    dplyr::mutate(vars = forcats::as_factor(.data$vars)) |>
+    dplyr::group_by(.data$vars) |>
+    dplyr::mutate(max_lv = dplyr::n(),
+                  vars_group = ceiling((dplyr::row_number()-1)/2) ) |>
+    dplyr::ungroup()
+
+
+  active_var_level0 <-
+    active_var_levels_not_zero |>
+    dplyr::filter(.data$vars_group == 0) |>
+    dplyr::mutate(max_group = ceiling((.data$max_lv-1)/2)) |>
+    dplyr::group_by(.data$vars) |>
+    dplyr::group_split() |>
+    purrr::map_dfr(~ tibble::tibble(vars = .$vars,
+                                    lvs = .$lvs,
+                                    vars_group = 1:.$max_group,
+                                    max_lv = .$max_lv)
+    )
+
+  active_var_levels_not_zero <- active_var_levels_not_zero |>
+    dplyr::filter(.data$vars_group != 0)
+
+  active_var_level_grouped <- active_var_level0 |>
+    dplyr::bind_rows(active_var_levels_not_zero) |>
+    dplyr::arrange(.data$vars)
+
+  active_var_level_grouped <-
+    active_var_level_grouped |>
+    dplyr::mutate(vars_group = paste0(
+      .data$vars, " (",
+      dplyr::case_when(
+        .data$max_lv <= 3   ~ "",
+
+        .data$vars_group == 1 ~ paste0(.data$vars_group*2 - 1, "-",
+                                       pmin(.data$vars_group*2 + 1, .data$max_lv)),
+
+        .data$vars_group*2 == .data$max_lv ~ paste0(.data$max_lv),
+
+        TRUE ~ paste0(.data$vars_group*2, "-", .data$vars_group*2 + 1)
+      ),
+      ")"
+
+    ) |>
+      stringr::str_remove(" *\\(\\)$")
+    ) |>
+    dplyr::mutate(vars_group = forcats::as_factor(.data$vars_group)) |>
+    dplyr::group_by(.data$vars_group) |>
+    dplyr::group_split() %>%
+    purrr::set_names(purrr::map_chr(., ~ as.character(dplyr::first(.$vars_group)))) |>
+    purrr::map(~ list(vars = .$vars[1], vars_group = .$vars_group[1], lvs = .$lvs))
+
+
+
+  # Table disjonctive
+  disj <-
+    purrr::pmap(active_var_level_grouped |> purrr::transpose(),
+         ~ {
+           disj <- res.mca$call$Xtot |>
+             dplyr::select(tidyselect::all_of(..3) ) |>
+             tibble::as_tibble() |>
+             tibble::add_column(row.w = row.w)
+           # disj <- dplyr::select(disj, tidyselect::all_of(..3) )
+
+           if (cleannames) {
+             disj <- disj |>
+               dplyr::rename_with(~ stringr::str_remove_all(., cleannames_condition()))
+           }
+
+           disj |>
+             dplyr::group_by(!!!rlang::syms(names(disj)[names(disj) != "row.w"])) |>
+             dplyr::summarise(n = dplyr::n(),
+                              wn = sum(row.w, na.rm = TRUE),
+                              .groups = "drop") |>
+             dplyr::mutate(freq = .data$wn/sum(.data$wn, na.rm = TRUE) ) |>
+             dplyr::filter(!dplyr::if_all(-tidyselect::all_of(c("n", "wn", "freq")), ~ . == 0L)) |> # Remove NA line (only zeros)
+             dplyr::rowwise() |>
+             dplyr::mutate(lvs = which(dplyr::c_across(tidyselect::everything()) == "1") |>
+                             dplyr::first()) |>
+             dplyr::ungroup() %>%
+             dplyr::mutate(lvs = names(.)[.data$lvs]) |>
+             dplyr::rename_with(~ paste0("x", 0:(length(.)-1)),
+                                .cols = -tidyselect::all_of(c("n", "wn", "lvs", "freq"))) |>
+             dplyr::mutate(vars = ..1, vars_group = ..2, .before = 1)
+
+           #dplyr::mutate(dplyr::across(tidyselect::starts_with("x"), ~ . * n / sum(n), .names = "mean_{.col}"))
+
+
+         }
+    )
+  # disj[c("VIDEOS", "MUSIQUE",  "LIVRES (1-3)", "LIVRES (4)")]
+
+  # Point moyen (barycentre)
+  disj <-
+    purrr::imap_dfr(
+      disj,
+      ~  {
+        mean <- tibble::tibble(name = paste0("mean_x", (nrow(.x)-1):0),
+                               freq = .x$freq
+        ) |>
+          tidyr::pivot_wider(names_from = "name", values_from = "freq") |>
+          dplyr::mutate(vars_group = .y, .before = 1)
+
+        .x |>
+          dplyr::left_join(mean, by = "vars_group", relationship = "many-to-one")
+      }
+    ) |>
+    dplyr::mutate(dplyr::across(
+      tidyselect::starts_with(c("x", "mean_x")),
+      ~ tidyr::replace_na(., 0)
+    )) |>
+    dplyr::mutate(vars_group = forcats::as_factor(.data$vars_group)) |>
+    dplyr::select("vars", "vars_group", "lvs", tidyselect::starts_with("x"),
+                  "n", "freq", tidyselect::starts_with("mean_x"))
+
+  #  disj |> dplyr::filter(vars %in% c("VIDEOS", "MUSIQUE", "LIVRES")) |> new_tab() |> dplyr::group_by(vars)
+
+  if (length(unique(disj$vars_group)) > 1) {
+    #(
+    disj |>
+      ggplot2::ggplot(
+        ggplot2::aes(x = .data$x2, y = .data$x1,
+                     group = .data$vars_group, color = .data$vars)) +
+      ggplot2::geom_polygon(
+        ggplot2::aes(fill = .data$vars), color = NA, alpha = 0.1) +
+      ggplot2::geom_segment(
+        ggplot2::aes(xend = .data$x2 , yend = .data$x1), x = 0, y = 0,
+        size = 0.75, linetype = "dashed"
+      ) +
+      ggiraph::geom_point_interactive(
+        ggplot2::aes(size    = .data$n,
+                     tooltip = paste0(round(.data$freq*100), "%",
+                                      " (n=", .data$n, ")"))
+      ) +
+      ggplot2::geom_segment(
+        ggplot2::aes(x = dplyr::if_else(.data$x0 == 0, .data$x2 * .data$freq, NA),
+                     y = .data$x1 * .data$freq,
+                     xend = .data$mean_x2, yend = .data$mean_x1),
+        na.rm = TRUE, color =  "black", linetype = "dashed") +
+      ggplot2::geom_point(
+        data = disj |>
+          dplyr::group_by(.data$vars_group) |>
+          dplyr::slice(1) |>
+          dplyr::ungroup(),
+        ggplot2::aes(x = .data$mean_x2, y = .data$mean_x1),
+        color = "black", fill = "#eeeeee", shape = 3, size = 5, stroke = 1.5
+      ) +
+      ggrepel::geom_text_repel(
+        ggplot2::aes(label = .data$lvs),
+        hjust = "inward", size = 3, color = "black", #point.padding = 0.1,
+        point.size = NA, nudge_x = 0.075, min.segment.length = Inf,
+        direction = "y" #, force = 0.5, force_pull = 1,
+      ) +
+      # ggplot2::geom_text(data = disj |> dplyr::group_by(vars_group) |> dplyr::slice(1) |> dplyr::ungroup(),
+      #             ggplot2::aes(x = mean_x1, y = mean_x2),
+      #           label = "Mean point (weighted barycenter)",
+      #           nudge_y = 0.06, size = 5, color = "black") +
+      ggplot2::geom_text(data = disj |> dplyr::filter(!(.data$x1 == 0 & .data$x2 == 0)), # Projections
+                         ggplot2::aes(x     = .data$x2 * .data$freq,
+                                      y     = .data$x1 * .data$freq,
+                                      hjust = dplyr::if_else(.data$x2 == 1, 0.5, proj_just[1]),
+                                      vjust = dplyr::if_else(.data$x2 == 1, proj_just[2], 0.5),
+                                      label = round(.data$freq, 2) ),
+                         na.rm = TRUE,  color = "black", fontface = "bold") +
+      # geom_label(ggplot2::aes(label = paste0("n=", n, " (", round(freq*100), "%)")),
+      #            hjust = 0, nudge_x = 0.1, size = 3,
+      #            fontface = "bold") +
+      ggplot2::scale_x_continuous("", breaks = seq(0, 1, 0.25), lim = c(-0.4, 1.20) ) +
+      ggplot2::scale_y_continuous("", breaks = seq(0, 1, 0.25), lim = c(-0.2, 1.10) ) +
+      ggplot2::scale_size_area(max_size = 8, guide = "none") +
+      ggplot2::scale_color_discrete(guide = "none") +
+      ggplot2::scale_fill_discrete(guide = "none") +
+      ggplot2::facet_wrap(ggplot2::vars(.data$vars_group)) + # NO .data$ ?
+      # coord_fixed() +
+      # coord_flip() +
+      ggplot2::theme_minimal() +
+      ggplot2::theme(panel.grid = ggplot2::element_blank(),
+                     panel.spacing = ggplot2::unit(0, "cm")
+                     #panel.grid.major = ggplot2::element_line(color = "grey80", linetype = "dotted")
+      )  #) |>
+    #ggi()
+
+
+    # Juste une variable
+  } else {
+
+    if (! "x2" %in% names(disj)) disj <- disj |>
+        dplyr::mutate(x2 = 0, mean_x2 = 0)
+
+    #print(disj)
+    #print(nrow(disj) > 2)
+    #     print(if(nrow(disj) > 2) {seq(0, 1, 0.25)} else {0}
+    # )
+
+    disj |>
+      ggplot2::ggplot(
+        ggplot2::aes(x = .data$x2, y = .data$x1, group =.data$ vars_group,
+                                   color = .data$vars)) +
+      ggplot2::geom_polygon(ggplot2::aes(fill = .data$vars), color = NA, alpha = 0.1) +
+      ggplot2::geom_segment(
+        ggplot2::aes(xend = .data$x2 , yend = .data$x1), x = 0, y = 0,
+        size = 0.75, linetype = "dashed"
+      ) +
+      ggplot2::geom_point(ggplot2::aes(size = .data$n)) +
+      ggplot2::geom_segment(
+        ggplot2::aes(x = dplyr::if_else(.data$x0 == 0, .data$x2 * .data$freq, NA),
+                     y = .data$x1 * .data$freq,
+                     xend = .data$mean_x2, yend = .data$mean_x1),
+        na.rm = TRUE, color =  "black", linetype = "dashed"
+      ) +
+      ggplot2::geom_point(
+        data = disj |>
+          dplyr::group_by(.data$vars_group) |>
+          dplyr::slice(1) |>
+          dplyr::ungroup(),
+        ggplot2::aes(x = .data$mean_x2, y = .data$mean_x1),
+        color = "black", fill = "#eeeeee", shape = 3, size = 5, stroke = 1.5
+      ) +
+      ggplot2::geom_text(
+        ggplot2::aes(label = .data$lvs), nudge_y = 0.06, size = 5, color = "black"
+      ) +
+      ggplot2::geom_text(
+        data = disj |>
+          dplyr::group_by(.data$vars_group) |>
+          dplyr::slice(1) |>
+          dplyr::ungroup(),
+        ggplot2::aes(x = .data$mean_x2, y = .data$mean_x1),
+        label = "Mean point (weighted barycenter)",
+        nudge_y = 0.06, size = 5, color = "black"
+      ) +
+      ggplot2::geom_text(
+        data = disj |> dplyr::filter(!(.data$x1 == 0 & .data$x2 == 0)),
+        ggplot2::aes(x     = .data$x2 * .data$freq,
+                     y     = .data$x1 * .data$freq,
+                     hjust = dplyr::if_else(.data$x2 == 1, 0.5, proj_just[1]),
+                     vjust = dplyr::if_else(.data$x2 == 1, proj_just[2], 0.5),
+                     label = round(.data$freq, 2) ),
+        na.rm = TRUE,  color = "black", fontface = "bold"
+      ) +
+      ggplot2::geom_label(
+        ggplot2::aes(label = paste0(round(.data$freq*100), "%",
+                                    "( n=", .data$n, ")")),
+        hjust = 0, nudge_x = 0.035, size = 4,
+        fontface = "bold"
+      ) +
+      ggplot2::scale_x_continuous(
+        "", breaks = if(nrow(disj) > 2) {seq(0, 1, 0.25)} else {0},
+        lim = if(nrow(disj) > 2) {c(-0.15, 1.20)} else {c(-0.5, 0.5)}
+      ) +
+      ggplot2::scale_y_continuous("", breaks = seq(0, 1, 0.25) ) +
+      ggplot2::scale_size_area(max_size = 12, guide = "none") +
+      ggplot2::scale_color_discrete(guide = "none") +
+      ggplot2::scale_fill_discrete(guide = "none") +
+      ggplot2::theme_minimal()
+
+  }
+
+}
+
+
+
+
+
+#' Plot Initial Dimensions (Active Variables) on a Multiple Correspondence Analyses
+#'
+#' @description This function mostly have an educational value : it shows the
+#' initial dimensions of the Multiple Correspondence Analysis (active variables)
+#' in the space built by the analysis (principal axes). To see initial
+#' dimensions in their initial reference frame, use \code{\link[ggfacto]{ggmca_initial_dims}}.
+#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param axes The axes to print, as a numeric vector of length 2.
+#' @param keep A character vector of the name of active variables to keep.
+#'
+#' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
+#' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
+#' Sending the result through \code{\link{ggi}} will draw the
+#' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+#' @export
+#'
+#' @examples
+#' \donttest{
+#' data(tea, package = "FactoMineR")
+#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' ggmca_with_base_ref(res.mca)
+#'
+#' # It is more readable to select just a few active variables
+#' lv2_vars <- dplyr::select(tea[1:18], where(~ nlevels(.) == 2)) |> names()
+#' ggmca_with_base_ref(res.mca, keep = lv2_vars)
+#'
+#' lv3_vars <- dplyr::select(tea[1:18], where(~ nlevels(.) == 3)) |> names()
+#' ggmca_with_base_ref(res.mca, keep = lv3_vars)
+#'
+#' lv4_vars <- dplyr::select(tea[1:18], where(~ nlevels(.) == 4)) |> names()
+#' ggmca_with_base_ref(res.mca, keep = lv4_vars)
+#'
+#' lv6_vars <- dplyr::select(tea[1:18], where(~ nlevels(.) == 6)) |> names()
+#' ggmca_with_base_ref(res.mca, keep = lv6_vars)
+#' }
+ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
+                                keep = NULL) {
+
+  dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
+  dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+
+  active_vars <-
+    stringr::str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
+
+
+  active_var_levels <-
+    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) %>%
+                 as.factor() %>% levels()) %>%
+    purrr::set_names(active_vars) %>%
+    purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs = .x))
+
+  freqs <- tibble::enframe(res.mca$call$marge.col * length(active_vars),
+                           "lvs", "freq")
+  freqs <- active_var_levels |> dplyr::left_join(freqs, by = "lvs") |>
+    dplyr::mutate(lvs = stringr::str_remove_all(.data$lvs,
+                                                cleannames_condition()))
+
+
+  vars_data <- ggmca_data(res.mca)$vars_data # get_data = TRUE
+  acm_orga_from_base_ref <- vars_data |>
+    dplyr::filter(.data$color_group == "active_vars")
+
+  if(length(keep) > 0) acm_orga_from_base_ref <- acm_orga_from_base_ref |>
+    dplyr::filter(.data$vars %in% keep)
+
+  acm_orga_from_base_ref <- acm_orga_from_base_ref |>
+    dplyr::mutate(vars = forcats::fct_drop(.data$vars))
+
+
+  acm_orga_from_base_ref <- acm_orga_from_base_ref |>
+    dplyr::left_join(freqs, by = c("vars", "lvs")) |>
+    dplyr::mutate(lvs = forcats::as_factor(.data$lvs)) |> # to keep order
+    dplyr::group_by(.data$vars) |>
+    dplyr::arrange(dplyr::desc(.data$lvs), .by_group = TRUE) |>
+    dplyr::select(
+      tidyselect::everything() & -tidyselect::starts_with("Dim "),
+      tidyselect::all_of(c(as.character(dim1), as.character(dim2)))
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        tidyselect::starts_with("Dim "),
+        ~ dplyr::if_else(dplyr::row_number() != 1, dplyr::first(.), NA),
+        .names = "start_{.col}"
+      ),
+
+
+      dplyr::across(
+        tidyselect::starts_with("Dim "), # right angles of vars vectors vars vects
+        ~ dplyr::if_else(
+          dplyr::row_number() != 1,
+          true  = (.*1/16 + dplyr::first(.) * 15/16),
+          false = NA_real_),
+        .names = "start_angle_{.col}"
+      ),
+
+
+      dplyr::across(
+        tidyselect::starts_with("Dim "), # projections of mean point on vars vects
+        ~ dplyr::if_else(
+          dplyr::row_number() != 1,
+          true  = (.*.data$freq + dplyr::first(.) * (1-.data$freq)),
+          #(.*freq + dplyr::first(.) * dplyr::first(freq))/(freq + dplyr::first(freq)),
+          false = NA_real_),
+        .names = "proj_{.col}"
+      ),
+    ) |>
+    dplyr::rename_with(~stringr::str_remove(., "_Dim "),
+                       .cols = tidyselect::starts_with("proj_Dim")) |>
+    dplyr::rename_with(~stringr::str_remove(., "_Dim "),
+                       .cols = tidyselect::starts_with("start_angle_Dim")) |>
+    dplyr::mutate(
+      ang_x = .data$start_angle1 - dplyr::first(!!dim1),  # 2 left 3 down
+      ang_y = .data$start_angle2 - dplyr::first(!!dim2),  # 2 left 3 down
+
+      ang_ld_x =  dplyr::nth(.data$start_angle1, 2L) +
+        dplyr::nth(.data$ang_x, 3L) - dplyr::first(!!dim1), # left down
+
+      ang_ld_y =  dplyr::nth(.data$start_angle2, 2L) +
+        dplyr::nth(.data$ang_y, 3L) - dplyr::first(!!dim2), # left down
+
+      # right angle on zero var
+      start_angle12_x = dplyr::nth(.data$start_angle1, 2L) + dplyr::nth(.data$ang_x, 3L),
+
+      start_angle12_y = dplyr::nth(.data$start_angle2, 2L) + dplyr::nth(.data$ang_y, 3L),
+
+
+      # # right angles on mean point
+      # moy_angle1 = dplyr::if_else(
+      #          dplyr::row_number() != 1,
+      #          true  = 0 - ang_x,
+      #          false = NA_real_),
+      #
+      # moy_angle2 = dplyr::if_else(
+      #          dplyr::row_number() != 1,
+      #          true  = 0 - ang_y,
+      #          false = NA_real_),
+      #
+      # moy_angle12_x = dplyr::nth(moy_angle1, 2L) - dplyr::nth(ang_x, 3L),
+      #
+      # moy_angle12_y = dplyr::nth(moy_angle2, 2L) - dplyr::nth(ang_y, 3L),
+
+
+      # right angle on projections
+      proj_angle_x = dplyr::if_else( #
+        dplyr::row_number() != 1,
+        true  = .data$proj1 - .data$ang_x,
+        false = NA_real_),
+
+      proj_angle_y = dplyr::if_else(
+        dplyr::row_number() != 1,
+        true  = .data$proj2 - .data$ang_y,
+        false = NA_real_),
+
+
+      proj_angle_b_x = dplyr::if_else(
+        dplyr::row_number() != 1,
+        true  = .data$proj1 + dplyr::if_else(dplyr::row_number() == 2,
+                                       true  = dplyr::nth(.data$ang_x, 3),
+                                       false = dplyr::nth(.data$ang_x, 2) ),
+        false = NA_real_),
+
+      proj_angle_b_y = dplyr::if_else(
+        dplyr::row_number() != 1,
+        true  = .data$proj2 + dplyr::if_else(dplyr::row_number() == 2,
+                                       true  = dplyr::nth(.data$ang_y, 3),
+                                       false = dplyr::nth(.data$ang_y, 2) ),
+        false = NA_real_),
+
+      proj_angle_c_x = dplyr::if_else(
+        dplyr::row_number() != 1,
+        true  = .data$proj_angle_x + dplyr::if_else(dplyr::row_number() == 2,
+                                              true  = dplyr::nth(.data$ang_x, 3),
+                                              false = dplyr::nth(.data$ang_x, 2) ),
+        false = NA_real_),
+
+      proj_angle_c_y = dplyr::if_else(
+        dplyr::row_number() != 1,
+        true  = .data$proj_angle_y + dplyr::if_else(dplyr::row_number() == 2,
+                                                    true  = dplyr::nth(.data$ang_y, 3),
+                                                    false = dplyr::nth(.data$ang_y, 2) ),
+        false = NA_real_),
+
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::select(
+      "vars", "lvs", "freq", #"wcount",
+      "Dim 1", "Dim 2", "start_Dim 1", "start_Dim 2", "proj1", "proj2",
+      tidyselect::everything() & -tidyselect::any_of(
+        c("color_group", "id", "cah_id", "interactive_text", "face")
+      )
+    )
+
+
+  keep_has_names <- all(!is.null(names(keep)))
+
+  color_scale <-  if (keep_has_names) {
+    ggplot2::scale_color_manual(values = purrr::set_names(names(keep), keep),
+                                aesthetics = c("colour", "fill"),
+                                na.value = "grey70" )
+
+  } else if (length(unique(acm_orga_from_base_ref$vars)) <= 12) {
+    ggplot2::scale_color_manual(values = purrr::set_names(material_colors_light(), NULL),
+                                aesthetics = c("colour", "fill"),
+                                na.value = "grey70")
+  } else {
+    ggplot2::scale_color_discrete(aesthetics = c("colour", "fill"),
+                                  na.value = "grey70")
+  }
+
+
+  acm_orga_from_base_ref |>
+    ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
+    ggfacto::theme_facto(res.mca, no_color_scale = TRUE) +
+    #acm_orga_1_cah$graph_theme_acm +
+    ggplot2::geom_point(
+      data = tibble::tibble(!!dim1 := 0, !!dim2 := 0),
+      color = "black", fill = "#eeeeee", shape = 3, size = 5,
+      stroke = 1.5, na.rm = TRUE
+    ) +
+    ggplot2::geom_segment(
+      ggplot2::aes(xend = !!dim1, yend = !!dim2   ,
+                   x = .data$`start_Dim 1` , y = .data$`start_Dim 2`,
+                   color = .data$vars, group = .data$vars),
+      size = 1, arrow = ggplot2::arrow(length = ggplot2::unit(0.5, "lines")), na.rm = TRUE
+    ) +
+    ggplot2::geom_segment( # projections
+      ggplot2::aes(xend = .data$proj1 , yend = .data$proj2,
+                   color = .data$vars, group = .data$vars),
+      x = 0, y = 0, size = 0.5, linetype = "dashed",
+    ) +
+    #   ggplot2::geom_segment(data = mid_point_test, # projections
+    #   ggplot2::aes(color = vars, group = vars),
+    #   xend = 0, yend = 0, size = 0.5, linetype = "dashed",
+    # ) +
+    ggplot2::geom_segment( # right angle on vars vectors
+      ggplot2::aes(xend = .data$start_angle12_x , yend = .data$start_angle12_y,
+                   x = .data$start_angle1 , y = .data$start_angle2,
+                   color = .data$vars, group = .data$vars),
+      size = 0.5
+    ) +
+    #   ggplot2::geom_segment( # right angle on mean point
+    #   ggplot2::aes(xend = .data$moy_angle12_x , yend = .data$moy_angle12_y,
+    #                x = .data$moy_angle1 , y = .data$moy_angle2,
+    #                color = .data$vars, group = .data$vars),
+    #   size = 0.5
+    # ) +
+
+    ggplot2::geom_segment( # right angle on projections
+      ggplot2::aes(xend = .data$proj_angle_x, yend = .data$proj_angle_y,
+                   x = .data$proj_angle_c_x , y = .data$proj_angle_c_y,
+                   color = .data$vars, group = .data$vars),
+      size = 0.5
+    ) +
+    ggplot2::geom_segment( # right angle on projections
+      ggplot2::aes(xend = .data$proj_angle_b_x , yend = .data$proj_angle_b_y,
+                   x = .data$proj_angle_c_x , y = .data$proj_angle_c_y,
+                   color = .data$vars, group = .data$vars),
+      size = 0.5
+    ) +
+    ggplot2::geom_polygon(
+      ggplot2::aes(fill = .data$vars, group = .data$vars),
+      size = 0.5, color = NA, alpha = 0.2,
+    ) +
+    ggrepel::geom_label_repel(
+      ggplot2::aes(x = dplyr::if_else(!!dim1 > 0, !!dim1 + 0.03, !!dim1 - 0.03),
+                   label = .data$lvs, fontface = "bold", color = .data$vars),
+      size = 3, na.rm = TRUE, direction = "y", fill = grDevices::rgb(1, 1, 1, alpha = 0.7),
+      min.segment.length = Inf,
+      force = 0.5, force_pull = 1, point.padding = 0.1, box.padding = 0, hjust = "outward"
+    ) +
+    color_scale
+
+}
+
+
+
+
+
+
+
+
+#
+#
+# ggmca_cah <- function(res.mca, dat, cah, axes = c(1, 2), text_size = 3,
+#                       color_groups, ...) {
+#
+#   dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
+#   dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+#
+#   if (missing(color_groups)) color_groups <- "^.{1}"
+#
+#   acm <- res.mca |>
+#     ggmca(dat = pc_AGD,
+#           cah = cah,
+#           axes = axes,
+#           color_groups = color_groups,
+#           profiles = TRUE,
+#           get_data = TRUE,
+#           ...
+#     )
+#
+#
+#   acm_cah <- acm$vars_data |>
+#     dplyr::filter(stringr::str_detect(color_group, paste0("^", cah)))
+#   acm_vars <- new_tab(acm$vars_data) |>
+#     dplyr::filter(vars != cah) |>
+#     dplyr::mutate(face = dplyr::if_else(color_group != "variables_actives", "italic", "bold") )
+#   #     certains profils n'ont pas de cah : corriger dans ggmca_data
+#   cah_id_recode <- acm$profiles_coord |> dplyr::select(cah, cah_id) |>
+#     dplyr::filter(!is.na(cah)) |>
+#     dplyr::distinct() |>
+#     dplyr::mutate(recode_vect = purrr::set_names(as.character(cah), cah_id)) |> dplyr::pull(recode_vect)
+#   cah_color <- acm_cah |>
+#     dplyr::select(lvs, color_group) |>
+#     dplyr::mutate(recode_vect = purrr::set_names(as.character(lvs), color_group)) |> dplyr::pull(recode_vect)
+#   acm_profiles <- acm$profiles_coord |>
+#     dplyr::mutate(
+#       cah = map2_chr(
+#         cah, sup_vars,
+#         ~ dplyr::case_when(
+#           !is.na(.x)                      ~ .x,
+#           all(is.na(dplyr::pull(.y, !!rlang::sym(cah))) | dplyr::pull(.y, !!rlang::sym(cah)) == dplyr::first(dplyr::pull(.y, !!rlang::sym(cah))))
+#           ~ as.character(dplyr::first(dplyr::pull(.y, !!rlang::sym(cah)))),
+#           TRUE                            ~ NA_character_)
+#       ),
+#
+#       cah_id = forcats::fct_recode(cah, !!!cah_id_recode) |> as.integer(),
+#
+#       color_group = forcats::fct_recode(cah, !!!cah_color)
+#     ) |>
+#     dplyr::filter(!is.na(cah))
+#   # acm_profiles |> slice_sample(n = 20)
+#
+#   cah_name_with_pct <- acm_cah |>
+#     dplyr::select(lvs, wcount) |>
+#     dplyr::mutate(pct = round(wcount/sum(wcount)*100), 0) |>
+#     dplyr::mutate(recode_vect = purrr::set_names(as.character(lvs), paste0(lvs, " (", pct, "%)"))) |>
+#     dplyr::pull(recode_vect)
+#   acm_cah <- acm_cah |>
+#     dplyr::mutate(lvs = forcats::fct_recode(lvs, !!!cah_name_with_pct))
+#
+#   # heigth_width_ratio <- (0.8 + 1.2) / (0.8 + 1.1)
+#
+#
+#   ggplot(acm_vars, ggplot2::aes(x = !!dim1, y = !!dim2)) +
+#     acm$graph_theme_acm +
+#     ggplot2::geom_point(
+#       data = acm_profiles, ggplot2::aes(size = wcount, color = color_group),
+#       na.rm = TRUE, show.legend = FALSE, stroke = 0, alpha = 0.5
+#     ) +
+#     ggplot2::geom_point(
+#       data = acm$mean_point_data,
+#       color = "black", fill = "#eeeeee", shape = 3, size = 5, stroke = 1.5, na.rm = TRUE
+#     ) +
+#     ggrepel::geom_text_repel(
+#       ggplot2::aes(label = lvs, fontface = face),
+#       size = text_size, na.rm = TRUE, direction = "both",  min.segment.length = 0.01,
+#       force = 0.5, force_pull = 1, point.padding = 0, box.padding = 0,
+#       point.size = NA, arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines"))
+#     ) +
+#     # ggplot2::geom_segment(
+#     #   data = acm_cah |>
+#     #     dplyr::mutate(!!dim1 = pmin(1.3, pmax(!!dim1, -0.9)),
+#     #            !!dim2 = pmin(1.3, pmax(!!dim2, -0.85)),
+#     #            start1  = pmin(0.95, pmax(!!dim1, -0.5)),
+#     #            start2  = pmin(1.25, pmax(!!dim2, -0.775)),
+#     #     ),
+#     #   ggplot2::aes(x = start1, xend = !!dim1, y = start2, yend = !!dim2,
+#     #                color = color_group),
+#     #   arrow = ggplot2::arrow(length = ggplot2::unit(0.3, "lines")), na.rm = TRUE
+#     # ) +
+#   ggrepel::geom_label_repel(
+#     data = acm_cah,
+#     ggplot2::aes(label = lvs, color = color_group), fill = rgb(1, 1, 1, alpha = 0.7),
+#     direction = "y", force = 0.5, force_pull = 1, point.padding = 0, point.size = NA,
+#     arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
+#     fontface = "bold", size = text_size, na.rm = TRUE
+#   )
+# }
+
+
+
+
+
+
+
+
+
+
+
 #' Benzecri's modified rate of variance
 #'
 #' @param res.mca The result of \link[FactoMineR]{MCA}.
@@ -1560,7 +2470,10 @@ ggmca_plot <- function(data,
 #' @return A numeric vector (or fmt vector with `fmt = TRUE`).
 #' @export
 #'
-# @examples
+#' @examples
+#' data(tea, package = "FactoMineR")
+#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' benzecri_mrv(res.mca)
 benzecri_mrv <- function(res.mca, fmt = FALSE) {
   Q   <- length(res.mca$call$quali)
   eig <- purrr::keep(res.mca$eig[, 1], res.mca$eig[, 1] > 1/Q)
@@ -1568,11 +2481,167 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
   eig <- eig/sum(eig)
 
   if (fmt) {
-    fmt(pct = eig, n = 0, type = "all")
+    tabxplor::fmt(pct = eig, n = 0, type = "all")
   } else {
-    eig * 100
+    purrr::set_names(eig * 100, paste0("Dim ", 1:length(eig)) )
   }
 }
+
+
+
+
+
+
+# data <- pc_AGD
+# wt <- expr(POND)
+# vars <- variables_actives
+
+# exclure_categories <- c(NA, "NA", "3-Livre: 1-9")
+# excl = exclure_categories
+
+
+#' Multiple Tables for Hierarchical Clusters
+#'
+#' @param data A data frame.
+#' @param row_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The row variables
+#' of the table, to cross with the clusters. Typically, actives variables of the MCA.
+#' @param clust In columns, the variable with the clusters, typically made with hierarchical
+#' clustering functions like \code{\link[FactoMineR]{HCPC}} (object
+#' `res$data.clust$clust`). Can be either a symbol or a character vector of
+#' length 1 (for vars in `data`), or an external variable (not in `data`)
+#' provided its length is equal to the number of rows of `data`.
+#' @param wt The name of the weight variable. Leave empty for unweighted results.
+#' @param excl The name of the levels to exclude, as a character vector.
+# @param recode_helper Set to `TRUE` to print a helper to recode levels.
+#' @param color The type of colors to print, see \code{\link[tabxplor]{tab}}.
+#' @param pct The type of percentages to print, see \code{\link[tabxplor]{tab}}.
+#' Default to column percentages
+#' @param row_tot The name of the total line (frequencies of each cluster)
+#' @param ... Additional arguments to pass to \code{\link[tabxplor]{tab_many}}.
+#'
+#' @return A \code{tibble} of class \code{tab}, possibly with colored reading helpers.
+#' @export
+#'
+#'@examples
+#'
+#' data(tea, package = "FactoMineR")
+#' res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
+#' cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
+#' tea$clust <- cah$data.clust$clust
+#' HCPC_tab(tea, row_vars = all_of(names(tea)[1:18]), clust = "clust") #|>
+#' #tabxplor::tab_kable()
+#'
+HCPC_tab <- function(data, row_vars = character(), clust, wt,
+                     excl = character(), # recode_helper = FALSE,
+                     color = "diff", pct = "col",
+                     row_tot = "% of population",
+                     ...) {
+  #active <- names(CAH$data.clust)[names(CAH$data.clust) != "clust"]
+
+  row_vars <- tidyselect::eval_select(rlang::enquo(row_vars), data)
+  row_vars <- names(row_vars)
+
+  if (missing(wt)) {
+    wt <- character()
+  } else {
+    wt <- as.character(rlang::ensym(wt))
+  }
+
+  clust <- rlang::enquo(clust)
+
+  safe_clust <- purrr::safely(rlang::eval_tidy)(clust)
+
+  if (is.null(safe_clust$error)) {
+    clust_is_var <- (is.factor(safe_clust$result) |
+                       is.character(safe_clust$result)) &
+      length(safe_clust$result) == nrow(data)
+
+  } else {
+    clust_is_var <- FALSE
+  }
+
+  if (clust_is_var) {
+    # clust <- safe_clust$result
+    data <- data |>
+      dplyr::select(tidyselect::all_of(row_vars), tidyselect::all_of(wt) ) |>
+      levels_to_na(tidyselect::all_of(row_vars), excl = excl,
+                   levels_to = "Remove levels") |>
+      tibble::add_column(clust = safe_clust$result )
+
+  } else {
+    data <- data |> dplyr::select(tidyselect::all_of(row_vars),
+                                  tidyselect::all_of(wt),
+                                  clust = !!clust ) |>
+      levels_to_na(tidyselect::all_of(row_vars), excl = excl,
+                   levels_to = "Remove levels")
+  }
+
+
+  if (length(wt) == 0) {
+    wt <- rlang::expr(NA)
+  } else {
+    wt <- rlang::sym(wt)
+  }
+
+  first_lvs <- dplyr::select(data, tidyselect::all_of(row_vars)) |>
+    purrr::map_chr(~ dplyr::if_else(nlevels(.) == 2L, "first", "all"))
+
+  #if(recode_helper) tabxplor:::fct_recode_helper(data, "clust")
+
+  cah_actives_tab <- tabxplor::tab_many(data, "clust", tidyselect::all_of(row_vars),
+                                        pct = dplyr::if_else(pct == "row", "col", "row"),
+                                        wt = !!wt,
+                                        na = "drop", cleannames = TRUE, color = color,
+                                        levels = first_lvs) |>
+    dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "Total_", ), "Total", .)) |>
+    dplyr::mutate(
+      Total = dplyr::mutate(.data$Total,
+                            wn = dplyr::if_else(is.na(.data$wn), as.double(.data$n), .data$wn)),
+      Total = vctrs::`field<-`(.data$Total, "pct",
+                               vctrs::field(.data$Total, "wn") /
+                                   dplyr::last(vctrs::field(.data$Total, "wn")))
+    )
+
+  col_var <- tabxplor::get_col_var(cah_actives_tab)[tabxplor::get_col_var(cah_actives_tab) != ""]
+  col_var_total <- purrr::set_names(dplyr::last(names(col_var)), "Total" )
+  col_var <- col_var[-length(col_var)]
+  col_var <- c(purrr::set_names(names(col_var), col_var), col_var_total)
+
+  cah_actives_tab <- cah_actives_tab |>
+    tab_transpose() |>
+    dplyr::rename("lvs" = "variables") |>
+    dplyr::mutate(variables = forcats::fct_recode(.data$lvs, !!!col_var), .before = 1) |>
+    dplyr::rename("Ensemble" = "Total")
+
+  cah_actives_tab <- cah_actives_tab |>
+    dplyr::filter(!stringr::str_detect(.data$lvs, "Remove levels")) |>
+    dplyr::mutate(
+      lvs = forcats::fct_recode(.data$lvs, !!!purrr::set_names("Total", row_tot)),
+      lvs = forcats::fct_relabel(.data$lvs,
+                                 ~ stringr::str_replace_all(., " ", unbrk))
+    )
+
+
+  n_rows <- dplyr::filter(cah_actives_tab, tabxplor::is_totrow(cah_actives_tab)) |>
+    dplyr::mutate(
+      variables = factor("Total"),
+      lvs = factor("n"),
+      dplyr::across(where(tabxplor::is_fmt),
+                    ~ dplyr::mutate(., display = "n", in_totrow = FALSE))
+      )
+  cah_actives_tab <- dplyr::bind_rows(cah_actives_tab, n_rows) |>
+    dplyr::group_by(.data$variables)
+
+  cah_actives_tab
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -1781,6 +2850,109 @@ mca_interpret <- function(res.mca = res.mca,
 
 
 
+#' Colored Table to Help Interpretation of Principal Component Analysis
+#'
+#' @param res.pca The result of \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.
+#' @param axes The axes to print, as a numeric vector.
+#'
+#' @return A tibble of class tabxplor
+#' @export
+#'
+#'@examples
+#'
+#' data(mtcars, package = "datasets")
+#' mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
+#' res.pca <- FactoMineR::PCA(mtcars, graph = FALSE)
+#' pca_interpret(res.pca)
+#'
+pca_interpret <- function(res.pca, axes = 1:3) {
+  n_acp <- nrow(res.pca$ind$coord)
+
+  var_data <- res.pca$var |>
+    purrr::imap_dfr(~ .x[, axes] |>
+                      tibble::as_tibble(rownames = "variable") |>
+                      dplyr::mutate(type := factor(.y))) |>
+    dplyr::filter(.data$type != "cor") |>  # no need for correlation since scale.unit = TRUE
+    dplyr::mutate(type = forcats::fct_relevel(.data$type, "coord", "contrib", "cos2") |> # reorder types
+                    forcats::fct_recode("ctr" = "contrib"),
+                  variable = forcats::as_factor(.data$variable)
+    ) |>
+    dplyr::arrange(.data$type)
+
+  var_data <- var_data |>
+    tidyr::pivot_wider(names_from = "type",
+                       values_from = tidyselect::starts_with("Dim."),
+                       names_sort = TRUE) |>
+    dplyr::rename_with(~stringr::str_remove(., "_coord") |>
+                         stringr::str_replace("Dim\\.([^_]+)_(.+)", "\\2.\\1")
+    )
+
+  var_data |>
+    tibble::add_row(variable = factor("Total")) |>
+    dplyr::mutate(dplyr::across(where(is.numeric) & tidyselect::starts_with("ctr"),
+                                ~ dplyr::if_else(variable != "Total", ., 100/(dplyr::n() - 1) )) # mean(., na.rm = TRUE)
+    ) |>
+    dplyr::mutate(
+      dplyr::across(where(is.numeric) & tidyselect::starts_with("Dim"),
+                    #~ round(., 2)
+                    ~ tabxplor::fmt(n         = rep(n_acp, length(.)),
+                                    type      = "mean",
+
+                                    mean      = ., # dplyr::if_else(variable != "Total" , ., 0),
+                                    diff      = dplyr::case_when(
+                                      variable == "Total" ~ 1,
+                                      . > 0    ~ 3,
+                                      . < 0    ~ 1/9,
+                                      . == 0   ~ 1,
+                                    ),
+                                    in_totrow = variable == "Total",
+                                    in_refrow = variable == "Total",
+                                    digits  = 2L,
+
+                                    col_var   =  stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
+                                    color     = "diff",
+                                    diff_type = "tot",
+                                    #comp_all = FALSE
+                    )
+      ),
+
+      dplyr::across(where(is.numeric) & tidyselect::starts_with("ctr"),
+                    ~ tabxplor::fmt(n         = rep(n_acp, length(.)),
+                                    type      = "col",  # display = "pct",
+
+                                    pct       = dplyr::if_else(variable == "Total", 1, ./100),
+                                    ctr       = ./100,
+                                    in_totrow = variable == "Total",
+
+                                    col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
+                                    color     = "contrib",
+                                    diff_type = "tot",
+                    )),
+
+      dplyr::across(where(is.numeric) & tidyselect::starts_with("cos2"),
+                    ~ tabxplor::fmt(n    = rep(n_acp, length(.)),
+                                    type = "row", # display = "pct",
+
+                                    pct  = .,
+                                    diff = . - 0.5,
+                                    in_totrow = variable == "Total",
+                                    in_refrow = variable == "Total",
+
+                                    col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
+                                    color     = "diff",
+                                    diff_type = "tot",
+                                    #comp_all  = FALSE
+                    )
+      ),
+
+
+    )
+
+}
+
+
+
+
 
 
 
@@ -1943,7 +3115,7 @@ ggca <-
         dplyr::mutate_all(~ . - .[nrow(row_frequencies)]) %>%
         dplyr::mutate_all(~ dplyr::case_when(
           round(.*100,0) >= 0 ~ stringr::str_c("+", round(.*100, 0), "%"),
-          . < 0 ~ stringr::str_c(stringi::stri_unescape_unicode("\\u202f"), #Unbreakable space
+          . < 0 ~ stringr::str_c(unbrk, #Unbreakable space
                                  "-", round(abs(.)*100, 0), "%")
         )) %>% dplyr::slice(-nrow(row_frequencies))
       row_frequencies <- row_frequencies %>%
@@ -1952,7 +3124,7 @@ ggca <-
         dplyr::mutate_all(~dplyr::case_when(
           stringr::str_length(.) >= 3 ~ .,
           stringr::str_length(.) < 3 ~ stringr::str_c(
-            stringi::stri_unescape_unicode("\\u202f\\u202f"), . #2 unbreakable spaces
+            unbrk, unbrk, . #2 unbreakable spaces
           ),
         ))
       row_frequencies <- row_frequencies %>%
@@ -2025,7 +3197,7 @@ ggca <-
         dplyr::mutate_all(~ . - .[nrow(col_frequencies)]) %>%
         dplyr::mutate_all(~ dplyr::case_when(
           round(.*100,0) >= 0 ~ stringr::str_c("+", round(.*100, 0), "%"),
-          . < 0 ~ stringr::str_c(stringi::stri_unescape_unicode("\\u202f"), #unbreakable space
+          . < 0 ~ stringr::str_c(unbrk, #unbreakable space
                                  "-", round(abs(.)*100, 0), "%")
         )) %>% dplyr::slice(-nrow(col_frequencies))
       col_frequencies <- col_frequencies %>%
@@ -2034,7 +3206,7 @@ ggca <-
         dplyr::mutate_all(~dplyr::case_when(
           stringr::str_length(.) >= 3 ~ .,
           stringr::str_length(.) < 3 ~ stringr::str_c(
-            stringi::stri_unescape_unicode("\\u202f\\u202f"), .), #Two unbreakable spaces
+            unbrk, unbrk, .), #Two unbreakable spaces
         ))
       col_frequencies <- col_frequencies %>%
         dplyr::bind_rows(col_residuals) %>%
@@ -2064,7 +3236,7 @@ ggca <-
     }
 
 
-    # Le Central point et son texte interactif :
+    # Le Central point et son texte interactive :
     col_freq_text <- rowSums(res.ca$call$Xtot) %>%
       tibble::enframe(name = "lvs", value = "freq") %>%
       dplyr::mutate(freq = stringr::str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) %>%
@@ -2336,6 +3508,2294 @@ ggca <-
 
 
 
+
+
+#' Correlation Circle Plot for Principal Component Analysis
+#'
+#' @param res.pca The result of \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.
+#' @param axes The axes to print, as a numeric vector of length 2.
+#' @param proj Set to `TRUE` to print projections of vectors over the two axes.
+#' @param interactive By default an html interactive plot is done. Set to `FALSE`
+#' to get a normal \code{\link[ggplot2]{ggplot}} graph.
+#' @param text_size Size of the texte.
+#'
+#' @return A \code{\link[ggplot2]{ggplot}}.
+#' @export
+#'
+#' @examples
+#'
+#' data(mtcars, package = "datasets")
+#' mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
+#' res.pca <- FactoMineR::PCA(mtcars, graph = FALSE)
+#' ggpca_cor_circle(res.pca, interactive = FALSE)
+#'
+ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
+                             proj = FALSE, interactive = TRUE, text_size = 3) {
+  requireNamespace("plotly")
+  if (exists("axes_names", where = res.pca)) {
+    first_axe_title  <-
+      stringr::str_c(
+        "Axe ", axes[1]," (", round(res.pca$eig[axes[1],2], 1),
+        "%)",
+        if (!is.null(res.pca$axes_names[axes[1]]) ) paste0(" : ", res.pca$axes_names[axes[1]])
+      )
+    second_axe_title <-
+      stringr::str_c(
+        "Axe ", axes[2]," (", round(res.pca$eig[axes[2],2], 1),
+        "%)",
+        if (!is.null(res.pca$axes_names[axes[2]]) ) paste0(" : ", res.pca$axes_names[axes[2]])
+      )
+  } else {
+    first_axe_title  <-
+      stringr::str_c("Axe ", axes[1]," (",
+                     round(res.pca$eig[axes[1],2], 1), "%)")
+    second_axe_title <-
+      stringr::str_c("Axe ", axes[2]," (",
+                     round(res.pca$eig[axes[2],2], 1), "%)")
+  }
+
+
+  dim1 <- rlang::sym(paste0("Dim.", axes[1]))
+  dim2 <- rlang::sym(paste0("Dim.", axes[2]))
+
+  if (interactive) proj <- FALSE
+
+  data_circle <- res.pca$var$coord |> as.data.frame() |> tibble::rownames_to_column("name") |>
+    tibble::as_tibble() |> dplyr::mutate(id = as.integer(as.factor(.data$name)))
+
+  #unbrk <- stringi::stri_unescape_unicode("\\u202f") # unbreakable space
+
+  interactive_txt <-
+    data_circle |>
+    dplyr::select("name", tidyselect::starts_with("Dim.")) |>
+    dplyr::mutate(
+      name = paste0("<b>", .data$name, "</b>\n"),
+
+      dplyr::across(
+        tidyselect::starts_with("Dim."),
+        ~ paste0("Coord", unbrk, "Axe", unbrk, stringr::str_sub(dplyr::cur_column(), -1, -1),
+                 ":", unbrk,
+                 stringr::str_pad(round(., 2), width = 5, side = "left") |>
+                   stringr::str_replace_all("-", paste0(unbrk, "-")),
+                 " (cor",
+                 stringr::str_pad(round(.*100, 0), width = 3, side = "left"),
+                 "%)\n") |>
+          stringr::str_replace_all("-", paste0(unbrk, "-") ) |>
+          stringr::str_replace_all(" ", paste0(unbrk, unbrk, unbrk))
+      )) |>
+    tidyr::unite(col = "interactive_text", sep = "")
+
+
+  data_circle <- data_circle |> dplyr::bind_cols(interactive_txt)
+
+  # dplyr::mutate(interactive_text = paste0(
+  # "<b>", name, "</b>\n",
+  #   "Coord Axe ", axes[1], ": ", round(!!dim1, 2), " (cor ", round(!!dim1*100, 0), "%)\n",
+  #   "Coord Axe ", axes[2], ": ", round(!!dim2, 2), " (cor ", round(!!dim2*100, 0), "%)\n"
+  # ))
+  #
+  data_proj   <- dplyr::bind_rows(
+    data_circle |>
+      dplyr::mutate(name  = paste0("x=", round(!!dim1, 2)),
+                    Proj1 = !!dim1,
+                    Proj2 = 0),
+    data_circle |>
+      dplyr::mutate(name  = paste0("y=", round(!!dim2, 2)),
+                    Proj1 = 0 ,
+                    Proj2 = !!dim2),
+  )
+
+  plot_proj_base <- if(proj) {
+    list(
+      ggplot2::geom_segment(
+        ggplot2::aes(xend = .data$Proj1, yend = .data$Proj2),
+        data = data_proj,
+        linewidth = 0.5, linetype = "dashed"
+      ),  # color = "grey30",
+      ggrepel::geom_label_repel(
+        ggplot2::aes(x = .data$Proj1, y = .data$Proj2, label = .data$name),
+        data = data_proj,
+        fill = grDevices::rgb(1, 1, 1, alpha = 0.5), label.size = 0.05, fontface = "bold",
+        #hjust = "outward",
+        size = text_size, nudge_y = -0.075, na.rm = TRUE)
+    )
+  } else if (interactive) {
+    list(
+      ggiraph::geom_segment_interactive(
+        ggplot2::aes(xend = .data$Proj1, yend = .data$Proj2, data_id = .data$id),
+        data = data_proj,
+        linewidth = 0.5, linetype = "dashed", color = NA
+        )#,
+
+    )
+  } else {
+    NULL
+  }
+
+
+  plot_proj_int <- if (interactive) {
+    list(
+      ggiraph::geom_label_repel_interactive(
+        ggplot2::aes(x = .data$Proj1, y = .data$Proj2, label = .data$name,
+                     data_id = .data$id),
+        data = data_proj,
+        #fill = grDevices::rgb(1, 1, 1, alpha = 0.7),
+        label.size = 0.05, fontface = "bold", size = text_size,
+        nudge_y = -0.075, na.rm = TRUE, color = NA, fill = NA)
+    )
+  } else {
+    NULL
+  }
+
+
+  plot_output <- data_circle |>
+    ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
+    ggforce::geom_circle(ggplot2::aes(x0 = 0, y0 = 0, r = 1), color = "#d32f2f", linewidth = 1) +
+    ggplot2::geom_hline(yintercept = 0, color="#d32f2f", linetype = "solid") +
+    ggplot2::geom_vline(xintercept = 0, color="#d32f2f", linetype = "solid") +
+    ggplot2::labs(x = first_axe_title, y =  second_axe_title) +
+    ggplot2::coord_fixed() +
+    ggplot2::scale_x_continuous(minor_breaks = seq(-1, 1, by = 0.1)) +
+    ggplot2::scale_y_continuous(minor_breaks = seq(-1, 1, by = 0.1)) +
+    ggplot2::theme_minimal()  +
+    ggplot2::theme(legend.position = "none",
+                   panel.grid.minor = ggplot2::element_line(linewidth = 0.3, color="gray80"),
+                   panel.grid.major = ggplot2::element_line(linewidth = 0.3, color="gray60"),
+                   strip.text = ggplot2::element_text(face = "bold"), #Titles of facets
+                   plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"), #Center titre of graph
+                   axis.title.x = ggplot2::element_text(size = 12, hjust = 1),
+                   axis.title.y = ggplot2::element_text(size = 12, hjust = 1),
+                   text = ggplot2::element_text(family = "sans") #"DejaVu Sans Condensed"
+    ) +
+    plot_proj_base +
+    ggplot2::geom_segment(
+      ggplot2::aes(xend = !!dim1, yend = !!dim2),
+      x = 0, y = 0, color = "#0077c2",
+      arrow = grid::arrow(length = ggplot2::unit(0.25, "cm")), linewidth = 1
+    ) +
+    ggiraph::geom_label_repel_interactive(
+      ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$name,
+                   tooltip = .data$interactive_text, data_id = .data$id),
+      data = data_circle |> dplyr::mutate(!!dim1 := dplyr::if_else(!!dim1 > 0, !!dim1 + 0.03, !!dim1 - 0.03)),
+      fill = grDevices::rgb(1, 1, 1, alpha = 0.5), label.size = 0, size = text_size,
+      color = "#0077c2", fontface = "bold", hjust = "outward", # nudge_y = -0.1,
+      direction = "y", force = 0.5, force_pull = 1, point.padding = 0, box.padding = 0, point.size = NA,
+      arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
+      min.segment.length = 0.1, #0.4,
+      na.rm = TRUE
+
+    ) + # parse = TRUE
+    plot_proj_int
+
+
+  # css_hover <- ggiraph::girafe_css("stroke:orange;stroke-width:2;", #,
+  #                                  # line = "line-style:dashed;",
+  #                                  text = "color:#000000;stroke:none;" #color:black
+  #                                  )
+  # # plot_output <- plot_output |> append(c("css_hover" = css_hover)) |>
+  #   `attr<-`("class", c("gg", "ggplot"))
+  #
+
+
+  if (interactive) {
+    plot_output <- plot_output |> ggi()
+
+  }
+  plot_output
+
+
+}
+
+
+
+
+# ind.size    <- 4
+# ind_name.size <- 1
+# princ_axes_print = -3:3
+# base_axe_n_breaks = 10
+# # camera_view = list(
+# #   "Plan 1-2" = list(
+# #     center = list(x =  0   , y =  0  , z = 0  ),
+# #     eye    = list(x =  0   , y =  0  , z = 1),
+# #     up     = list(x =  0   , y =  1  , z = 0  )
+# #   ),
+# #   "Plan 1-3" = list(
+# #     center = list(x =  0   , y =  0  , z = 0  ),
+# #     eye    = list(x =  0   , y = -1  , z = 0  ),
+# #     up     = list(x =  0   , y =  0  , z = 1  )
+# #   )
+# # )
+# # camera_view <- list(
+# #  "Base" = list(
+# #   center = list(x =  0   , y =  0  , z = 0  ),
+# #   eye    = list(x =  0.6 , y = -0.4, z = 0.7),
+# #   up     = list(x =  0   , y =  0  , z = 1  )
+# # )
+# # )
+# center = TRUE
+# var_names_on = "var"
+# base_zoom = 1
+# remove_buttons = FALSE
+# view = "Plane 1-2"
+# aspectratio_from_eig = FALSE
+# always_make_ind_tooltips = FALSE
+# axes = c(1, 2, 3)
+# type = c("var", "ind", "main_plan", "projections")
+# var_color = "#4D4D4D"
+
+# camera_view = list(
+#   "Plan 1-2" = list(
+#     center = list(x =  0   , y =  0  , z = 0  ),
+#     eye    = list(x =  0   , y =  0  , z = 1  ),
+#     up     = list(x =  0   , y =  1  , z = 0  )
+#   ),
+#   "Plan 1-3" = list(
+#     center = list(x =  0   , y =  0  , z = 0  ),
+#     eye    = list(x =  0   , y = -1  , z = 0  ),
+#     up     = list(x =  0   , y =  0  , z = 1  )
+#   )
+# ),
+
+
+
+
+
+
+#' Interactive 3D Plot for Principal Component Analyses (plotly::)
+#'
+#' @param res.pca The result of \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.
+#' @param axes The axes to print, as a numeric vector of length 3 (or 2).
+#' @param princ_axes_print The breaks of the principal axes.
+#' @param base_axe_n_breaks The number of breaks in initial variables axes.
+#' @param ind.size The size of the points of individuals.
+#' @param ind_name.size The size of the names of individuals.
+#' @param title Plot title.
+#' @param center By default the plot is centered on the central point. Set to
+#' `FALSE` to center on the origin of all variables (zero coordinates).
+#' @param var_names_on By default `"var"` the names of variables are drawn upon
+#' the initial axes. Set to `"cor"` to draw them upon correlation vectors instead.
+#' @param base_zoom The base level of zoom.
+#' @param remove_buttons Set to TRUE to remove buttons to change view.
+#' @param cone_size The size of the conic arrow at the end of each axe.
+#' @param view The starting point of view (in 3D) :
+#'      \itemize{
+#'    \item \code{"Plane 1-2"} : Axes 1 and 2.
+#'    \item \code{"Plane 1-3"} : Axes 1 and 3.
+#'    \item \code{"Plane 2-3"} : Axes 2 and 3.
+#'    \item \code{"All"      } : A 3D perspective with Axes 1, 2, 3.
+#'  }
+#' @param type Which elements of the graph to print, among :
+#' #'      \itemize{
+#'    \item \code{"var"        } : initial variables axes, with breaks
+#'    \item \code{"cor"        } : normalized correlation vectors (length = 1)
+#'    \item \code{"cor_sphere" } : a 3D sphere of standard deviation 1
+#'    \item \code{"ind"        } : points of individuals
+#'    \item \code{"ind_name"   } : names of individuals
+#'    \item \code{"main_plan"  } : the plan 1-2.
+#'    \item \code{"projections"} : projections of mean point on initial variables
+#'    \item \code{"V"          } : vectors of the V transition matrix
+#'    \item \code{"vs"         } : vectors of the matrix of singular values
+#    \item \code{"all"        } : all elements.
+#'  }
+#' @param camera_view Possibility to add a (replace `view`)
+#' @param aspectratio_from_eig Set to `TRUE` to modify axes length based on
+#' eigenvalues.
+#' @param always_make_ind_tooltips Set to `TRUE` to add interactive toolips for
+#'  individuals.
+#' @param var_color The color of the initial variables/dimensions
+#' @param max_ind The maximun number of individuals to print.
+#' @param max_ind_seed The random seed used to sample individuals.
+#'
+#' @return A \code{\link[plotly]{plotly}} html interactive 2d or 3d graph.
+#' @export
+#'
+#'@examples
+#' \donttest{
+#' data(mtcars, package = "datasets")
+#' mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
+#' res.pca <- FactoMineR::PCA(mtcars, graph = FALSE)
+#'
+#' # Variables and individuals
+#' ggpca_3d(res.pca)
+#'
+#' # Circle of correlation 3D
+#' ggpca_3d(res.pca, type = c("cor", "cor_sphere"),
+#'          var_names_on = "cor", base_zoom = 0.6,
+#'          princ_axes_print = -1:1, view = "All"
+#' )
+#' }
+ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
+                     princ_axes_print = -3:3, base_axe_n_breaks = 10,
+                     ind.size = 4, ind_name.size = 3, title, center = TRUE,
+                     var_names_on = "var", #"cor",
+                     base_zoom = 1, remove_buttons = FALSE, cone_size = 0.33,
+                     view = "All", # c("Plane 1-2", "Plane 1-3", "Plane 2-3", "All")
+                     type = c("var", "ind", "main_plan", "projections"),
+                     camera_view, aspectratio_from_eig = FALSE,
+                     always_make_ind_tooltips = FALSE,
+                     var_color = "#4D4D4D", max_ind = 500, max_ind_seed
+) {
+  requireNamespace("plotly")
+
+  D2 <- length(axes) == 2 ; stopifnot(length(axes) %in% 2:3 )
+  if (D2) axes <- c(axes, NA)
+
+  ind_coords <- res.pca$ind$coord |> as.data.frame() |>
+    tibble::rownames_to_column("name") |>
+    tibble::as_tibble() |>
+    dplyr::left_join(tibble::rownames_to_column(res.pca$call$X, "name"),
+                     by = "name") |>
+    tibble::add_column(wt = res.pca$call$row.w)
+
+  if (max_ind < nrow(ind_coords)) {
+    if (!missing(max_ind_seed)) set.seed(max_ind_seed)
+    ind_coords <- ind_coords |> dplyr::slice_sample(n = max_ind)
+  }
+
+
+  df_base <- res.pca$call$X |>
+    tibble::rownames_to_column("name") |>
+    tibble::as_tibble()
+
+  if (!is.null(res.pca$call$quali.sup) ) {
+    quali_sup <- names(res.pca$call$quali.sup$quali.sup)
+    df_base <- df_base |> dplyr::select(-tidyselect::all_of(quali_sup))
+  } else {
+    quali_sup <- character()
+  }
+  if (!is.null(  res.pca$call$quanti.sup) ) {
+    quanti.sup <- names(res.pca$call$quanti.sup)
+    df_base <- df_base |> dplyr::select(-tidyselect::all_of(quanti.sup))
+  } else {
+    quanti.sup <- character()
+  }
+
+  active_vars <- colnames(df_base)[!colnames(df_base) == "name"]
+
+  active_means <- if(center) {
+    res.pca$call$centre |> purrr::set_names(active_vars)
+  } else {
+    rep(0, length(res.pca$call$centre)) |> purrr::set_names(active_vars)
+  }
+
+  # # (Probleme : res.pca$var n'est pas tout a fait aligne avec les axes de depart...)
+  # # (ca ne vient pas non plus de la fonction de calcul des ind.sup : resultats identiques)
+  # # Solution : var_coords est fait pour le cercle des correlations, ou il faut corriger
+  # #  les vecteurs normes en fonction de l'importance des axes ?
+  var_coords <- res.pca$var$coord |> as.data.frame() |>
+    tibble::rownames_to_column("name")
+  # # # manually :
+  # # coord.var <- t(t(as.matrix(res.pca$svd$V)) * res.pca$svd$vs) # vs^2 = eig # eig <- eig[1:ncp]
+  # # rownames(coord.var) <- active_vars ; colnames(coord.var) <- paste("Dim",  c(1:ncol(res.pca$svd$V)), sep = ".")
+  # # coord.var
+  #
+  V_coords <-  res.pca$svd$V |> as.data.frame()
+  colnames(V_coords) <- colnames(var_coords[, names(var_coords) != "name"])
+  V_coords <- V_coords |>
+    tibble::add_column(name = var_coords$name, .before = 1)
+  #
+  # # The operation is this one (and is ok) :
+  # var_coords
+  # V_coords |>
+  #   dplyr::mutate(Dim.1 = Dim.1*res.pca$svd$vs[1],
+  #          Dim.2 = Dim.2*res.pca$svd$vs[2],
+  #          Dim.3 = Dim.3*res.pca$svd$vs[3],
+  #          )
+  #
+  # # # Par rapport a Brigitte Le Roux, Analyse geometrique..., (cf. Chap. 6 Exercice 6.1)
+  # #                # X0: coordonnees de base centrees.
+  # # scale.unit = T # X0r: X0 * 1/sqrt(vjj) : coordonnees c. reduites (matrice diag des variances)
+  # # res.pca$eig    # Lambda "\\u039b" : matrice diagonale des valeurs propres
+  # # res.pca$svd$vs # Ksi "\\u039e" : matrice diagonale des valeurs singulieres (mais, ici, vecteur) ;
+  # #                      (les elements sont notes Ksi-j  "\\u03be" )
+  # # res.pca$svd$U
+  # # res.pca$svd$V  # A: matrice des vecteurs propres normes.
+  # # ind$coord      # Y: coordonnees principales. Y = X0A    Inv: X0=Yt(A) (ou X0r)
+  # # var$coords     # B: coeffs de regression B = A Ksi (b1j = sqrt(Lamda1) * a1j = Ksi1 * a1j)
+  #
+  # # # var$coords calculation is equivalent to Britte Le Roux
+  # # t(t(as.matrix(res.pca$svd$V)) * res.pca$svd$vs)
+  # # as.matrix(res.pca$svd$V) %*% diag(res.pca$svd$vs)
+  #
+  # # # var_coord et V sont tous les deux sur la sphere de rayon 1 ecart-type
+  # # # (mais la sphere est aplatie le long de l'axe 2 : pas de fixed ratio ?)
+  # # # install.packages("pracma")
+  # # theta = seq(0, pi, length.out = 25)
+  # # phi   = seq(-pi,   pi, length.out = 25)
+  # # meshgrid_sphere <- pracma::meshgrid(theta, phi)
+  # # theta <- meshgrid_sphere[[1]] #|> c()
+  # # phi   <- meshgrid_sphere[[2]] #|> c()
+  # # r = 1
+  # # sphere_data <- tibble::tibble(
+  # #   x = r * sin(theta) * cos(phi),
+  # #   y = r * sin(theta) * sin(phi),
+  # #   z = r * cos(theta),
+  # # )
+  # #
+  # # SALAIRE_3D_cor |>
+  # #   plotly::add_surface(data = sphere_data,
+  # #     x = ~x, y = ~y, z = ~z,
+  # #     opacity = 0.3,
+  # #     colorscale = list(list(0, "#ba2d65"), list(1, "#ba2d65")), showscale = FALSE,
+  # #     showlegend = FALSE, inherit = FALSE
+  # #   )
+  #
+  # ## code :
+  # # # (cor is the same by default, with scale.unit = TRUE)
+  # # X <- t(t(as.matrix(X)) - centre)
+  # # if (scale.unit) {
+  # #   ecart.type <- ec.tab(X, row.w)
+  # #   X <- t(t(X)/ecart.type)
+  # # }
+  # # dist2.var <- as.vector(crossprod(rep(1, nrow(X)), as.matrix(X^2 * row.w)))
+  # # cor.var <- coord.var/sqrt(dist2)
+
+
+
+  base_axis_coords <-
+    purrr::imap_dfr(
+      dplyr::select(df_base, -"name"),
+      ~ tibble::tibble(
+        !!rlang::sym(.y) := scales::breaks_extended(n = base_axe_n_breaks)(if (center) {.x} else {c(0, .x)}),
+        name       = .y,
+        base_coord = !!rlang::sym(.y)
+      )
+    ) |>
+    dplyr::select("name", tidyselect::everything()) |>
+    dplyr::mutate(dplyr::across(
+      tidyselect::everything(),
+      ~ tidyr::replace_na(., active_means[dplyr::cur_column()])
+    ),
+    name = paste0(.data$name, "_", .data$base_coord)
+    )
+
+  ind.sup_coords <- base_axis_coords |> dplyr::select(-"base_coord") |>
+    PCA_ind.sup_coord(res.pca) # center = !center
+
+  base_axis_in_princ <- ind.sup_coords |>
+    as.data.frame() |> tibble::rownames_to_column("name") |>
+    # dplyr::filter(!stringr::str_detect(name, "mean$")) |>
+    dplyr::left_join(base_axis_coords, by = "name") |>
+    dplyr::mutate(
+      name    = forcats::as_factor(stringr::str_remove(.data$name, "_[^_]+$")),
+      pair_id = as.integer(as.factor(.data$name)) #,
+    )
+
+
+  # plot_ly(x=res.pca$ind$coord[, "Dim.1"], y=res.pca$ind$coord[, "Dim.2"], z=res.pca$ind$coord[, "Dim.3"], type="scatter3d", mode="markers")
+
+
+  princ_axes <-
+    colnames(ind_coords)[stringr::str_detect(colnames(ind_coords), "Dim.")] |>
+    purrr::map_dfr(~ tibble::tibble(
+      !!rlang::sym(.x) := princ_axes_print,
+      base_coord = princ_axes_print,
+      name       = stringr::str_replace(.x, "Dim.", "Axe "),
+    )
+    ) |>
+    dplyr::mutate(
+      dplyr::across(tidyselect::starts_with("Dim."), ~ tidyr::replace_na(., 0)),
+      name    = forcats::as_factor(.data$name),  #name = paste0(name, ".", base_coord)
+      pair_id = as.integer(.data$name),
+
+    ) |>
+    dplyr::select("name", "pair_id", "base_coord", tidyselect::starts_with("Dim.") )
+
+
+  # Coordonnees des projections du point moyen sur les axes de depart dans princ
+  mean_point <- res.pca$call$centre |> diag() |> as.data.frame()
+  colnames(mean_point) <- active_vars ; rownames(mean_point) <- active_vars
+  mean_projs <- PCA_ind.sup_coord(mean_point, res.pca)
+  # mean_projs <- mapply(FUN = `*`, as.data.frame(mean_projs), res.pca$call$ecart.type) |>
+  mean_projs <- mean_projs |> as.data.frame() |>
+    tibble::rownames_to_column("name") |> tibble::as_tibble()
+  mean_projs <- dplyr::bind_rows(
+    mean_projs,
+    dplyr::mutate(mean_projs, dplyr::across(where(is.double), ~ 0))
+  ) |>
+    dplyr::arrange(.data$name)
+
+  plot_range <-
+    dplyr::bind_rows(
+      dplyr::select(ind_coords, tidyselect::starts_with("Dim.")),
+      dplyr::select(base_axis_in_princ, tidyselect::starts_with("Dim."))
+    ) |>
+    purrr::map(~ range(.) |> abs() |> max())
+  plot_range <- plot_range  |> purrr::map(~ c(-., .))
+
+
+  #     Plan 1-2
+  planDf <-
+    dplyr::bind_cols(
+      data.frame(Dim.1 = rep(range(princ_axes_print), 2),
+                 Dim.2 = rep(range(princ_axes_print), each = 2)
+      ) |> tibble::as_tibble(),
+
+      dplyr::select(princ_axes, tidyselect::starts_with("Dim.") &
+                      -tidyselect::all_of(c("Dim.1", "Dim.2")) ) |>
+        dplyr::slice(1:4) |>
+        dplyr::mutate(dplyr::across(tidyselect::everything(), ~ 0L))
+    )
+
+
+  # Tooltips at point hover
+  if ("ind" %in% type | always_make_ind_tooltips) {
+
+
+    ind_tooltips_active_vars <- ind_coords |>
+      dplyr::select("name", tidyselect::all_of(active_vars)) |>
+      dplyr::mutate(
+        dplyr::across(tidyselect::all_of(active_vars), # -name,
+                      ~ format(., justify = "right", digits = 1, big.mark = " ", trim = TRUE) #,  # nsmall = 0,
+        ),
+
+        dplyr::across(tidyselect::all_of(active_vars), stringr::str_length, .names = "{.col}_length_str"),
+
+        max_length = pmax(!!!rlang::syms(paste0(active_vars, "_length_str")), na.rm = TRUE),
+
+        dplyr::across(
+          tidyselect::all_of(active_vars),
+          ~ paste0(dplyr::cur_column(), ": ",
+                   stringr::str_pad(., width = max_length,  side = "left")) |>
+            stringr::str_replace("(^[^\\.]+\\.)", paste0(unbrk, "\\1") ) #,
+        )
+      ) |>
+      dplyr::select(-tidyselect::ends_with("_length_str"), -"max_length")
+
+
+    ind_tooltips_active_diff <- ind_coords |>
+      dplyr::select("name", tidyselect::all_of(active_vars)) |>
+      dplyr::mutate(
+        dplyr::across(tidyselect::all_of(active_vars), ~ . - active_means[dplyr::cur_column()]),
+
+        dplyr::across(tidyselect::all_of(active_vars),
+                      ~ paste0(dplyr::if_else(. >= 0, "+", ""), #paste0(unbrk, "-")
+                               format(., justify = "right", digits = 1, big.mark = " ", trim = TRUE) ) |>
+                        stringr::str_replace("\\+ ", "\\+")
+        ),
+
+        dplyr::across(tidyselect::all_of(active_vars), stringr::str_length, .names = "{.col}_length_str"),
+        max_length = pmax(!!!rlang::syms(paste0(active_vars, "_length_str")), na.rm = TRUE),
+
+        dplyr::across(tidyselect::all_of(active_vars),
+                      ~ stringr::str_pad(., width = max_length,  side = "left") |>
+                        stringr::str_replace("-", paste0(unbrk, "-")) |>
+                        stringr::str_replace("(^[^\\.]+\\.)", paste0(unbrk, "\\1") )
+        )
+      ) |>
+      dplyr::select(-tidyselect::ends_with("_length_str"), -"max_length") |>
+      dplyr::rename_with(~ paste0(., "_diff"), .cols = tidyselect::all_of(active_vars))
+
+    ind_tooltips_active_vars <-  ind_tooltips_active_vars |>
+      dplyr::left_join(ind_tooltips_active_diff, by = "name") |>
+      dplyr::mutate(dplyr::across(
+        tidyselect::all_of(active_vars),
+        ~ paste0(., " (", rlang::eval_tidy(rlang::sym(paste0(dplyr::cur_column(), "_diff"))), ")<br>" )
+      )) |>
+      dplyr::select(-tidyselect::ends_with("_diff"))
+
+
+    ind_contrib <- res.pca$ind$contrib |> as.data.frame() |> tibble::rownames_to_column("name") |>
+      tibble::as_tibble() |>
+      dplyr::rename_with(~ stringr::str_replace(., "Dim.", "ctr."), .cols = tidyselect::starts_with("Dim."))
+
+    ind_cos2 <- res.pca$ind$cos2 |> as.data.frame() |> tibble::rownames_to_column("name") |>
+      tibble::as_tibble() |>
+      dplyr::rename_with(~ stringr::str_replace(., "Dim.", "cos2."), .cols = tidyselect::starts_with("Dim."))
+
+
+    ind_tooltips_coords <-  ind_coords |>
+      dplyr::select("name", tidyselect::starts_with("Dim.")) |>
+      dplyr::left_join(ind_contrib, by = "name") |>
+      dplyr::left_join(ind_cos2, by = "name") |>
+      dplyr::mutate(
+        dplyr::across(
+          tidyselect::starts_with("Dim."),
+          ~ paste0("Axe ", stringr::str_remove(dplyr::cur_column(), "Dim."),  ": " ,
+                   format(round(., 1), justify = "right", nsmall = 1)#,  # nsmall = 0,
+          )
+        ),
+
+        dplyr::across(
+          tidyselect::starts_with("ctr."),
+          ~ paste0(" ; contrib: ",
+                   format(round(., 1), justify = "right", nsmall = 1),  # nsmall = 0,
+                   "%"
+          )
+        ),
+
+        dplyr::across(
+          tidyselect::starts_with("cos2."),
+          ~ paste0(" ; cos2: ",
+                   format(round(.*100, 0), justify = "right", nsmall = 0),  # nsmall = 0,
+                   "%<br>"
+          )
+        ),
+
+        dplyr::across(tidyselect::any_of(dplyr::first(tidyselect::starts_with("Dim."))), ~ paste0("<br>", .) )
+      )
+    ind_coords_order <- purrr::set_names(names(ind_tooltips_coords)[-1] |> stringr::str_sub(-1, -1) ,
+                                         names(ind_tooltips_coords)[-1]
+    ) |> sort() |> names()
+    ind_tooltips_coords <- ind_tooltips_coords |>
+      dplyr::select("name", tidyselect::all_of(ind_coords_order))
+
+    ind_tooltips_quali_sup <- ind_coords |>
+      dplyr::select("name", tidyselect::all_of(quali_sup)) |>
+      dplyr::mutate(
+        dplyr::across(
+          tidyselect::all_of(quali_sup),
+          ~ paste0(dplyr::cur_column(), ": ", ., "<br>") # stringr::str_pad(., max(stringr::str_length(.)), side = "right")
+        ),
+
+        dplyr::across(
+          tidyselect::any_of(dplyr::first(quali_sup, default = "NO__VAR_:")),
+          ~ paste0("<br><b>Quali sup:</b><br>", .)
+        )
+      )
+
+    ind_tooltips_quanti_sup <- ind_coords |>
+      dplyr::select("name", tidyselect::all_of(quanti.sup)) |>
+      dplyr::mutate(
+        dplyr::across(tidyselect::all_of(quanti.sup),
+                      ~ paste0(dplyr::cur_column(), ": " ,
+                               format(., justify = "right", digits = 1, big.mark= " "),
+                               "<br>"
+                      )
+        ),
+
+        dplyr::across(tidyselect::any_of(dplyr::first(quanti.sup, default = "NO__VAR_:")),
+                      ~ paste0("<br><b>Quanti sup:</b><br>", .)
+        )
+      )
+
+    ind_tooltips <- ind_tooltips_active_vars |>
+      dplyr::left_join(ind_tooltips_coords    , by = "name") |>
+      dplyr::left_join(ind_tooltips_quali_sup , by = "name") |>
+      dplyr::left_join(ind_tooltips_quanti_sup, by = "name") |>
+      dplyr::mutate(name2 = paste0("<b>", .data$name, "</b><br>"), .after = 1) |>
+      tidyr::unite(col = "tooltip", tidyselect::everything() & -"name",
+                   remove = TRUE, sep = "") # , na.rm = TRUE
+
+    ind_tooltips <- ind_tooltips |>
+      dplyr::mutate(
+        tooltip = stringr::str_replace_all(.data$tooltip, " ",
+                                           paste0(unbrk, unbrk, unbrk))
+      )
+
+    ind_coords <- ind_coords |> dplyr::left_join(ind_tooltips, by = "name")
+  }
+
+
+
+
+  # Axes
+  axes_common_infos <- list(
+    showspikes     = FALSE, # projections lines
+    showgrid       = FALSE,
+    zeroline       = FALSE,
+    showticklabels = FALSE #,
+
+    # backgroundcolor="rgb(200, 200, 230",
+    # gridcolor="rgb(255,255,255)",
+    # zerolinecolor="rgb(255,255,255"
+
+    # ticketmode = 'array',
+    # ticktext   = c("Huey", "Dewey", "Louie"),
+    # tickvals   = c(0,25,50),
+    # range      = c(-25,75)
+
+    # nticks = 4,
+  )
+
+  axes_params <- purrr::map(
+    plot_range,
+    ~ c(list(range = ., title = ""), axes_common_infos)
+  )
+
+
+
+
+
+
+
+  ## Assemble plot ----
+
+  dim1 <- rlang::sym(stringr::str_c("Dim.", axes[1]))
+  dim2 <- rlang::sym(stringr::str_c("Dim.", axes[2]))
+  dim3 <- if (D2) {NULL} else {rlang::sym(stringr::str_c("Dim.", axes[3]))}
+
+
+  # To get a fixed aspect ratio, put a point in max range * aspectratio on all axes
+  if (aspectratio_from_eig) {
+    aspectratio <- list(x = res.pca$svd$vs[axes[1]],
+                        y = res.pca$svd$vs[axes[2]],
+                        z = if (D2) {NULL} else {res.pca$svd$vs[axes[3]]}
+    )
+
+  } else {
+    aspectratio <- list(x = 1, y = 1, z =if (D2) {NULL} else {1})
+  }
+
+  aspectratio_range <- tibble::as_tibble(plot_range) |>
+    ## dplyr::mutate(Dim.2 = Dim.2 * 2) |>  # test
+    #dplyr::mutate(dplyr::across(tidyselect::everything(), ~pmax(!!!rlang::syms(names(plot_range))))) |>
+    dplyr::mutate(
+      dplyr::across(axes[1], ~ . * aspectratio[[1]]),
+      dplyr::across(axes[2], ~ . * aspectratio[[2]]),
+      dplyr::across(if (D2) {NULL} else {axes[3]}, ~ . * aspectratio[[3]]),
+    )
+  if (D2) aspectratio_range <- aspectratio_range |> dplyr::select(-"Dim.3")
+
+  #     se calcule ensuite, pour chaque axe, par rapport a son propre range ?
+
+
+
+
+  # camera_title <- names(camera_view)
+
+  if (!missing(camera_view)) {
+    camera_view <- camera_view |>
+      purrr::set_names(paste0("scene", 1:length(camera_view)) |>
+                         stringr::str_replace("scene1", "scene") )
+    scene_name <- names(camera_view)
+
+  } else {
+    scene_name <- "scene"
+  }
+
+  # i <- 1
+  dual_plots <- vector("list", length(scene_name))
+  for (i in 1:length(scene_name)) {
+
+    dual_plots[[i]] <- plotly::plot_ly(scene = scene_name[i])
+
+    # Individus
+    if ("ind" %in% type) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = ind_coords, scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
+          text = ~tooltip,
+          #textfont = list(color = "#00600f", size = ind_name.size),  # "#0077c2"
+          marker   = list(color = "#00600f", size = ind.size),  # "#0077c2"
+          # hovertemplate = paste(
+          #   "<b>%{text}</b><br>", # <br>
+          #   "%{yaxis.title.text}: %{y:$,.0f}<br>",
+          #   "%{xaxis.title.text}: %{x:.0%}<br>",
+          #   #"Number Employed: %{marker.size:,}",
+          #   "<extra></extra>"
+          # ),
+          hoverinfo = "text",
+          hoverlabel = list(align = "right"),
+          # text = ~paste("Price: ", price, '$<br>Cut:', cut),
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "markers", showlegend = FALSE, inherit = FALSE)
+    }
+
+    if ("ind_name" %in% type) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = ind_coords, scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
+          text = ~name,
+          textfont = list(color = "#00600f", size = ind_name.size),  # "#0077c2"
+          hoverinfo = "skip",
+          # text = ~paste("Price: ", price, '$<br>Cut:', cut),
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "text", showlegend = FALSE, inherit = FALSE)
+
+    }
+
+    # Variables : referentiels de depart
+    if ("var" %in% type) {
+      c("#4D4D4D", "black")
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        # plotly::add_trace(data = base_axis_in_princ |> dplyr::group_by(name) |> dplyr::slice(-dplyr::n()) |> dplyr::ungroup(),
+        #                   scene = scene_name[i],
+        #                   x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ pair_id,
+        #                   line   = list(color  = "black", width = 5),
+        #                   marker = list(color  = "black",
+        #                                 symbol = "cross",
+        #                                 size = 5), # 3, # in 2D : "line-ns-open"
+        #                   type = "scatter3d", mode = "lines+markers", showlegend = FALSE, inherit = FALSE,
+        #                   hoverinfo = "skip") |>
+        plotly::add_trace(
+          data = base_axis_in_princ |>
+            dplyr::group_by(.data$name) |> dplyr::slice(-dplyr::n()) |>
+            dplyr::mutate(base_coord = format(.data$base_coord, trim = TRUE, digits = 1)) |>
+            dplyr::ungroup(),
+          scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
+          marker = list(color  = var_color,
+                        symbol = "cross",
+                        size = 5), # 3, # in 2D : "line-ns-open"
+          text = ~base_coord, textfont = list(color = var_color, size = 10),
+          textposition = "bottom center", hoverinfo = "skip",
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = 'markers+text', showlegend = FALSE, inherit = FALSE) |>
+        plotly::add_trace(
+          data = base_axis_in_princ |> dplyr::group_by(.data$name) |>
+            dplyr::slice(1, dplyr::n()) |>
+            dplyr::mutate(name = dplyr::if_else(
+              dplyr::row_number() != 1 & var_names_on == "var",
+              true  = paste0("<b>", .data$name, "</b>"),
+              false = ""
+            )) |>
+            dplyr::ungroup(),
+          scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ pair_id,
+          line = list(color  = var_color, width = 5), # "black"
+          text = ~name, textfont = list(color = var_color, size = 15),  # "black"
+          #textposition = "top center",
+          hoverinfo = "skip",
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = 'lines+text', showlegend = FALSE, inherit = FALSE)
+
+      if (!D2) {
+        dual_plots[[i]] <- dual_plots[[i]] |>
+          plotly::add_trace( # cone au bout des axes
+            data = base_axis_in_princ |> dplyr::group_by(.data$name) |>
+              dplyr::mutate(is_last = dplyr::row_number() == dplyr::n(),
+                            is_min  = .data$base_coord == min(.data$base_coord) ) |>
+              dplyr::ungroup() |> dplyr::filter(.data$is_last | .data$is_min) |>
+              dplyr::select("name", "is_last",  tidyselect::starts_with("Dim.")) |>
+              dplyr::mutate(is_last = dplyr::if_else(.data$is_last, "", "_o")) |>
+              tidyr::pivot_wider(names_from  = "is_last",
+                                 values_from = tidyselect::starts_with("Dim."),
+                                 names_sep = "") |>
+              dplyr::mutate(dplyr::across(
+                tidyselect::ends_with("_o"),
+                ~ rlang::eval_tidy(
+                  rlang::sym(stringr::str_remove(dplyr::cur_column(), "_o"))
+                ) - .
+              )),
+            scene = scene_name[i],
+            x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+            u = ~eval(rlang::sym(stringr::str_c("Dim.", axes[1], "_o"))),
+            v = ~eval(rlang::sym(stringr::str_c("Dim.", axes[2], "_o"))),
+            w = ~eval(rlang::sym(stringr::str_c("Dim.", axes[3], "_o"))),
+            sizeref = cone_size, sizemode = "absolute",
+
+            colorscale = list(list(0, var_color), list(1, var_color)), # "black"
+            showscale = FALSE, hoverinfo = "skip",
+            # lighting  = list(ambient = 1), lightposition= list(x=0, y=0, z=1e5),
+            type = "cone", anchor = "center", showlegend = FALSE, inherit = FALSE
+          )
+      }
+    }
+
+
+    # V : vecteurs propres normees (A Brigitte Le Roux) : 1 ecart-type sur axes de depart
+    if ("V" %in% type) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = dplyr::bind_rows(
+            V_coords,
+            V_coords |>  dplyr::mutate(dplyr::across(tidyselect::starts_with("Dim."), ~ 0))
+          ) |> dplyr::mutate(
+            id_pair = as.integer(as.factor(.data$name)),
+            name    = dplyr::if_else(dplyr::row_number() == 1L, "<b>V</b>", NA_character_)
+          ),
+          scene = scene_name[i],
+          x = ~eval(dim1)*9/10, y = ~eval(dim2)*9/10, z = ~eval(dim3)*9/10, split = ~ id_pair,
+
+          line   = list(color  = "black", width = 5),
+          #text = ~name, textfont = list(color = "black", size = 15),
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "lines", showlegend = FALSE, inherit = FALSE,
+          hoverinfo = "skip")
+
+      if (!D2) {
+        dual_plots[[i]] <- dual_plots[[i]] |>
+          plotly::add_trace(
+            data = V_coords,
+            scene = scene_name[i],
+            x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+            u = ~eval(dim1), v = ~eval(dim2), w = ~eval(dim3),
+            sizeref = cone_size, sizemode = "absolute",
+            colorscale = list(list(0, "black"), list(1,"black")), #autocolorscale = FALSE,
+            showscale = FALSE, hoverinfo = "skip",
+            # lighting  = list(ambient = 1), lightposition= list(x=0, y=0, z=1e5),
+            type = "cone", anchor = "tip", showlegend = FALSE, inherit = FALSE
+          )
+      }
+    }
+
+
+    # Correlations des variables : cor (1 ecart type, mais un peu decale /axes de depart)
+    if ("cor" %in% type) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = dplyr::bind_rows(var_coords |>  dplyr::mutate(dplyr::across(tidyselect::starts_with("Dim."), ~ 0)),
+                                  var_coords
+          ) |>
+            dplyr::mutate(id_pair = as.integer(as.factor(.data$name))) |>
+            dplyr::group_by(.data$name) |>
+            dplyr::mutate(
+              name = dplyr::if_else(
+                dplyr::row_number() != 1 & var_names_on == "cor",
+                true  = paste0("<b>", .data$name, "</b>"),
+                false = "")
+              #dplyr::if_else(dplyr::row_number() == 1L, "<b>cor</b>", NA_character_)
+            ) |> dplyr::ungroup(),
+          scene = scene_name[i],
+          x = ~eval(dim1)*9/10, y = ~eval(dim2)*9/10, z = ~eval(dim3)*9/10,
+          split = ~ id_pair,
+          line   = list(color  = "#0077c2", width = 5), # c("#42a5f5", "#0077c2")
+          text = ~name, textfont = list(color = "#0077c2", size = 15), # "#4D4D4D"
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "lines+text", showlegend = FALSE, inherit = FALSE,
+          hoverinfo = "skip")
+
+      if (!D2) {
+        dual_plots[[i]] <- dual_plots[[i]] |>
+          plotly::add_trace(
+            data = var_coords,
+            scene = scene_name[i],
+            x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+            u = ~eval(dim1), v = ~eval(dim2), w = ~eval(dim3),
+            sizeref = cone_size, sizemode = "absolute",
+            colorscale = list(list(0, "#0077c2"), list(1, "#0077c2")), #autocolorscale = FALSE,
+            showscale = FALSE, hoverinfo = "skip",
+            # lighting  = list(ambient = 1), lightposition= list(x=0, y=0, z=1e5),
+            type = "cone", anchor = "tip", showlegend = FALSE, inherit = FALSE
+          )
+      }
+    }
+
+    if (!D2 & "cor_sphere" %in% type) {
+      #arg cor_sphere_resolution ?
+      theta = seq(0, 2*pi, length.out = 15)
+      phi   = seq(0,   pi, length.out = 15)
+
+      sphere_data <- tibble::tibble(
+        x = outer(cos(theta), sin(phi)) ,
+        y = outer(sin(theta), sin(phi)) ,
+        z = outer(rep(1, 15), cos(phi)),
+      )
+      ## alternative
+      # theta = seq(0, pi, length.out = 25)
+      # phi   = seq(-pi,   pi, length.out = 25)
+      # meshgrid_sphere <- pracma::meshgrid(theta, phi) # outer works ?
+      # theta <-  meshgrid_sphere[[1]] #|> c()
+      # phi   <-  meshgrid_sphere[[2]] #|> c()
+      # r = 1
+      # sphere_data <- tibble::tibble(
+      #   x = r * sin(theta) * cos(phi),
+      #   y = r * sin(theta) * sin(phi),
+      #   z = r * cos(theta),
+      # )
+
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = sphere_data,
+          scene = scene_name[i],
+          x = ~x, y = ~y, z = ~z,
+          opacity = 0.1,
+          colorscale = list(list(0, "#ba2d65"), list(1, "#ba2d65")), showscale = FALSE,
+          type = "surface", showlegend = FALSE, inherit = FALSE, hoverinfo = "skip" #,
+        )
+
+    }
+
+
+    # Axes principaux de l'ACP
+    dual_plots[[i]] <- dual_plots[[i]] |>
+      # plotly::add_trace(data = princ_axes,  scene = scene_name[i],
+      #                   x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ pair_id,
+      #                   line = list(color  = "#d32f2f", width = 5),
+      #                   marker = list(color  = "#d32f2f",
+      #                                 symbol = "cross",
+      #                                 size = 5), # 3
+      #                   type = "scatter3d", mode = "lines+markers", showlegend = FALSE, inherit = FALSE,
+      #                   hoverinfo = "skip") |>
+      # add_trace(data = princ_axes |> dplyr::filter(base_coord <= 1 & base_coord >= -1), #
+      #         scene = scene_name[i],
+      #         x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ pair_id,
+    #         line   = list(color  = "#d32f2f", width = 5),
+    #         type = "scatter3d", mode = "lines", showlegend = FALSE, inherit = FALSE,
+    #         hoverinfo = "skip") |>
+    plotly::add_trace(
+      data = princ_axes |>
+        dplyr::filter(.data$name %in% paste0("Axe ", axes) ) |>
+        dplyr::group_by(.data$name) |>
+        dplyr::slice(-dplyr::n()) |>
+        dplyr::ungroup(),
+      # dplyr::mutate(remove_last_if_not_1 = dplyr::row_number() == dplyr::n() & base_coord != 1) |>
+      # dplyr::filter(!remove_last_if_not_1) |> dplyr::ungroup(),
+      scene = scene_name[i],
+      x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
+      marker = list(color  = "#d32f2f",
+                    symbol = "cross",
+                    size = 5), # 3
+      text = ~base_coord, textfont = list(color = "#d32f2f", size = 10),
+      textposition = "bottom center", hoverinfo = "skip",
+      type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+      mode = 'markers+text', showlegend = FALSE, inherit = FALSE) |>
+      plotly::add_trace(
+        data = princ_axes |>
+          dplyr::filter(.data$name %in% paste0("Axe ", axes) ) |>
+          dplyr::group_by(.data$name) |> dplyr::slice(1, dplyr::n()) |>
+          dplyr::mutate(
+            name = dplyr::if_else(dplyr::row_number() == 1,
+                                  true  = "",
+                                  false  = paste0("<b>", .data$name, "</b>"))
+          ) |>
+          dplyr::ungroup(),
+        scene = scene_name[i],
+        x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ pair_id,
+        line = list(color  = "#d32f2f", width = 5),
+        text = ~name, textfont = list(color = "#d32f2f", size = 15),
+        #textposition = "top center",
+        hoverinfo = "skip",
+        type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+        mode = 'lines+text', showlegend = FALSE, inherit = FALSE)
+
+    if (!D2) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace( # cone au bout des axes
+          data = princ_axes |>
+            dplyr::filter(.data$name %in% paste0("Axe ", axes) ) |>
+            dplyr::group_by(.data$name) |>
+            dplyr::slice(dplyr::n()) |>
+            dplyr::ungroup(),
+          scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+          u = ~eval(dim1)*9/10, v = ~eval(dim2)*9/10, w = ~eval(dim3)*9/10,
+          sizeref = cone_size, sizemode = "absolute",
+
+          colorscale = list(list(0, "#d32f2f"), list(1, "#d32f2f")), #autocolorscale = FALSE,
+          showscale = FALSE, hoverinfo = "skip",
+          # lighting  = list(ambient = 1), lightposition= list(x=0, y=0, z=1e5),
+          type = "cone", anchor = dplyr::if_else(max(princ_axes_print) == 1, "tip", "center"),
+          showlegend = FALSE, inherit = FALSE
+        )
+    }
+
+    # To get a fixed aspect ratio, put a point in max ranges on all axes
+    if (!D2) { # Also in 2D ?
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = aspectratio_range, scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
+          hoverinfo = "skip", opacity = 0, visible = TRUE,
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "text", showlegend = FALSE, inherit = FALSE
+        )
+    }
+
+
+    # Valeurs singulieres (racine carree des valeurs propres)
+    if ("vs" %in% type) {
+      vs_diag <- diag(res.pca$svd$vs) |>
+        magrittr::set_colnames(paste0("Dim.", 1:length(res.pca$svd$vs))) |>
+        magrittr::set_rownames(paste0("Dim.", 1:length(res.pca$svd$vs))) |>
+        as.data.frame() |> tibble::rownames_to_column("name") |> tibble::as_tibble() |>
+        dplyr::mutate(name = stringr::str_replace(.data$name, "Dim.", "vs"))
+
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = dplyr::bind_rows(vs_diag,
+                                  vs_diag |>  dplyr::mutate(dplyr::across(tidyselect::starts_with("Dim."), ~ 0))
+          ) |> dplyr::mutate(id_pair = as.integer(as.factor(.data$name)),
+                             name    = dplyr::if_else(dplyr::row_number() == 1L, "<b>vs</b>", NA_character_)
+          ),
+          scene = scene_name[i],
+          x = ~Dim.1*9/10, y = ~Dim.2*9/10, z = ~Dim.3*9/10, split = ~ id_pair,
+          line   = list(color  = "#9e9d24", width = 10),
+          text = ~name, textfont = list(color = "#9e9d24", size = 15),
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "lines+text", showlegend = FALSE, inherit = FALSE,
+          hoverinfo = "skip")
+
+      if (!D2) {
+        dual_plots[[i]] <- dual_plots[[i]] |>
+          plotly::add_trace(
+            data = vs_diag,
+            scene = scene_name[i],
+            x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+            u = ~eval(dim1), v = ~eval(dim2), w = ~eval(dim3),
+            sizeref = cone_size, sizemode = "absolute",
+
+            colorscale = list(list(0, "#9e9d24"), list(1,"#9e9d24")), #autocolorscale = FALSE,
+            showscale = FALSE, hoverinfo = "skip",
+            # lighting  = list(ambient = 1), lightposition= list(x=0, y=0, z=1e5),
+            type = "cone", anchor = "tip", showlegend = FALSE, inherit = FALSE
+          )
+      }
+    }
+
+    # Point moyen et projections du point moyen sur les axes de depart
+    if (!center) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = mean_projs,  scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+          line   = list(color = "#f57c00", dash = "dash", width = 3), # "#bb4d00"
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "lines", showlegend = FALSE, inherit = FALSE,
+          hoverinfo = "skip")
+    }
+
+    # Plan Axe 1/Axe 2 et projections des points
+    if ("projections" %in% type) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = dplyr::bind_rows(ind_coords, dplyr::mutate(ind_coords, Dim.3 = 0)),
+          scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+          line   = list(color  = "#9575cd"), # dash = "longdash", width = 4  #( "dash" | "dashdot" | "dot" | "longdash" | "longdashdot" | "solid" )
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "lines", showlegend = FALSE, inherit = FALSE,
+          hoverinfo = "skip") |>
+        plotly::add_trace(
+          data = dplyr::mutate(ind_coords, Dim.3 = 0), scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
+          marker   = list(color  = "#9575cd", size = 2),  # "#65499c"
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "markers", showlegend = FALSE, inherit = FALSE,
+          hoverinfo = "skip")
+    }
+
+
+    if ("main_plan" %in% type) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = planDf, scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
+          opacity = 0.5, #color = "A", colorscale = c("A" = "#65499c"), #vertexcolor  = "#65499c",
+          facecolor = rep('#CFC0E8', nrow(planDf)), # "#65499c"
+          hoverinfo = "skip",
+          type = "mesh3d", showlegend = FALSE, inherit = FALSE)
+    }
+  }
+
+  # cat(
+  # paste0("c(",
+  #   paste0(
+  #     paste0("'",
+  #       c(material_colors_lighter(by = 0.25)[1],
+  #       material_colors_lighter(by = 0.20)[1],
+  #       material_colors_lighter(by = 0.15)[1],
+  #       material_colors_lighter(by = 0.10)[1],
+  #       material_colors_lighter(by = 0.05)[1]
+  #     ),
+  #     "'" #,
+  #     ),
+  #     collapse = ", "
+  #   ),
+  #   ")"
+  #   )
+  # )
+  c('#DDD3EF', '#CFC0E8', '#C0ADE1', '#B29ADB', '#A388D4')
+
+
+  # plotly::layout(# title = "Title",
+  #   scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+  #                #              # domain=list(x=c(0,0.5),y=c(0.5,1),
+  #                #              # aspectratio = list(x=1, y=1, z=2)))
+  #                camera = list(
+  #                  center = list(x =  0   , y =  0  , z = 0  ),
+  #                  eye    = list(x =  0.6 , y = -0.4, z = 0.7),
+  #                  up     = list(x =  0   , y =  0  , z = 1  ) # ,
+  #                  #projection = list(type = 'orthographic')
+  #                )
+  #                #              #
+  #                #              # dragmode = "turntable",
+  #                #              # annotations =
+  #                #
+  #   ) #,
+  #
+  #   # scene2 = ,
+  #   # margin = list(t = 30, r = 30, l = 30, b = 30, padding = 2)
+  # )
+
+
+  # dual_referential_3D_plot |>
+  #   # Layout
+  #   plotly::layout(# title = "Title",
+  #          scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+  #                       #              # domain=list(x=c(0,0.5),y=c(0.5,1),
+  #                       #              # aspectratio = list(x=1, y=1, z=2)))
+  #                       camera = list(
+  #                         center = list(x =  0   , y =  0  , z = 0  ),
+  #                         eye    = list(x =  0.6 , y = -0.4, z = 0.7),
+  #                         up     = list(x =  0   , y =  0  , z = 1  ) # ,
+  #                         #projection = list(type = 'orthographic')
+  #                       )
+  #                       #              #
+  #                       #              # dragmode = "turntable",
+  #                       #              # annotations =
+  #                       #
+  #          ) #,
+  #
+  #          # scene2 = ,
+  #          # margin = list(t = 30, r = 30, l = 30, b = 30, padding = 2)
+  #   )
+
+
+
+  # # Plan 1-2
+  # dual_plots[[1]] |>
+  #   plotly::layout(#title = "Title",
+  #          scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+  #                       camera = list(
+  #                         center = list(x =  0   , y =  0  , z = 0  ),
+  #                         eye    = list(x =  0   , y =  0  , z = 1  ),
+  #                         up     = list(x =  0   , y =  1  , z = 0  )
+  #                       )
+  #          )
+  #   )
+  #
+  # # Plan 1-3
+  # dual_plots[[2]] |>
+  #   plotly::layout(#title = "Title",
+  #          scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+  #                       camera = list(
+  #                         center = list(x =  0   , y =  0  , z = 0  ),
+  #                         eye    = list(x =  0   , y = -1  , z = 0  ),
+  #                         up     = list(x =  0   , y =  0  , z = 1  )
+  #                       )
+  #          )
+  #   )
+  #
+
+
+
+  if (!D2) {
+    # Buttons to set plans
+    plan12  <- paste0("Plane ", axes[1], "-", axes[2]) # 1-2
+    plan13  <- paste0("Plane ", axes[1], "-", axes[3]) # 1-3
+    plan23  <- paste0("Plane ", axes[2], "-", axes[3]) # 2-3
+    plan123 <-  "All"
+
+    if (!remove_buttons) {
+      updatemenus <- list(
+        list(
+          active = -1,
+          # switch(view,
+          #        plan12 = 0,
+          #        "Plane 1-3" = 1,
+          #        "Plane 2-3" = 2,
+          #        "All"       = 3,
+          #        stop("'view' argument is not recognized")) , # -1,
+          type   = 'buttons', # uirevision  = FALSE, # showactive = FALSE, # visible  = TRUE,
+          buttons = list(
+            list(
+              label = plan12,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x =  0   , y =  0  , z = base_zoom),
+                  up     = list(x =  0   , y =  1  , z = 0  ),
+                  projection = "orthographic"
+                )
+              )
+              )) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                                 aspectratio = = aspectratio, aspectmode = "data",
+              #                                 camera = list(
+              #                                   center = list(x =  0   , y =  0  , z = 0  ),
+              #                                   eye    = list(x =  0   , y =  0  , z = base_zoom),
+              #                                   up     = list(x =  0   , y =  1  , z = 0  )
+              #                                 )
+              # )
+              # ))
+            ),
+            #list(list(shapes = list(cluster0, c(), c())))),
+
+            list(
+              label = plan13,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x =  0   , y = -base_zoom  , z = 0  ),
+                  up     = list(x =  0   , y =  0  , z = 1  ),
+                  projection = "orthographic"
+                )
+              )
+              )
+              ) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                        aspectratio = = aspectratio, aspectmode = "data",
+              #                        camera = list(
+              #                          center = list(x =  0   , y =  0  , z = 0  ),
+              #                          eye    = list(x =  0   , y = -base_zoom  , z = 0  ),
+              #                          up     = list(x =  0   , y =  0  , z = 1  )
+              #                        )
+              # )
+              # )
+              #)
+            ),
+            #list(list(shapes = list(c(), cluster1, c())))),
+
+            list(
+              label = plan23,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x =  base_zoom , y =  0  , z = 0  ),
+                  up     = list(x =  0   , y =  0  , z = 1  ),
+                  projection = "orthographic"
+                )
+              )
+              )
+              ) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                               aspectratio = = aspectratio, aspectmode = "data",
+              #                               camera = list(
+              #                                 center = list(x =  0   , y =  0  , z = 0  ),
+              #                                 eye    = list(x =  base_zoom , y =  0  , z = 0  ),
+              #                                 up     = list(x =  0   , y =  0  , z = 1  )
+              #                               )
+              # )
+              # )
+              # )
+            ),
+
+            list(
+              label = plan123,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x = base_zoom/6, y = -base_zoom, z = base_zoom),
+                  #         list(x =  0.6 * base_zoom, y = -0.4 * base_zoom, z = 0.7 * base_zoom),
+                  up     = list(x =  0   , y =  0  , z = 1  ),
+                  projection = "orthographic"
+                )
+              )
+              )) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                               aspectratio = = aspectratio, aspectmode = "data",
+              #                               camera = list(
+              #                                 center = list(x =  0   , y =  0  , z = 0  ),
+              #                                 eye    = list(x = base_zoom/6, y = -base_zoom, z = base_zoom),
+              #                                 #         list(x =  0.6 * base_zoom, y = -0.4 * base_zoom, z = 0.7 * base_zoom),
+              #                                 up     = list(x =  0   , y =  0  , z = 1  )
+              #                               )
+              # )
+              # ))
+            ) # ,
+            #list(list(shapes = c()))),
+
+          )
+        )
+      )
+
+    } else {
+      updatemenus <- NULL
+    }
+
+
+  } else { # 2D
+    updatemenus <- NULL
+  }
+
+
+  if (!D2 & !missing(camera_view)) {
+    scenes <- purrr::map(
+      camera_view,
+      ~ list(xaxis = axes_params[[axes[1]]],
+             yaxis = axes_params[[axes[2]]],
+             zaxis = axes_params[[axes[3]]],
+             aspectratio = aspectratio, aspectmode = "data",
+
+             #aspectratio = list(x = 1, y = 1, z = 1),
+             #domain = list(x = c(0, 0.5), y = c(0, 1)),
+             camera = .x
+      )
+    )
+
+  } else if (!D2) {
+    scenes <- list("scene" = dplyr::case_when(
+      view == plan12   ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x =  0   , y =  0  , z = base_zoom),
+          up     = list(x =  0   , y =  1  , z = 0  ),
+          projection = "orthographic"
+        )
+      ),
+      view == plan13   ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x =  0   , y =  - base_zoom  , z = 0),
+          up     = list(x =  0   , y =  0  , z = 1  ),
+          projection = "orthographic"
+        )
+      ),
+      view == plan23   ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x = base_zoom, y =  0  , z = 0),
+          up     = list(x =  0   , y =  0  , z = 1  ),
+          projection = "orthographic"
+        )
+      ),
+      view == plan123  ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x = base_zoom/6, y = -base_zoom, z = base_zoom),
+          #         list(x =  0.6 * base_zoom, y = -0.4 * base_zoom, z = 0.7 * base_zoom),
+          up     = list(x =  0   , y =  0  , z = 1  ),
+          projection = "orthographic"
+        )
+      ),
+
+      TRUE ~ list(a = NULL)
+    )
+
+    )
+    #print(scenes)
+    if (is.null(scenes$scene[[1]])) stop(paste0(
+      "view argument must be among: ",
+      paste0(
+        paste0("'", c(plan12, plan13, plan23, plan123), "'"), collapse = ", "),
+      collapse = ""
+    ))
+
+
+  } else {  # 2D
+    scenes <- list("scene" = list(
+      xaxis = axes_params[[axes[1]]],
+      yaxis = axes_params[[axes[2]]],
+      aspectratio = aspectratio, aspectmode = "data" #,
+    ))
+  }
+
+
+  final_plots <-
+    plotly::subplot(purrr::list_flatten(dual_plots), margin = 0.1, #0,
+                    nrows = ceiling(length(scene_name)/2L)
+    )
+  final_plots <- do.call(plotly::layout,
+
+                         c(list(p           = final_plots,
+                                margin      = list(b = 0, l = 0, r = 0, t = 0),
+                                updatemenus = updatemenus
+                         ),
+                         if (missing(title)) {NULL} else {list(title = title)},
+                         scenes
+                         )
+  )
+
+  #print(aspectratio)
+
+
+  final_plots$data$ind_coords         <- ind_coords
+  final_plots$data$base_axis_in_princ <- base_axis_in_princ
+  final_plots$data$princ_axes         <- princ_axes
+  final_plots$data$mean_projs         <- mean_projs
+  final_plots$data$planDf             <- planDf
+
+  final_plots
+
+  # plotly::layout(#title = "Title",
+  #   scene = list(title = ,
+  #                xaxis = axx, yaxis = axy, zaxis = axz,
+  #                #domain = list(x = c(0, 0.5), y = c(0, 1)),
+  #                    camera = list(
+  #                      center = list(x =  0   , y =  0  , z = 0  ),
+  #                      eye    = list(x =  0   , y =  0  , z = 1),
+  #                      up     = list(x =  0   , y =  1  , z = 0  )
+  #                    )
+  #       )#,
+  #     ) |>
+  #     plotly::layout(#title = "Title",
+  #       scene2 = list(title = ,
+  #                     xaxis = axx, yaxis = axy, zaxis = axz,
+  #                     #domain = list(x = c(0.5, 1), y = c(0, 1)),
+  #                     camera = list(
+  #                       center = list(x =  0   , y =  0  , z = 0  ),
+  #                       eye    = list(x =  0   , y = -1  , z = 0  ),
+  #                       up     = list(x =  0   , y =  0  , z = 1  )
+  #                     )
+  #       )
+  #     )
+
+}
+
+
+
+
+
+
+#'  Interactive 3D Plot for Multiple Correspondence Analyses (plotly::)
+#'
+#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param dat The data in which to find the cah variable, etc.
+#' @param cah A variable made with \code{\link[FactoMineR]{HCPC}}, to link
+#' the answers-profiles points who share the same HCPC class (will be colored
+#' the same color and linked at mouse hover).
+#' @param axes The axes to print, as a numeric vector of length 3.
+#' @param base_zoom The base level of zoom.
+#' @param remove_buttons Set to TRUE to remove buttons to change view.
+#' @param cone_size The size of the conic arrow at the end of each axe.
+#' @param view The starting point of view (in 3D) :
+#'      \itemize{
+#'    \item \code{"Plane 1-2"} : Axes 1 and 2.
+#'    \item \code{"Plane 1-3"} : Axes 1 and 3.
+#'    \item \code{"Plane 2-3"} : Axes 2 and 3.
+#'    \item \code{"All"      } : A 3D perspective with Axes 1, 2, 3.
+#'  }
+#' @param camera_view Possibility to add a (replace `view`)
+#' @param aspectratio_from_eig Set to `TRUE` to modify axes length based on
+#' eigenvalues.
+#' @param title The title of the graph.
+#' @param ind_name.size The size of the names of individuals.
+#' @param max_point_size The size of the biggest point.
+#' @param ... Additional arguments to pass to \code{\link[ggfacto:ggmca]{ggmca}}.
+#'
+#' @return A \code{\link[plotly]{plotly}} html interactive 3d (or 2d) graph.
+#' @export
+#'
+#' @examples
+#' \donttest{
+#' data(tea, package = "FactoMineR")
+#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' ggmca_3d(res.mca)
+#'
+#' # 3D graph with colored HCPC clusters (cah)
+#' res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
+#' cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
+#' tea$clust <- cah$data.clust$clust
+#' ggmca_3d(res.mca, dat = tea, cah = "clust")
+#' }
+ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
+                     base_zoom = 1, remove_buttons = FALSE, cone_size = 0.15,
+                     view = "All",
+                     camera_view, aspectratio_from_eig = FALSE, title,
+                     ind_name.size = 10, max_point_size = 30, # ind.size = 4,
+                     ...) {
+  requireNamespace("plotly")
+
+  if (missing(cah)) cah <- character()
+
+  D2 <- length(axes) == 2 ; stopifnot(length(axes) %in% 2:3 )
+  if (D2) axes <- c(axes, NA)
+
+  dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
+  dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+
+  # if (missing(color_groups)) color_groups <- "^.{1}"
+
+  acm <- res.mca |>
+    ggmca(dat = dat,
+          cah = cah,
+          # color_groups = color_groups,
+          profiles = TRUE,
+          get_data = TRUE,
+          ...
+    )
+
+
+  acm_cah <- acm$vars_data |>
+    dplyr::filter(stringr::str_detect(.data$color_group, paste0("^", cah)))
+  acm_vars <- tabxplor::new_tab(acm$vars_data) |>
+    dplyr::filter(!.data$vars %in% cah) |>
+    dplyr::mutate(face = dplyr::if_else(.data$color_group != "variables_actives", "italic", "bold") )
+  acm_profiles <- acm$profiles_coord
+
+  if(length(cah) > 0) {
+    acm_profiles <- acm_profiles |> dplyr::filter(!is.na(cah))
+
+    cah_name_with_pct <- acm_cah |>
+      dplyr::select("lvs", "wcount") |>
+      dplyr::mutate(pct = round(.data$wcount/sum(.data$wcount)*100), 0) |>
+      dplyr::mutate(recode_vect = purrr::set_names(as.character(.data$lvs),
+                                                   paste0(.data$lvs, " (",
+                                                          .data$pct, "%)"))) |>
+      dplyr::pull("recode_vect")
+
+    acm_cah <- acm_cah |>
+      dplyr::mutate(lvs = forcats::fct_recode(.data$lvs, !!!cah_name_with_pct),
+                    lvs = paste0("<b>", .data$lvs, "</b>"))
+  }
+
+
+  # heigth_width_ratio <- (0.8 + 1.2) / (0.8 + 1.1)
+
+
+  plot_range <-
+    dplyr::bind_rows(dplyr::select(acm_profiles, tidyselect::starts_with("Dim ")),
+                     dplyr::select(acm_cah, tidyselect::starts_with("Dim ")),
+                     dplyr::select(acm_vars, tidyselect::starts_with("Dim ")),
+                     #dplyr::select(base_axis_in_princ, tidyselect::starts_with("Dim."))
+    ) |>
+    purrr::map(~ range(.) |> abs() |> max())
+  plot_range <- plot_range |> purrr::map(~ c(-., .))
+
+  princ_axes <-
+    plot_range |> purrr::map(~  scales::breaks_extended(n = 4)(.)) |>
+    purrr::imap_dfr(~ tibble::tibble(name = .y, !!rlang::sym(.y) := .x, base_coord = .x)) |>
+    dplyr::mutate(dplyr::across(tidyselect::starts_with("Dim "), ~ tidyr::replace_na(., 0)),
+                  name    = forcats::as_factor(.data$name),  #name = paste0(name, ".", base_coord)
+                  pair_id = as.integer(.data$name),
+
+    ) |>
+    dplyr::mutate(name = stringr::str_replace(.data$name, "Dim ", "Axe ") ) |>
+    dplyr::select("name", "pair_id", "base_coord", tidyselect::starts_with("Dim ") )
+
+  plot_range <-
+    purrr::map2(plot_range,
+                princ_axes |>
+                  dplyr::group_by(.data$name) |>
+                  dplyr::group_split() |>
+                  purrr::map(~.$base_coord |> range()),
+                ~ range(c(.x, .y))
+    )
+
+
+
+
+  #   # Base ggplot 2D
+  # ggplot(acm_vars, ggplot2::aes(x = !!dim1, y = !!dim2)) +
+  #   acm$graph_theme_acm +
+  #   ggplot2::geom_point(
+  #     data = acm_profiles, ggplot2::aes(size = wcount, color = color_group),
+  #     na.rm = TRUE, show.legend = FALSE, stroke = 0, alpha = 0.5
+  #   ) +
+  #   ggplot2::geom_point(
+  #     data = acm$mean_point_data,
+  #     color = "black", fill = "#eeeeee", shape = 3, size = 5, stroke = 1.5, na.rm = TRUE
+  #   ) +
+  #   ggrepel::geom_text_repel(
+  #     ggplot2::aes(label = lvs, fontface = face),
+  #     size = text_size, na.rm = TRUE, direction = "both",  min.segment.length = 0.01,
+  #     force = 0.5, force_pull = 1, point.padding = 0, box.padding = 0,
+  #     point.size = NA, arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines"))
+  #   ) +
+  #   # ggplot2::geom_segment(
+  #   #   data = acm_cah |>
+  #   #     dplyr::mutate(!!dim1 = pmin(1.3, pmax(!!dim1, -0.9)),
+  #   #            !!dim2 = pmin(1.3, pmax(!!dim2, -0.85)),
+  #   #            start1  = pmin(0.95, pmax(!!dim1, -0.5)),
+  #   #            start2  = pmin(1.25, pmax(!!dim2, -0.775)),
+  #   #     ),
+  #   #   ggplot2::aes(x = start1, xend = !!dim1, y = start2, yend = !!dim2,
+  #   #                color = color_group),
+  #   #   arrow = ggplot2::arrow(length = ggplot2::unit(0.3, "lines")), na.rm = TRUE
+  #   # ) +
+  # ggrepel::geom_label_repel(
+  #   data = acm_cah,
+  #   ggplot2::aes(label = lvs, color = color_group), fill = grDevices::rgb(1, 1, 1, alpha = 0.7),
+  #   direction = "y", force = 0.5, force_pull = 1, point.padding = 0, point.size = NA,
+  #   arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
+  #   fontface = "bold", size = text_size, na.rm = TRUE
+  # )
+
+
+  if (length(cah) > 0) {
+  acm_lv <- acm_cah$color_group |> forcats::fct_drop() |> levels()
+  acm_lv <- purrr::set_names(acm_lv,
+                             material_colors_light()[1:length(acm_lv)],
+
+  )
+
+  acm_cah <- acm_cah |>
+    dplyr::mutate(
+      color_group = forcats::fct_recode(.data$color_group, !!!acm_lv) |>
+        forcats::fct_drop()
+    )
+
+  acm_profiles <- acm_profiles |>
+    dplyr::mutate(
+      color_group = forcats::fct_recode(.data$color_group, !!!acm_lv) |>
+        forcats::fct_drop()
+    )
+
+  } else {
+    acm_profiles <- acm_profiles |> dplyr::mutate(color_group = factor("#bbbbbb"))
+  }
+
+  acm_profiles <- acm_profiles |>
+    dplyr::mutate(
+      size_scaled = scales::abs_area(max = max_point_size)(.data$wcount),
+      size_scaled =
+        .data$size_scaled/max(.data$size_scaled, na.rm = TRUE)*max_point_size,
+    )
+  # acm_profiles |>
+  #   dplyr::select(wcount, size_scaled ) |>
+  #   dplyr::slice(4500:5000) |>
+  #   print(n = 900)
+
+
+
+
+  # Axes
+  axes_common_infos <- list(
+    showspikes     = FALSE, # projections lines
+    showgrid       = FALSE,
+    zeroline       = FALSE,
+    showticklabels = FALSE #,
+
+    # backgroundcolor="rgb(200, 200, 230",
+    # gridcolor="rgb(255,255,255)",
+    # zerolinecolor="rgb(255,255,255"
+
+    # ticketmode = 'array',
+    # ticktext   = c("Huey", "Dewey", "Louie"),
+    # tickvals   = c(0,25,50),
+    # range      = c(-25,75)
+
+    # nticks = 4,
+  )
+
+  axes_params <- purrr::map(plot_range,
+                            ~ c(list(range = ., title = ""), axes_common_infos)
+  )
+
+
+
+
+
+
+
+  ## Assemble plot ----
+
+  dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
+  dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+  dim3 <- if (D2) {NULL} else {rlang::sym(stringr::str_c("Dim ", axes[3]))}
+
+
+  # To get a fixed aspect ratio, put a point in max range * aspectratio on all axes
+  if (aspectratio_from_eig) {
+    aspectratio <- list(x = res.mca$svd$vs[axes[1]],
+                        y = res.mca$svd$vs[axes[2]],
+                        z = if (D2) {NULL} else {res.mca$svd$vs[axes[3]]}
+    )
+
+  } else {
+    aspectratio <- list(x = 1, y = 1, z =if (D2) {NULL} else {1})
+  }
+
+  aspectratio_range <- tibble::as_tibble(plot_range) |>
+    ## dplyr::mutate(Dim.2 = Dim.2 * 2) |>  # test
+    #dplyr::mutate(dplyr::across(tidyselect::everything(), ~pmax(!!!rlang::syms(names(plot_range))))) |>
+    dplyr::mutate(dplyr::across(axes[1], ~ . * aspectratio[[1]]),
+                  dplyr::across(axes[2], ~ . * aspectratio[[2]]),
+                  dplyr::across(if (D2) {NULL} else {axes[3]}, ~ . * aspectratio[[3]]),
+    )
+  if (D2) aspectratio_range <- aspectratio_range |> dplyr::select(-"Dim.3")
+
+  #     se calcule ensuite, pour chaque axe, par rapport a son propre range ?
+
+
+
+
+  # camera_title <- names(camera_view)
+
+  if (!missing(camera_view)) {
+    camera_view <- camera_view |>
+      purrr::set_names(paste0("scene", 1:length(camera_view)) |>
+                         stringr::str_replace("scene1", "scene") )
+    scene_name <- names(camera_view)
+
+  } else {
+    scene_name <- "scene"
+  }
+
+  # i <- 1
+  dual_plots <- vector("list", length(scene_name))
+  for (i in 1:length(scene_name)) {
+
+    dual_plots[[i]] <- plotly::plot_ly(scene = scene_name[i])
+
+    # Individus colores selon CAH
+    dual_plots[[i]] <- dual_plots[[i]] |>
+      plotly::add_trace(
+        data = acm_profiles, scene = scene_name[i],
+        x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
+        text = ~interactive_text,
+        #textfont = list(color = "#00600f", size = ind_name.size),  # "#0077c2"
+        marker   = list(color = ~color_group, size = ~size_scaled),  # "#0077c2"
+        # hovertemplate = paste(
+        #   "<b>%{text}</b><br>", # <br>
+        #   "%{yaxis.title.text}: %{y:$,.0f}<br>",
+        #   "%{xaxis.title.text}: %{x:.0%}<br>",
+        #   #"Number Employed: %{marker.size:,}",
+        #   "<extra></extra>"
+        # ),
+        hoverinfo = "text",
+        hoverlabel = list(align = "right"),
+        # text = ~paste("Price: ", price, '$<br>Cut:', cut),
+        type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+        mode = "markers", showlegend = FALSE, inherit = FALSE)
+
+
+    # variables actives
+    dual_plots[[i]] <- dual_plots[[i]] |>
+      plotly::add_trace(
+        data = acm_vars, scene = scene_name[i],
+        x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
+        text = ~lvs,
+        textfont = list(color = "black", size = ind_name.size),  # "#0077c2"
+        hoverinfo = "skip",
+        # text = ~paste("Price: ", price, '$<br>Cut:', cut),
+        type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+        mode = "text", showlegend = FALSE, inherit = FALSE)
+
+    # labels cah
+    if (length(cah) > 0) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = acm_cah, scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
+          text = ~lvs,
+          textfont = list(color = ~color_group, size = ind_name.size),  # "#0077c2"
+          hoverinfo = "skip",
+          # text = ~paste("Price: ", price, '$<br>Cut:', cut),
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "text", showlegend = FALSE, inherit = FALSE)
+    }
+
+    # Axes principaux de l'ACP
+    dual_plots[[i]] <- dual_plots[[i]] |>
+      plotly::add_trace(
+        data = princ_axes |>
+          dplyr::filter(.data$name %in% paste0("Axe ", axes) ) |>
+          dplyr::group_by(.data$name) |>
+          dplyr::slice(-dplyr::n()) |> dplyr::ungroup(),
+        # dplyr::mutate(remove_last_if_not_1 = dplyr::row_number() == dplyr::n() & base_coord != 1) |>
+        # dplyr::filter(!remove_last_if_not_1) |> dplyr::ungroup(),
+        scene = scene_name[i],
+        x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
+        marker = list(color  = "black",
+                      symbol = "cross",
+                      size = 5), # 3
+        text = ~base_coord, textfont = list(color = "black", size = 10),
+        textposition = "bottom center", hoverinfo = "skip",
+        type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+        mode = 'markers+text', showlegend = FALSE, inherit = FALSE) |>
+      plotly::add_trace(
+        data = princ_axes |>
+          dplyr::filter(.data$name %in% paste0("Axe ", axes) ) |>
+          dplyr::group_by(.data$name) |> dplyr::slice(1, dplyr::n()) |>
+          dplyr::mutate(
+            name = dplyr::if_else(
+              dplyr::row_number() == 1,
+              true  = "",
+              false = paste0("<b>", .data$name, "</b>")
+            )
+          ) |>
+          dplyr::ungroup(),
+        scene = scene_name[i],
+        x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ pair_id,
+        line = list(color  = "black", width = 5),
+        text = ~name, textfont = list(color = "black", size = 15),
+        #textposition = "top center",
+        hoverinfo = "skip",
+        type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+        mode = 'lines+text', showlegend = FALSE, inherit = FALSE)
+
+    if (!D2) {
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace( # cone au bout des axes
+          data = princ_axes |>
+            dplyr::filter(.data$name %in% paste0("Axe ", axes) ) |>
+            dplyr::group_by(.data$name) |>
+            dplyr::slice(dplyr::n()) |>
+            dplyr::ungroup(),
+          scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+          u = ~eval(dim1)*9/10, v = ~eval(dim2)*9/10, w = ~eval(dim3)*9/10,
+          sizeref = cone_size, sizemode = "absolute",
+
+          colorscale = list(list(0, "black"), list(1, "black")), #autocolorscale = FALSE,
+          showscale = FALSE, hoverinfo = "skip",
+          # lighting  = list(ambient = 1), lightposition= list(x=0, y=0, z=1e5),
+          type = "cone", anchor = "center", #dplyr::if_else(max(princ_axes_print) == 1, "tip", "center"),
+          showlegend = FALSE, inherit = FALSE
+        )
+    }
+
+    # To get a fixed aspect ratio, put a point in max ranges on all axes
+    if (!D2) { # Also in 2D ?
+      dual_plots[[i]] <- dual_plots[[i]] |>
+        plotly::add_trace(
+          data = aspectratio_range, scene = scene_name[i],
+          x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
+          hoverinfo = "skip", opacity = 0, visible = TRUE,
+          type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+          mode = "text", showlegend = FALSE, inherit = FALSE
+        )
+    }
+
+
+
+    # # Plan Axe 1/Axe 2 et projections des points
+    # if ("projections" %in% type) {
+    #   dual_plots[[i]] <- dual_plots[[i]] |>
+    #     plotly::add_trace(data = dplyr::bind_rows(ind_coords, dplyr::mutate(ind_coords, Dim.3 = 0)),
+    #                       scene = scene_name[i],
+    #                       x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
+    #                       line   = list(color  = "#9575cd"), # dash = "longdash", width = 4  #( "dash" | "dashdot" | "dot" | "longdash" | "longdashdot" | "solid" )
+    #                       type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+    #                       mode = "lines", showlegend = FALSE, inherit = FALSE,
+    #                       hoverinfo = "skip") |>
+    #     plotly::add_trace(data = dplyr::mutate(ind_coords, Dim.3 = 0), scene = scene_name[i],
+    #                       x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
+    #                       marker   = list(color  = "#9575cd", size = 2),  # "#65499c"
+    #                       type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
+    #                       mode = "markers", showlegend = FALSE, inherit = FALSE,
+    #                       hoverinfo = "skip")
+    # }
+    #
+    #
+    # if ("main_plan" %in% type) {
+    #   dual_plots[[i]] <- dual_plots[[i]] |>
+    #     plotly::add_trace(data = planDf, scene = scene_name[i],
+    #                       x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
+    #                       opacity = 0.5, #color = "A", colorscale = c("A" = "#65499c"), #vertexcolor  = "#65499c",
+    #                       facecolor = rep('#CFC0E8', nrow(planDf)), # "#65499c"
+    #                       hoverinfo = "skip",
+    #                       type = "mesh3d", showlegend = FALSE, inherit = FALSE)
+    # }
+
+  }
+
+
+
+
+
+  if (!D2) {
+    # Buttons to set plans
+    plan12  <- paste0("Plane ", axes[1], "-", axes[2]) # 1-2
+    plan13  <- paste0("Plane ", axes[1], "-", axes[3]) # 1-3
+    plan23  <- paste0("Plane ", axes[2], "-", axes[3]) # 2-3
+    plan123 <-  "All"
+
+    if (!remove_buttons) {
+      updatemenus <- list(
+        list(
+          active = -1,
+          # switch(view,
+          #        plan12 = 0,
+          #        "Plane 1-3" = 1,
+          #        "Plane 2-3" = 2,
+          #        "All"       = 3,
+          #        stop("'view' argument is not recognized")) , # -1,
+          type   = 'buttons', # uirevision  = FALSE, # showactive = FALSE, # visible  = TRUE,
+          buttons = list(
+            list(
+              label = plan12,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x =  0   , y =  0  , z = base_zoom),
+                  up     = list(x =  0   , y =  1  , z = 0  ),
+                  projection = "orthographic"
+                )
+              )
+              )) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                                 aspectratio = = aspectratio, aspectmode = "data",
+              #                                 camera = list(
+              #                                   center = list(x =  0   , y =  0  , z = 0  ),
+              #                                   eye    = list(x =  0   , y =  0  , z = base_zoom),
+              #                                   up     = list(x =  0   , y =  1  , z = 0  )
+              #                                 )
+              # )
+              # ))
+            ),
+            #list(list(shapes = list(cluster0, c(), c())))),
+
+            list(
+              label = plan13,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x =  0   , y = -base_zoom  , z = 0  ),
+                  up     = list(x =  0   , y =  0  , z = 1  ),
+                  projection = "orthographic"
+                )
+              )
+              )
+              ) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                        aspectratio = = aspectratio, aspectmode = "data",
+              #                        camera = list(
+              #                          center = list(x =  0   , y =  0  , z = 0  ),
+              #                          eye    = list(x =  0   , y = -base_zoom  , z = 0  ),
+              #                          up     = list(x =  0   , y =  0  , z = 1  )
+              #                        )
+              # )
+              # )
+              #)
+            ),
+            #list(list(shapes = list(c(), cluster1, c())))),
+
+            list(
+              label = plan23,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x =  base_zoom , y =  0  , z = 0  ),
+                  up     = list(x =  0   , y =  0  , z = 1  ),
+                  projection = "orthographic"
+                )
+              )
+              )
+              ) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                               aspectratio = = aspectratio, aspectmode = "data",
+              #                               camera = list(
+              #                                 center = list(x =  0   , y =  0  , z = 0  ),
+              #                                 eye    = list(x =  base_zoom , y =  0  , z = 0  ),
+              #                                 up     = list(x =  0   , y =  0  , z = 1  )
+              #                               )
+              # )
+              # )
+              # )
+            ),
+
+            list(
+              label = plan123,
+              method = "relayout",
+              args = list(list(scene = list(
+                xaxis = axes_params[[axes[1]]],
+                yaxis = axes_params[[axes[2]]],
+                zaxis = axes_params[[axes[3]]],
+                aspectratio = aspectratio, aspectmode = "data",
+                camera = list(
+                  center = list(x =  0   , y =  0  , z = 0  ),
+                  eye    = list(x = base_zoom/6, y = -base_zoom, z = base_zoom),
+                  #         list(x =  0.6 * base_zoom, y = -0.4 * base_zoom, z = 0.7 * base_zoom),
+                  up     = list(x =  0   , y =  0  , z = 1  ),
+                  projection = "orthographic"
+                )
+              )
+              )) #,
+              # args2 = list(list(scene = list(xaxis = axx, yaxis = axy, zaxis = axz,
+              #                               aspectratio = = aspectratio, aspectmode = "data",
+              #                               camera = list(
+              #                                 center = list(x =  0   , y =  0  , z = 0  ),
+              #                                 eye    = list(x = base_zoom/6, y = -base_zoom, z = base_zoom),
+              #                                 #         list(x =  0.6 * base_zoom, y = -0.4 * base_zoom, z = 0.7 * base_zoom),
+              #                                 up     = list(x =  0   , y =  0  , z = 1  )
+              #                               )
+              # )
+              # ))
+            ) # ,
+            #list(list(shapes = c()))),
+
+          )
+        )
+      )
+
+    } else {
+      updatemenus <- NULL
+    }
+
+
+  } else { # 2D
+    updatemenus <- NULL
+  }
+
+
+  if (!D2 & !missing(camera_view)) {
+    scenes <- purrr::map(camera_view,
+                         ~ list(
+                           xaxis = axes_params[[axes[1]]],
+                           yaxis = axes_params[[axes[2]]],
+                           zaxis = axes_params[[axes[3]]],
+                           aspectratio = aspectratio, aspectmode = "data",
+
+                           #aspectratio = list(x = 1, y = 1, z = 1),
+                           #domain = list(x = c(0, 0.5), y = c(0, 1)),
+                           camera = .x
+                         )
+    )
+
+  } else if (!D2) {
+    scenes <- list("scene" = dplyr::case_when(
+      view == plan12   ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x =  0   , y =  0  , z = base_zoom),
+          up     = list(x =  0   , y =  1  , z = 0  ),
+          projection = "orthographic"
+        )
+      ),
+      view == plan13   ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x =  0   , y =  - base_zoom  , z = 0),
+          up     = list(x =  0   , y =  0  , z = 1  ),
+          projection = "orthographic"
+        )
+      ),
+      view == plan23   ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x = base_zoom, y =  0  , z = 0),
+          up     = list(x =  0   , y =  0  , z = 1  ),
+          projection = "orthographic"
+        )
+      ),
+      view == plan123  ~ list(
+        xaxis = axes_params[[axes[1]]],
+        yaxis = axes_params[[axes[2]]],
+        zaxis = axes_params[[axes[3]]],
+        aspectratio = aspectratio, aspectmode = "data",
+        camera = list(
+          center = list(x =  0   , y =  0  , z = 0  ),
+          eye    = list(x = base_zoom/6, y = -base_zoom, z = base_zoom),
+          #         list(x =  0.6 * base_zoom, y = -0.4 * base_zoom, z = 0.7 * base_zoom),
+          up     = list(x =  0   , y =  0  , z = 1  ),
+          projection = "orthographic"
+        )
+      ),
+
+      TRUE ~ list(a = NULL)
+    )
+
+    )
+    #print(scenes)
+    if (is.null(scenes$scene[[1]])) stop(paste0("view argument must be among: ",
+                                                paste0(
+                                                  paste0("'", c(plan12, plan13, plan23, plan123), "'"),
+                                                  collapse = ", "),
+                                                collapse = ""
+    ))
+
+
+  } else {  # 2D
+    scenes <- list("scene" = list(
+      xaxis = axes_params[[axes[1]]],
+      yaxis = axes_params[[axes[2]]],
+      aspectratio = aspectratio, aspectmode = "data" #,
+    ))
+  }
+
+
+  final_plots <-
+    plotly::subplot(purrr::list_flatten(dual_plots), margin = 0.1, #0,
+                    nrows = ceiling(length(scene_name)/2L)
+    )
+  final_plots <- do.call(plotly::layout,
+
+                         c(list(p           = final_plots,
+                                margin      = list(b = 0, l = 0, r = 0, t = 0),
+                                updatemenus = updatemenus
+                         ),
+                         if (missing(title)) {NULL} else {list(title = title)},
+                         scenes
+                         )
+  )
+
+  #print(aspectratio)
+
+
+  # final_plots$data$ind_coords         <- ind_coords
+  # final_plots$data$base_axis_in_princ <- base_axis_in_princ
+  # final_plots$data$princ_axes         <- princ_axes
+  # final_plots$data$mean_projs         <- mean_projs
+  # final_plots$data$planDf             <- planDf
+
+  final_plots
+
+  # plotly::layout(#title = "Title",
+  #   scene = list(title = ,
+  #                xaxis = axx, yaxis = axy, zaxis = axz,
+  #                #domain = list(x = c(0, 0.5), y = c(0, 1)),
+  #                    camera = list(
+  #                      center = list(x =  0   , y =  0  , z = 0  ),
+  #                      eye    = list(x =  0   , y =  0  , z = 1),
+  #                      up     = list(x =  0   , y =  1  , z = 0  )
+  #                    )
+  #       )#,
+  #     ) |>
+  #     plotly::layout(#title = "Title",
+  #       scene2 = list(title = ,
+  #                     xaxis = axx, yaxis = axy, zaxis = axz,
+  #                     #domain = list(x = c(0.5, 1), y = c(0, 1)),
+  #                     camera = list(
+  #                       center = list(x =  0   , y =  0  , z = 0  ),
+  #                       eye    = list(x =  0   , y = -1  , z = 0  ),
+  #                       up     = list(x =  0   , y =  0  , z = 1  )
+  #                     )
+  #       )
+  #     )
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
 #' A ggplot2 Theme for Geometrical Data Analysis
 #'
 #' @param res An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
@@ -2520,13 +5980,14 @@ material_colors_dark <- function() {
 #' @param savewidget Should the html widget be saved on disk ?
 #' @param dir If saved as file, the directory in which to save the html widget.
 #' Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
-#' with \code{link[base:options]{options}} to change default directory.
+#' with \code{link[base:options](options)} to change default directory.
 #' @param open Should the resulting file be opened at once ?
 #' @param name The name of the file to save.
 #' @param replace Replace file ? By default, number added to find a new name.
 #' @param iframe Create an html frame around the plot to ensure fixed
 #' dimensions. Useful when opening the plot in a web browser (but will produce a blank
 #' graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
+#' Require package \code{\link[widgetframe:widgetframe]{widgetframe}}.
 #' @param pixel_width The width in pixels for
 #'  \code{\link[widgetframe:widgetframe]{widgetframe}}.
 #' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
@@ -2611,6 +6072,7 @@ ggi <- function(plot = ggplot2::last_plot(),
 
 
   if (iframe == TRUE) {
+    requireNamespace("widgetframe")
     if (missing(pixel_width)) pixel_width <- grDevices::dev.size("px")[1]
 
     widget <-
@@ -2629,8 +6091,11 @@ ggi <- function(plot = ggplot2::last_plot(),
     path <- plot_path(dir = dir, name = name, extension = "html", replace = replace)
 
     if (iframe == FALSE) {
+      requireNamespace("htmlwidgets")
       htmlwidgets::saveWidget(widget, path, title = name)
+
     } else {
+      requireNamespace("widgetframe")
       widgetframe::saveWidgetframe(widget, path, selfcontained = TRUE)
     }
 
@@ -2852,7 +6317,7 @@ pers_or_plot <-
                                     no = stringr::str_remove_all(as.character(
                                       legend_ticks_breaks), "0+$|\\.$"))
 
-      ubs <- stringi::stri_unescape_unicode("\\u202f")
+      #unbrk <- stringi::stri_unescape_unicode("\\u202f")
 
       df.out <- df.out %>%
         dplyr::mutate(freq = (
@@ -2863,13 +6328,13 @@ pers_or_plot <-
         dplyr::mutate(`OR (multivariable)` = dplyr::case_when(
           `OR (multivariable)` == "-" ~ "Reference",                               #There were unbreakable spaces.
           OR >= 1 & p <  0.001 ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "***"),
-          OR >= 1 & p <  0.005 ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "**" , paste0(rep(ubs, 2), collapse = "")),            #Unbreakable space
-          OR >= 1 & p <  0.01  ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "*"  , paste0(rep(ubs, 4), collapse = "")),
-          OR >= 1 & p >= 0.01  ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2),        paste0(rep(ubs, 6), collapse = "")),
+          OR >= 1 & p <  0.005 ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "**" , paste0(rep(unbrk, 2), collapse = "")),            #Unbreakable space
+          OR >= 1 & p <  0.01  ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "*"  , paste0(rep(unbrk, 4), collapse = "")),
+          OR >= 1 & p >= 0.01  ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2),        paste0(rep(unbrk, 6), collapse = "")),
           OR <  1 & p <  0.001 ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "***"),
-          OR <  1 & p <  0.005 ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "**" , paste0(rep(ubs, 2), collapse = "")),
-          OR <  1 & p <  0.01  ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "*"  , paste0(rep(ubs, 4), collapse = "")),
-          OR <  1 & p >= 0.01  ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2),        paste0(rep(ubs, 6), collapse = ""))
+          OR <  1 & p <  0.005 ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "**" , paste0(rep(unbrk, 2), collapse = "")),
+          OR <  1 & p <  0.01  ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "*"  , paste0(rep(unbrk, 4), collapse = "")),
+          OR <  1 & p >= 0.01  ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2),        paste0(rep(unbrk, 6), collapse = ""))
         )) %>%
         dplyr::mutate(color = as.factor(dplyr::case_when(
           `OR (multivariable)` == "Reference" ~ "Reference",
@@ -2885,7 +6350,7 @@ pers_or_plot <-
 
       first_row <- df.out[1,] %>%
         tibble::add_row(fit_id = "Title1", label = "Variable", Total = 0, index = 0,
-                        levels = stringi::stri_unescape_unicode("Modalit\\u00e9"),
+                        levels = "Levels",
                         `OR (multivariable)` = "Odds ratio", # stringi::stri_unescape_unicode("Odds ratio (IC \\u00e0 95%, \\u00e9chelle logarithmique)")
                         .before = 1) %>%
         tibble::add_row(fit_id = "Title2", label = "", Total = 0, index = 1,
@@ -2911,7 +6376,7 @@ pers_or_plot <-
         ggplot2::geom_errorbarh(height = 0.2, na.rm = TRUE) +
         #geom_point(ggplot2::aes(size = Total/2), color = "#222222", shape = 4) +
         ggplot2::annotate("text", x = 0, y = first_row$fit_id[1],
-                          label = stringi::stri_unescape_unicode(" (IC \\u00e0 95%, \\u00e9chelle logarithmique)"), #" / rapport de chances",
+                          label = " (95% IC, log scale)", #" / rapport de chances",
                           hjust = 0,
                           size = table_text_size, fontface = "bold", na.rm = TRUE) +
         # ggplot2::annotate("text", x = 0, y = first_row$fit_id[2],
@@ -3131,7 +6596,7 @@ interactive_tooltips <- function(dat,
                                  tooltip_vars     = character()#,
                                  #excl             = character(),
                                  #cleannames       = FALSE
-                                 ) {
+) {
   sup_list <- c(tooltip_vars_1lv, active_vars, tooltip_vars)
   vars <- c(active_tables[!active_tables %in% sup_vars], sup_vars)
   #c(sup_vars[!sup_vars %in% active_tables], sup_vars) #vars <- c(active_vars, sup_vars)
@@ -3173,30 +6638,30 @@ interactive_tooltips <- function(dat,
 
 
   if (any(vars %in% active_tables)) {
-  tabs_active_tables <-
-    withr::with_options(list(tabxplor.output_kable = FALSE), {
-      tabxplor::tab_many(dat,
-                         row_vars = tidyselect::all_of(vars[vars %in% active_tables]),
-                         col_vars = tidyselect::all_of(sup_list),
-                         na       = "drop",
-                         wt       = "row.w",
-                         pct      = "row",
-                         color    = "diff"
-                         )
-    })
+    tabs_active_tables <-
+      withr::with_options(list(tabxplor.output_kable = FALSE), {
+        tabxplor::tab_many(dat,
+                           row_vars = tidyselect::all_of(vars[vars %in% active_tables]),
+                           col_vars = tidyselect::all_of(sup_list),
+                           na       = "drop",
+                           wt       = "row.w",
+                           pct      = "row",
+                           color    = "diff"
+        )
+      })
 
 
     if (is.data.frame(tabs_active_tables)) tabs_active_tables <- list(tabs_active_tables)
 
 
-  tabs[vars %in% active_tables] <- tabs_active_tables %>%
-    purrr::map(
-      ~ dplyr::rename_with(., ~ "lvs", 1) %>%
-        dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "^Total_"), "Total", .)) %>%
-        dplyr::select(-tidyselect::starts_with("Remove_levels"),
-                      -tidyselect::any_of(active_vars_2levels)) %>%
-        dplyr::filter(!.data$lvs == "Remove_levels")
-    )
+    tabs[vars %in% active_tables] <- tabs_active_tables %>%
+      purrr::map(
+        ~ dplyr::rename_with(., ~ "lvs", 1) %>%
+          dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "^Total_"), "Total", .)) %>%
+          dplyr::select(-tidyselect::starts_with("Remove_levels"),
+                        -tidyselect::any_of(active_vars_2levels)) %>%
+          dplyr::filter(!.data$lvs == "Remove_levels")
+      )
   }
 
   if (any(!vars %in% active_tables)) {
@@ -3292,7 +6757,7 @@ interactive_tooltips <- function(dat,
                      "</font>"
       )
 
-    pct[is.na(color_code)] <- paste0("\\u202f", pct[is.na(color_code)])
+    pct[is.na(color_code)] <- paste0(unbrk, pct[is.na(color_code)])
 
     #pct <- paste0("\t", pct)
 
@@ -3313,9 +6778,9 @@ interactive_tooltips <- function(dat,
     ) %>%
       stringr::str_replace_all(
         "@",
-        "\\u202f\\u202f"
-      ) %>%
-      stringi::stri_unescape_unicode()
+        paste0(unbrk, unbrk, collapse = "")
+      ) #%>%
+     # stringi::stri_unescape_unicode()
   }
 
 
@@ -3410,5 +6875,160 @@ interactive_tooltips <- function(dat,
   interactive_text
 }
 
-# ok ?
+
+# data <- ind_data
+
+#' @keywords internal
+complete_cah <- function(data, cah, active_vars, treshold = 0.5) {
+  data.table::setDT(data)
+
+
+group_count <- cah_pct  <- cah_max <- rn <-  cah_counts <- NULL
+
+  # data[, cah_base := eval(str2expression(cah))]
+  data[, cah_counts := .N, by = c(active_vars, cah)]
+  data[, group_count := .N, by = eval(active_vars)]
+  data[, rn := 1:.N]
+  data[, cah_pct := dplyr::if_else(
+    !is.na(eval(str2expression(cah))),
+    true  = eval(str2expression("cah_counts"))/eval(str2expression("group_count")),
+    false = eval(str2expression("cah_counts"))/eval(str2expression("group_count")) - 0.01
+    )]
+  data[, cah_max := dplyr::first(eval(str2expression("rn"))) - 1L +
+         dplyr::first(which(eval(str2expression("cah_pct")) >= treshold), default = NA_real_),
+       by = eval(active_vars)]
+  data[, eval(cah) := eval(str2expression(cah))[eval(str2expression("cah_max"))] ]
+
+  # data |>
+  #   dplyr::mutate(group = paste0(!!!rlang::syms(active_vars)) |>
+  #                   forcats::as_factor() |> as.integer()) |>
+  #   dplyr::select(group,
+  #                 group_count, cah_counts, cah_base, cah_culture, cah_pct,
+  #                 cah_max ) |>
+  #   tibble::as_tibble() |>
+  #   tabxplor::new_tab() |>
+  #   dplyr::filter(cah_pct < 1)  |>
+  #   dplyr::group_by(group) |>
+  #   dplyr::arrange(.by_group = TRUE) |>
+  #   print(n = 900)
+
+  data[, cah_counts := NULL]
+  data[, group_count := NULL]
+  data[, cah_pct := NULL]
+  data[, cah_max := NULL]
+  data[, rn := NULL]
+
+  data.table::setDF(data)
+  data <- data |> tibble::as_tibble()
+  data
+}
+
+
+
+
+# coords  <- axes_principaux_df
+# res.pca <- res.pca
+
+#' @keywords internal
+PCA_princ_coord_in_base <- function(coords, res.pca) {
+
+  # # # Par rapport a Brigitte Le Roux, Analyse geometrique..., (cf. Chap. 6 Exercice 6.1)
+  # #                # X0: coordonnees de base centrees.
+  # # scale.unit = T # X0r: X0 * 1/sqrt(vjj) : coordonnees c. reduites (matrice diag des variances)
+  # # res.pca$eig    # Lambda "\\u039b" : matrice diagonale des valeurs propres
+  # # res.pca$svd$vs # Ksi "\\u039e" : matrice diagonale des valeurs singulieres (mais, ici, vecteur) ;
+  # #                      (les elements sont notes Ksi-j  "\\u03be" )
+  # # res.pca$svd$U
+  # # res.pca$svd$V  # A: matrice des vecteurs propres normes.
+  # # ind$coord      # Y: coordonnees principales. Y = X0A    Inv: X0=Yt(A) (ou X0r)
+  # # var$coords     # B: coeffs de regression B = A Ksi (b1j = sqrt(Lamda1) * a1j = Ksi1 * a1j)
+
+
+  coords_mat <- coords |> dplyr::select(where(is.double)) |> as.matrix()    # Y
+
+  # dplyr::rowwise()|>
+  # dplyr::mutate(princ_coord = paste0(dplyr::c_across(where(is.numeric)), collapse = ";") ) |>
+  # dplyr::ungroup() |>
+  # dplyr::mutate(name = paste0(name, "|", princ_coord)) |>
+  # dplyr::select(-princ_coord) |>
+  # tibble::column_to_rownames("name") |>
+  # as.matrix()
+
+  df_base <- res.pca$call$X # coordonnees de base + nom des variables actives
+  mean_mat <- purrr::map_dbl(df_base, mean) |> as.matrix() |> t()
+  # sd_mat   <- purrr::map_dbl(df_base, sd) |> as.matrix() |> t()   ; sd_mat
+
+  A_named <- res.pca$svd$V |> as.data.frame() # A, named from df_base to keep it after
+  rownames(A_named) <- names(df_base)
+
+  tA  <- t(A_named) # t(A)           # t(res.pca$svd$V)
+  x0j <- (coords_mat %*% tA) # X0 = Y*t(A)
+
+  princ_coord_in_base <- (x0j + mean_mat[col(x0j)]) |> tibble::as_tibble()
+
+
+  # princ_coord_in_base <- (x0j + mean_mat[col(x0j)]) |> # ajouter moyenne a chaque colonne
+  #   as.data.frame() |> tibble::rownames_to_column("name") |> tibble::as_tibble() |>
+  #   # dplyr::rename_with(stringr::str_to_lower) |>
+  #   dplyr::mutate(princ_coord = stringr::str_extract(name, "[^|]+$"),
+  #          name        = as.factor(stringr::str_extract(name, "^[^|]+")),
+  #   ) |>
+  #   separate_wider_delim(cols  = princ_coord,
+  #                        delim = ";",
+  #                        names = colnames(coords)) |>
+  #   dplyr::mutate(dplyr::across(tidyselect::all_of(colnames(coords)), as.integer)) |>
+  #   dplyr::select(name, tidyselect::everything())
+
+  return(dplyr::bind_cols(coords, princ_coord_in_base))
+}
+
+
+# X.ind.sup <- base_axis_coords |> dplyr::select(-base_coord)
+
+#' @keywords internal
+PCA_ind.sup_coord <- function(X.ind.sup, res.pca, center = TRUE) { #no_sd = FALSE
+  df_base <- res.pca$call$X |>
+    tibble::rownames_to_column("name") |> tibble::as_tibble()
+
+  if (!is.null(res.pca$call$quali.sup) ) {
+    df_base <- df_base |>
+      dplyr::select(-tidyselect::all_of(names(res.pca$call$quali.sup$quali.sup)))
+  }
+  if (!is.null(res.pca$call$quanti.sup) ) {
+    df_base <- df_base |>
+      dplyr::select(-tidyselect::all_of(names(res.pca$call$quanti.sup)))
+  }
+
+  active_vars <- colnames(df_base)[!colnames(df_base) == "name"]
+
+  if ("name" %in% names(X.ind.sup)) {
+    X.ind.sup  <- X.ind.sup |> #as.data.frame() |> tibble::rownames_to_column("name") |>
+      dplyr::select("name", tidyselect::all_of(active_vars)) |>
+      tibble::column_to_rownames("name") |>
+      as.matrix()
+  } else {
+    X.ind.sup <- as.matrix(X.ind.sup)
+    # X.ind.sup |> tibble::rownames_to_column("name") |> as_
+  }
+
+  if (center) {
+    centre <- res.pca$call$centre
+  } else {
+    centre <- rep(0, length(res.pca$call$centre))
+  }
+
+  ecart.type <- res.pca$call$ecart.type
+  # if (no_sd) ecart.type <- rep(1, length(centre))
+
+  X.ind.sup <- t(t(X.ind.sup) - centre)
+  X.ind.sup <- t(t(X.ind.sup)/ecart.type)
+  coord.ind.sup <- t(t(X.ind.sup) * res.pca$call$col.w)
+  coord.ind.sup <- crossprod(t(coord.ind.sup), res.pca$svd$V)
+  # coord.ind.sup <- coord.ind.sup[, 1:ncp, drop = F]
+  colnames(coord.ind.sup) <- paste("Dim", c(1:ncol(coord.ind.sup)), sep = ".")
+  coord.ind.sup
+
+}
+
+
 

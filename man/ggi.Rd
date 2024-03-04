@@ -33,7 +33,7 @@ size of the MCA's axes. Set to \code{FALSE} to avoid this behavior.}
 
 \item{dir}{If saved as file, the directory in which to save the html widget.
 Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
-with \code{link[base:options]{options}} to change default directory.}
+with \code{link[base:options](options)} to change default directory.}
 
 \item{name}{The name of the file to save.}
 
@@ -43,7 +43,8 @@ with \code{link[base:options]{options}} to change default directory.}
 
 \item{iframe}{Create an html frame around the plot to ensure fixed
 dimensions. Useful when opening the plot in a web browser (but will produce a blank
-graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.}
+graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
+Require package \code{\link[widgetframe:widgetframe]{widgetframe}}.}
 
 \item{pixel_width}{The width in pixels for
 \code{\link[widgetframe:widgetframe]{widgetframe}}.}

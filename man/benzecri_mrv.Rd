@@ -18,3 +18,8 @@ A numeric vector (or fmt vector with `fmt = TRUE`).
 \description{
 Benzecri's modified rate of variance
 }
+\examples{
+data(tea, package = "FactoMineR")
+res.mca <- MCA2(tea, active_vars = 1:18)
+benzecri_mrv(res.mca)
+}
