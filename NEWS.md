@@ -6,9 +6,11 @@
 * New fonction : `ggmca_initial_dims()` 
 * New fonction : `ggmca_with_base_ref()`
 * New fonction : `ggmca_3d()`           
+* New fonction : `PCA2()`      
 * New fonction : `pca_interpret()`      
 * New fonction : `ggpca_cor_circle()`   
 * New fonction : `ggpca_3d()`           
+* New fonction : `mean_sd_tab()`
 
 ## Bug correction
 * `ggmca()` can now properly color profiles of answer with `cah` (HCPC clusters) levels.

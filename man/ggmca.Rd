@@ -102,7 +102,7 @@ ggmca_plot(
 \item{dat}{The data in which to find the supplementary variables, etc.}
 
 \item{sup_vars}{A character vectors of supplementary qualitative variables
-to print. They must have been passed in \code{\link[FactoMineR]{MCA}} before.}
+to print (they don't need to be passed in \code{\link[FactoMineR]{MCA}} before).}
 
 \item{active_tables}{Should colored crosstables be added in interactive tooltips ?
 `active_tables = "sup"` crosses each `sup_vars` with active variables.

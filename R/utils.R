@@ -167,6 +167,18 @@ unbrk <- stringi::stri_unescape_unicode("\\u202f") # unbreakable space
 
 
 
+#' @keywords internal
+weighted.var <- function(x, wt, na.rm = FALSE) {
+  #Nwt_non_zero <- length((wt)[wt != 0])
+  round(
+    sum(wt * (x - stats::weighted.mean(x, wt, na.rm = na.rm))^2,  na.rm = na.rm) /
+      ( sum(wt, na.rm = na.rm) ),
+    10)
+  #((Nwt_non_zero - 1) / Nwt_non_zero) *
+} #Same results as sqrt(Hmisc::wtd.var(!!num_var, !!wt, na.rm = TRUE, method = "ML")
+
+
+
 
 ## Color conversion -----
 
