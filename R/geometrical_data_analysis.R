@@ -1005,7 +1005,7 @@ ggmca_plot <- function(data,
           "\nContrib axe ", axes[1], " : ", stringr::str_pad(round(!!contrib1, 0), 2), "%",
           "\nContrib axe ", axes[2], " : ", stringr::str_pad(round(!!contrib2, 0), 2), "%"
         )) %>%
-          dplyr::pull(text),
+          dplyr::pull("text"),
 
         .else = ~ ""
       ) %>%
@@ -1016,7 +1016,7 @@ ggmca_plot <- function(data,
         ~ dplyr::mutate(.x, begin_text = stringr::str_c(.data$begin_text, .y))
       )
     ) %>%
-    dplyr::select(-.data$contribs)
+    dplyr::select(-"contribs") # ??????????????????
 
 
 
@@ -1229,6 +1229,9 @@ ggmca_plot <- function(data,
             dplyr::pull("color_group") |>
             forcats::fct_drop()
 
+          sup_cah_colorvar <- purrr::set_names(as.character(sup_cah_colorvar),
+                                               names(sup_cah_colorvar))
+
           color_profiles_in_colorvar <- sup_cah_colorvar %>%
             purrr::keep(. %in% ind_cah_levels) %>%
             purrr::keep(. %in% color_profiles)
@@ -1291,7 +1294,7 @@ ggmca_plot <- function(data,
         ind_data <- ind_data %>%
           dplyr::mutate(color_group = forcats::fct_recode(.data$cah,
                                                           !!!cah_colorvar_recode))
-
+        # ind_data |> dplyr::select(color_group) |> print(n = 40)
 
         #Discard the points that are out of limits
         profiles_coord <- ind_data
@@ -2529,7 +2532,6 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
           ...
     )
 
-
   acm_cah <- acm$vars_data |>
     dplyr::filter(stringr::str_detect(.data$color_group, paste0("^", cah)))
   acm_vars <- tabxplor::new_tab(acm$vars_data) |>
@@ -3415,7 +3417,7 @@ mca_interpret <- function(res.mca = res.mca,
 
 
     final_tab <- final_tab %>%
-      kableExtra::kable() %>%
+      kableExtra::kable(format = "html") %>%
       kableExtra::kable_classic(lightable_options = "hover",
                                 #bootstrap_options = c("hover", "condensed", "responsive", "bordered"), #"striped",
                                 full_width = FALSE,
@@ -5988,6 +5990,13 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
                                  ~ stringr::str_replace_all(., " ", unbrk))
     )
 
+  cah_actives_tab <- cah_actives_tab |>
+    dplyr::mutate(dplyr::across(
+      where(tabxplor::is_fmt), ~ dplyr::if_else(.$display == "mean",
+                               true  = dplyr::mutate(., diff = 0) |>
+                                 tabxplor::as_totrow(),
+                               false = .)
+    ))
 
   n_rows <- dplyr::filter(cah_actives_tab, tabxplor::is_totrow(cah_actives_tab)) |>
     dplyr::mutate(
