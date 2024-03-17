@@ -5961,14 +5961,17 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
                                         pct = dplyr::if_else(pct == "row", "col", "row"),
                                         wt = !!wt,
                                         na = "drop", cleannames = TRUE, color = color,
-                                        levels = first_lvs) |>
+                                        levels = first_lvs,
+                                        ...) |>
     dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "Total_", ), "Total", .)) |>
+    dplyr::relocate(.data$Total, .after = tidyselect::last_col()) |>
     dplyr::mutate(
       Total = dplyr::mutate(.data$Total,
                             wn = dplyr::if_else(is.na(.data$wn), as.double(.data$n), .data$wn)),
       Total = vctrs::`field<-`(.data$Total, "pct",
                                vctrs::field(.data$Total, "wn") /
-                                 dplyr::last(vctrs::field(.data$Total, "wn")))
+                                 dplyr::last(vctrs::field(.data$Total, "wn"))) |>
+        tabxplor::set_col_var("Total")
     )
 
   col_var <- tabxplor::get_col_var(cah_actives_tab)[tabxplor::get_col_var(cah_actives_tab) != ""]
@@ -5986,17 +5989,11 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
     dplyr::filter(!stringr::str_detect(.data$lvs, "Remove levels")) |>
     dplyr::mutate(
       lvs = forcats::fct_recode(.data$lvs, !!!purrr::set_names("Total", row_tot)),
-      lvs = forcats::fct_relabel(.data$lvs,
-                                 ~ stringr::str_replace_all(., " ", unbrk))
-    )
 
-  cah_actives_tab <- cah_actives_tab |>
-    dplyr::mutate(dplyr::across(
-      where(tabxplor::is_fmt), ~ dplyr::if_else(.$display == "mean",
-                               true  = dplyr::mutate(., diff = 0) |>
-                                 tabxplor::as_totrow(),
-                               false = .)
-    ))
+      ## not a good idea : unbreakable spaces should be used at the end, in tab_kable()
+      # lvs = forcats::fct_relabel(.data$lvs,
+      #                            ~ stringr::str_replace_all(., " ", unbrk))
+    )
 
   n_rows <- dplyr::filter(cah_actives_tab, tabxplor::is_totrow(cah_actives_tab)) |>
     dplyr::mutate(
@@ -6007,6 +6004,17 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
     )
   cah_actives_tab <- dplyr::bind_rows(cah_actives_tab, n_rows) |>
     dplyr::group_by(.data$variables)
+
+
+  cah_actives_tab <- cah_actives_tab |>
+    dplyr::mutate(dplyr::across(
+      where(tabxplor::is_fmt), ~ dplyr::if_else(.$display == "mean",
+                               true  = dplyr::mutate(., diff = 0, digits = 2L) |>
+                                 tabxplor::as_totrow(),
+                               false = .)
+    ))
+
+
 
   cah_actives_tab
 }

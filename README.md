@@ -143,13 +143,11 @@ ggca(res.ca,
 ## Personnalize plots
 
 Step-by-step functions can be used to create a database with all the
-necessary data, modify it, then use it to draw the plot :
+necessary data, modify it, then use it to draw the plot:
 
 ``` r
 library(dplyr)
-#> Warning: package 'dplyr' was built under R version 4.3.2
 library(ggplot2)
-#> Warning: package 'ggplot2' was built under R version 4.3.2
 
 plot_data <- ggmca_data(res.mca, tea, sup_vars = "SPC")
 
