@@ -5186,7 +5186,7 @@ pca_interpret <- function(res.pca, axes = 1:3) {
 
                                     col_var   =  stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
                                     color     = "diff",
-                                    diff_type = "tot",
+                                    ref = "tot",
                                     #comp_all = FALSE
                     )
       ),
@@ -5201,7 +5201,7 @@ pca_interpret <- function(res.pca, axes = 1:3) {
 
                                     col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
                                     color     = "contrib",
-                                    diff_type = "tot",
+                                    ref = "tot",
                     )),
 
       dplyr::across(where(is.numeric) & tidyselect::starts_with("cos2"),
@@ -5215,7 +5215,7 @@ pca_interpret <- function(res.pca, axes = 1:3) {
 
                                     col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
                                     color     = "diff",
-                                    diff_type = "tot",
+                                    ref = "tot",
                                     #comp_all  = FALSE
                     )
       ),
