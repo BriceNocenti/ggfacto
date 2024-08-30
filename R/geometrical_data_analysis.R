@@ -108,7 +108,7 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' and additional chosen variables) while reading the graph.
 #' Profiles of answers (from the graph of "individuals") are drawn in the back,
 #' and can be linked to \code{FactoMineR::\link[FactoMineR]{HCPC}} classes.
-#' Since it is made in the spirit of \code{\link{ggplot2}}, it is possible to
+#' Since it is made in the spirit of \code{\link[ggplot2]{ggplot2}}, it is possible to
 #' change theme or add another plot elements with \code{+}. Then, interactive
 #' tooltips won't appear until you pass the result through \code{\link{ggi}}.
 #' Step-by-step functions : use \link{ggmca_data} to get the data frames with every
@@ -211,14 +211,14 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @param alpha_profiles The alpha (transparency, between 0 and 1) for profiles of answer.
 #' @param scale_color_light A scale color for sup vars points
 #' @param scale_color_dark A scale color for sup vars texts
-#' @param use_theme By default, a specific \pkg{ggplot2} theme is used.
+#' @param use_theme By default, a specific \code{ggplot2} theme is used.
 #' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
 #' @param get_data Returns the data frame to create the plot instead of the plot itself.
 #'
-#' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
 #' @export
 #'
 #' @examples
@@ -1753,10 +1753,10 @@ ggmca_plot <- function(data,
 #' prefix numbers like \code{"1-"}, and text in parentheses.
 #' @param keep A character vector of the name of active variables to keep.
 #'
-#' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
 #' @export
 #'
 #' @examples
@@ -2087,10 +2087,10 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 #' @param axes The axes to print, as a numeric vector of length 2.
 #' @param keep A character vector of the name of active variables to keep.
 #'
-#' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
 #' @export
 #'
 #' @examples
@@ -5331,7 +5331,7 @@ mean_sd_tab <- function(data, vars, wt) {
 #' correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{CA}}.
 #' Interactive tooltips, appearing when hovering on  points with mouse, allow to
 #' keep in mind all the content of the table while reading the graph. Since it is
-#' made in the spirit of \code{\link{ggplot2}}, it is possible to change
+#' made in the spirit of \code{\link[ggplot2]{ggplot2}}, it is possible to change
 #' theme or add another plot elements with +. Then, interactive
 #' tooltips won't appear until you pass the result through \code{\link{ggi}}.
 #'
@@ -5371,13 +5371,13 @@ mean_sd_tab <- function(data, vars, wt) {
 #' @param right_margin A margin at the right, in cm. Useful to read tooltips
 #'  over points placed at the right of the graph without formatting problems.
 #' @param size_scale_max Size of points.
-#' @param use_theme By default, a specific \pkg{ggplot2} theme is used.
+#' @param use_theme By default, a specific \code{ggplot2} theme is used.
 #' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
 #'
-#' @return A \code{\link[ggplot2]{ggplot}} object to be printed in the
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result  through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
 #' @export
 #'
 #' @examples # Make the correspondence analysis :

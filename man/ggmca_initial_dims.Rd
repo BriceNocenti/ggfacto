@@ -26,10 +26,10 @@ prefix numbers like \code{"1-"}, and text in parentheses.}
 \item{keep}{A character vector of the name of active variables to keep.}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object to be printed in the
+A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 Sending the result through \code{\link{ggi}} will draw the
-interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
 }
 \description{
 This function mostly have an educational value : it shows the

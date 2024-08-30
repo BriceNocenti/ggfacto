@@ -231,7 +231,7 @@ from points.}
 \item{right_margin}{A margin at the right, in cm. Useful to read tooltips
 over points placed at the right of the graph without formatting problems.}
 
-\item{use_theme}{By default, a specific \pkg{ggplot2} theme is used.
+\item{use_theme}{By default, a specific \code{ggplot2} theme is used.
 Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 
 \item{get_data}{Returns the data frame to create the plot instead of the plot itself.}
@@ -239,10 +239,10 @@ Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 \item{data}{A list of data frames made with \link{ggmca_data}.}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object to be printed in the
+A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 Sending the result through \code{\link{ggi}} will draw the
-interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
 
 A list containing the data frames to pass to \link{ggmca_plot}.
 
@@ -256,7 +256,7 @@ allow to keep in mind many important data (tables of active variables,
 and additional chosen variables) while reading the graph.
 Profiles of answers (from the graph of "individuals") are drawn in the back,
 and can be linked to \code{FactoMineR::\link[FactoMineR]{HCPC}} classes.
-Since it is made in the spirit of \code{\link{ggplot2}}, it is possible to
+Since it is made in the spirit of \code{\link[ggplot2]{ggplot2}}, it is possible to
 change theme or add another plot elements with \code{+}. Then, interactive
 tooltips won't appear until you pass the result through \code{\link{ggi}}.
 Step-by-step functions : use \link{ggmca_data} to get the data frames with every

@@ -84,21 +84,21 @@ over points placed at the right of the graph without formatting problems.}
 
 \item{size_scale_max}{Size of points.}
 
-\item{use_theme}{By default, a specific \pkg{ggplot2} theme is used.
+\item{use_theme}{By default, a specific \code{ggplot2} theme is used.
 Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}} object to be printed in the
+A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 Sending the result  through \code{\link{ggi}} will draw the
-interactive graph in the Viewer pane using \code{\link{ggiraph}}.
+interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
 }
 \description{
 A readable, complete and beautiful graph for simple
 correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{CA}}.
 Interactive tooltips, appearing when hovering on  points with mouse, allow to
 keep in mind all the content of the table while reading the graph. Since it is
-made in the spirit of \code{\link{ggplot2}}, it is possible to change
+made in the spirit of \code{\link[ggplot2]{ggplot2}}, it is possible to change
 theme or add another plot elements with +. Then, interactive
 tooltips won't appear until you pass the result through \code{\link{ggi}}.
 }

@@ -1,9 +1,9 @@
-## ggfacto new version 0.3.0 : first submission 
+## ggfacto new version 0.3.1 : first submission 
 
 
 
 ## Test environments
-* local Windows 10, R devel
+* local Windows 11, R devel
 
 * github Actions : https://github.com/BriceNocenti/ggfacto/actions/runs/7640406480 
    - macOS 12.7.2, R-release
