@@ -5961,8 +5961,14 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
                                         pct = dplyr::if_else(pct == "row", "col", "row"),
                                         wt = !!wt,
                                         na = "drop", cleannames = TRUE, color = color,
-                                        levels = first_lvs, add_n = FALSE,
-                                        ...) |>
+                                        levels = first_lvs, #, add_n = FALSE,
+                                        ...)
+  if (pct == "row") {
+    cah_actives_tab <- cah_actives_tab |> dplyr::select(-tidyselect::any_of(c("n")))
+  } else if (pct == "col") {
+    cah_actives_tab <- cah_actives_tab |> dplyr::filter(!clust == "n")
+  }
+  cah_actives_tab <- cah_actives_tab |>
     dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "Total_", ), "Total", .)) |>
     dplyr::relocate(.data$Total, .after = tidyselect::last_col()) |>
     dplyr::mutate(
@@ -6892,9 +6898,12 @@ interactive_tooltips <- function(dat,
                            na       = "drop",
                            wt       = "row.w",
                            pct      = "row",
-                           color    = "diff",
-                           add_n    = FALSE # ,
-        )
+                           color    = "diff"#,
+                           #add_n    = FALSE # ,
+        ) |>
+          purrr::map(
+            ~ dplyr::select(., -tidyselect::any_of(c("n")))
+          )
       })
 
 
@@ -6918,8 +6927,8 @@ interactive_tooltips <- function(dat,
                            row_vars = tidyselect::all_of(vars[!vars %in% active_tables]),
                            na       = "drop",
                            wt       = "row.w",
-                           pct      = "col",
-                           add_n    = FALSE # ,
+                           pct      = "col"#,
+                           #add_n    = FALSE # ,
         )
       })
 
@@ -7086,12 +7095,11 @@ interactive_tooltips <- function(dat,
                                         false = .data$lvs)
     )
 
-  if ("n" %in% names(interactive_text)) {
+  if ("n" %in% names(interactive_text) & "wn" %in% names(interactive_text)) {
     interactive_text <- interactive_text %>%
       dplyr::mutate(wn = vctrs::field(.data$wn, "wn"))  |>
       dplyr::rename("wcount" = "wn")
-
-  } else  {
+  } else if ("Total" %in% names(interactive_text)) {
     interactive_text <- interactive_text %>%
       dplyr::mutate(n     = vctrs::field(.data$Total, "n"),
                     Total = vctrs::field(.data$Total, "wn")) |>

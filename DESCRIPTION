@@ -35,7 +35,7 @@ Imports:
     vctrs (>= 0.3.0),
     ggrepel (>= 0.9.0),
     gridExtra (>= 2.0),
-    tabxplor (>= 1.0.3),
+    tabxplor (>= 1.1.0),
     withr (>= 2.0.0),
     magrittr (>= 1.5.0),
     data.table (>= 1.12.0),
