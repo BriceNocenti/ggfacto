@@ -1,3 +1,9 @@
+# ggfacto 0.3.2
+
+## Bug correction
+* Corrected to work with dependency package `tabxplor::` version 1.2.1
+
+
 # ggfacto 0.3.1
 
 ## Bug correction

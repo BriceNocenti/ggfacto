@@ -1,6 +1,6 @@
 Package: ggfacto
 Title: Graphs for Correspondence Analysis
-Version: 0.3.1
+Version: 0.3.2
 Authors@R: 
     person(given = "Brice",
            family = "Nocenti",
