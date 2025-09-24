@@ -17,7 +17,7 @@ ggmca_with_base_ref(res.mca = res.mca, axes = c(1, 2), keep = NULL)
 A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 Sending the result through \code{\link{ggi}} will draw the
-interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
+interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 }
 \description{
 This function mostly have an educational value : it shows the

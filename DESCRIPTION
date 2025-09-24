@@ -1,6 +1,6 @@
 Package: ggfacto
 Title: Graphs for Correspondence Analysis
-Version: 0.3.2.9000
+Version: 0.3.2.9001
 Authors@R: 
     person(given = "Brice",
            family = "Nocenti",
@@ -19,7 +19,7 @@ BugReports: https://github.com/BriceNocenti/ggfacto/issues
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Imports: 
     FactoMineR (>= 2.0.0),
     ggiraph (>= 0.8.2),
@@ -50,3 +50,5 @@ Suggests:
     grDevices (>= 4.0.0),
     stringi (>= 1.4.6),
     scales (>= 1.1.0)
+Depends:
+    R (>= 4.0.1)

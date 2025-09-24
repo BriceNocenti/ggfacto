@@ -218,7 +218,7 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 #' @export
 #'
 #' @examples
@@ -1756,7 +1756,7 @@ ggmca_plot <- function(data,
 #' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 #' @export
 #'
 #' @examples
@@ -2090,7 +2090,7 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 #' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 #' @export
 #'
 #' @examples
@@ -5377,7 +5377,7 @@ mean_sd_tab <- function(data, vars, wt) {
 #' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 #' Sending the result  through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
+#' interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 #' @export
 #'
 #' @examples # Make the correspondence analysis :
@@ -6891,7 +6891,10 @@ interactive_tooltips <- function(dat,
 
   if (any(vars %in% active_tables)) {
     tabs_active_tables <-
-      withr::with_options(list(tabxplor.output_kable = FALSE), {
+      withr::with_options(list(tabxplor.output_kable = FALSE,
+                               tabxplor.compact = FALSE,
+                               tabxplor.pvalue_lines = FALSE #,
+                               ), {
         tabxplor::tab_many(dat,
                            row_vars = tidyselect::all_of(vars[vars %in% active_tables]),
                            col_vars = tidyselect::all_of(sup_list),
@@ -6922,7 +6925,10 @@ interactive_tooltips <- function(dat,
 
   if (any(!vars %in% active_tables)) {
     tabs_no_active_tables <-
-      withr::with_options(list(tabxplor.output_kable = FALSE), {
+      withr::with_options(list(tabxplor.output_kable = FALSE,
+                               tabxplor.compact = FALSE,
+                               tabxplor.pvalue_lines = FALSE #,
+                               ), {
         tabxplor::tab_many(dat,
                            row_vars = tidyselect::all_of(vars[!vars %in% active_tables]),
                            na       = "drop",

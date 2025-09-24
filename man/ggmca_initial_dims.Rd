@@ -29,7 +29,7 @@ prefix numbers like \code{"1-"}, and text in parentheses.}
 A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
 Sending the result through \code{\link{ggi}} will draw the
-interactive graph in the Viewer pane using \code{\link[ggiraph]{ggiraph}}.
+interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 }
 \description{
 This function mostly have an educational value : it shows the
