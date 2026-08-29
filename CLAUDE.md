@@ -86,11 +86,39 @@ Copies from `~/github/tabxplor/CLAUDE.md`: to adapt to ggfacto when needed.
 
 ## ggfacto v 0.4.0 roadmap and "DONE" summaries
 
-### Phase 1 — clean dependency tree
+### Phase 1 — clean start
 
+#### Phase 1a — clean dependency tree
 
+Installing ggfacto with its `Suggests` went from **164 packages / 243.7 MB to 133 / 203.7 MB** (-31 packages, -40.0 MB, four fewer compiled from source), `R CMD check` clean at 0/0/0. `finalfit` and `gridExtra` had no call sites left once `pers_or_plot()` went, and were the bulk of it at 27 packages. `ggforce` drew exactly one thing, the PCA correlation circle, now a `geom_path()` — which also fixed a latent waste: `geom_circle()` evaluated its aes once per row of the plot data, so that circle was drawn eleven times over. `stringr` and `stringi` went behind a vendored base-R shim in `R/utils.R`. Undeclared `grid` became `ggplot2::arrow` (a re-export of the same function); `scales`, `stats` and `grDevices` moved from `Suggests` to `Imports`, where their unguarded use always belonged; `ggplot2` rose to `>= 3.4.0`, and **R to `>= 4.1.0` — the declared floor was 4.0.1, but the package already used `|>`, so it could never have installed there.**
 
+A shim rather than a hand conversion because ~20 of the 188 stringr sites diverge in base R, measured not assumed: `cleannames_condition()`'s lookaround makes `gsub()` *error* without `perl = TRUE`; four sites use `str_c()`'s `NA` as a guard that `paste0()`'s `"NA"` would defeat; `regmatches()` returns a vector shorter than its input on a non-match; `formatC()` errors on a vector `width` and cannot pad with anything but space or zero. The shim keeps stringr's semantics exactly, which turned all 188 sites into a namespace strip, and `tests/testthat/test-str-shim.R` pins it with 42 assertions. Padding has its own block: it aligns tooltip numbers under a monospace font.
 
+⚠ **The `%>%` to `|>` migration was the trap, not the strings.** It left **25** magrittr `.` placeholders in `purrr::keep`/`discard`/`set_names`/`map_if`, not the three a pre-flight regex predicted, and a second parse-tree scan missed them too (sibling `~` lambdas cleared the ancestor check). They fail *quietly*: the package-level `. = NULL` binding turns a stranded placeholder into a wrong answer instead of an error. `R CMD check`'s examples caught the first, a full unfiltered parse-level scan the rest; they are now `(\(x) ...)()` mid-chain and plain lambdas as predicates. `magrittr` itself stays one deprecation cycle — every internal use is `|>`, but `%>%` is still re-exported, and it costs 0 MB.
+
+Verification was a golden snapshot against a pristine `HEAD` extracted with `git archive`: 26 entries over `tea`, `mtcars` and `gss_cat`, deliberately including the `sup_vars` / `tooltip_vars` / `keep_levels` / `discard_levels` / `active_tables` / `cah` argument paths, since the plain calls reach none of the placeholders. **25 of 26 came back byte-identical**; the one diff, `pca_cor_circle`, is the intended ggforce change and was checked geometrically — both trace the unit circle through the same 361 unique points at radius exactly 1.0. `test-non-ascii.R`, copied from tabxplor, earned itself immediately by catching a literal U+202F typed into a test. Two pre-existing deprecations were left alone as out of scope: the `size` aesthetic for lines, and `select(cah)` on an external vector.
+
+#### Phase 1b — a real test suite
+
+`tests/` exists as of 1a but only guards the string helpers (`test-str-shim.R`, 42 parity assertions) and the ASCII/Rd rules (`test-non-ascii.R`, copied from tabxplor). Phase 1b turns that into the package's contract: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit.
+
+Cover the exported entry points — `MCA2`/`PCA2`, `ggmca_data` tooltips, `ggmca`, `ggca`, `HCPC_tab`, `mca_interpret`/`pca_interpret`, `mean_sd_tab`, `benzecri_mrv` — on the fixtures the roxygen examples already use (`tea`, `mtcars`, `gss_cat`). Golden tests only where the output is genuinely stable and the value beats the churn: tooltip strings and the interpret tables qualify, ggplot internals, and most internals in general, largely do not.
+
+⚠ **Argument coverage is the point, not function coverage.** 1a's migration left 25 magrittr `.` placeholders that a plain `ggmca_data(res.mca)` call cannot reach: every one lives on a `sup_vars` / `tooltip_vars` / `tooltip_vars_1lv` / `keep_levels` / `discard_levels` / `active_tables` / `cah` path, and they failed quietly rather than loudly. Port that argument matrix into `tests/testthat/`.
+
+Three calls in 1a's snapshot harness fail on argument shape rather than on behaviour — `ggmca_data(cah = )`, `HCPC_tab(clust = )` and `ggmca_with_base_ref()`. Resolve them while writing the tests: either the call is wrong or the roxygen is, and either way a user hits it first.
+
+Follow the locale, threads and orphan conventions in the Testing section above. The suite is small and runs serially; do not turn on `Config/testthat/parallel` for it.
+
+#### Phase 1c — drop kableExtra, render html tables with tabxplor
+
+`mca_interpret(type = "html")` (`R/geometrical_data_analysis.R:3431-3451`) is the package's only kableExtra consumer, and the last hard rule still broken: tables are tabxplor's job. Removing it takes the tree from 133 packages / 203.7 MB to **129 / 198.3 MB**.
+
+⚠ **This is a rewrite of the html branch, not a rewiring.** `tabxplor::tab_html()` accepts a plain tibble but *silently degrades to an unstyled table*: `tab_render_vars()` requires `tabxplor_fmt` columns plus a factor row-variable, and there is no public `row_spec()`/`column_spec()` equivalent — borders, bold and block rules are all derived from tabxplor's own semantics. What `mca_interpret` currently hands over is a grouped tibble of eight pre-rendered character columns, which fails both tests and would render bare.
+
+`pca_interpret()` (`:5157`) is the in-file template: it already builds `tabxplor::fmt()` columns with `scale`, `col_var`, `row_kind`, `color` and `ref`. Do the same here — keep the contribution and spread columns as `fmt`, mark each axis's "All levels" row `row_kind = "total"`, use `col_var` to separate the positive and negative blocks so the side borders land, and make `Axe`/`Question` real factors so the row variable and the block boundaries are found. Then delete the manual `new_group` / `last_row` / `totrows` / `questions` index arithmetic at `:3393-3400` outright: tabxplor derives all four itself, and that arithmetic exists only to feed kableExtra.
+
+Anything the class vocabulary cannot express — the two-line `Axe 1: 18.4%` / `of variance` label cell, the thin rule above each question — is a few user CSS rules appended after `tab_css()`, which is explicitly supported. The `type = "console"` path shares the computation and must not change. ⚠ Do not reach for `kable_tabxplor_style()`: it is defunct in tabxplor 2.0.0 and always errors.
 
 ## The last step of every implementation: update the documentation
 
@@ -101,7 +129,7 @@ Copies from `~/github/tabxplor/CLAUDE.md`: to adapt to ggfacto when needed.
 - If you use a plan, do a real **documentation planning work** : define what goes where, avoid duplication, state what level of details and what focus the lines written in each document should have.
 
 1. **File-header + inline comments** of every module you touched — make them state the CURRENT design, caveats and "why", never how it got there; add or adjust `# DESIGN:` / `# WARNING:` tags next to changed logic. *Cut, don't accrete.*
-2. **Phase "DONE" summary** — under its own `#### Phase <x> — <title>` header in the roadmap. This is the ONE place dev-history detail belongs (what changed, why, measurements). CLAUDE.md is the ONLY place it goes.
+2. **Phase "DONE" summary** — under its own `### Phase <x> — <title>` header in the roadmap above. CLAUDE.md is the ONLY place it goes. This is the ONE place dev-history detail belongs.
 3. (**Repository Map** in this file — refresh a file's role line only if you added, removed or repurposed a file; keep it absolutely and utterly brief, *never* add clutter here, *cut, don’t accrete*; otherwise skip.)
 4. (**`NEWS.md`** — user-facing / CRAN-facing only, new or changed functions/arguments, deprecations, important user-facing fixes; radically minimalistic, usually skipped.)
 5. (**`README.Rmd`** — only before a CRAN release.)

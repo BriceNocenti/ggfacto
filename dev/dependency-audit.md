@@ -28,18 +28,18 @@ Two totals anchor the rest:
 
 Figures are **ordered cumulative removals**, each row showing the tree after that drop. Order matters: `kableExtra` imports `stringr`, so measuring `stringr` first would understate it. A marginal-over-baseline metric would badly overstate `kableExtra` and `widgetframe`, whose tails arrive through `ggiraph` and `FactoMineR` anyway.
 
-| after dropping | packages | MB | this drop saves |
-|---|---:|---:|---|
-| *(start)* | 164 | 243.7 | --- |
-| finalfit | 137 | 208.0 | -27 pkgs / -35.7 MB |
-| gridExtra | 136 | 207.3 | -1 / -0.7 |
-| kableExtra | 132 | 201.9 | -4 / -5.4 |
-| ggforce | 129 | 198.4 | -3 / -3.5 |
-| widgetframe | 128 | 198.2 | -1 / -0.2 |
-| stringi | 128 | 198.2 | -0 / -0.0 |
-| stringr | 128 | 198.2 | -0 / -0.0 |
-| magrittr | 128 | 198.2 | -0 / -0.0 |
-| withr | 128 | 198.2 | -0 / -0.0 |
+| after dropping | packages |    MB | this drop saves     |
+|----------------|---------:|------:|---------------------|
+| *(start)*      |      164 | 243.7 | ---                 |
+| finalfit       |      137 | 208.0 | -27 pkgs / -35.7 MB |
+| gridExtra      |      136 | 207.3 | -1 / -0.7           |
+| kableExtra     |      132 | 201.9 | -4 / -5.4           |
+| ggforce        |      129 | 198.4 | -3 / -3.5           |
+| widgetframe    |      128 | 198.2 | -1 / -0.2           |
+| stringi        |      128 | 198.2 | -0 / -0.0           |
+| stringr        |      128 | 198.2 | -0 / -0.0           |
+| magrittr       |      128 | 198.2 | -0 / -0.0           |
+| withr          |      128 | 198.2 | -0 / -0.0           |
 
 For reference, outside the plan: dropping `plotly` would save 5 packages / 10.9 MB, `FactoMineR` 39 packages / 46.8 MB.
 
@@ -83,9 +83,9 @@ Replaced by a `ggplot2::geom_path()` over `t <- seq(0, 2 * pi, length.out = 200)
 
 Ten sites, all inside `mca_interpret(type = "html")` at `:3421-3441`. **-4 packages / -5.4 MB.**
 
-The stronger argument is architectural rather than numeric: tables are tabxplor's job here, and tabxplor 2.0.0 already renders HTML itself --- `tab_html()`, `tab_kable()` and `kable_tabxplor_style()` are exported, built on `htmltools`, and `tabxplor/R/tab-render-html.R:554` records that it deliberately uses none of kableExtra's themes.
+The stronger argument is architectural rather than numeric: tables are tabxplor's job here, and tabxplor 2.0.0 already renders HTML itself: `tab_html()` (and its alias `tab_kable()`) emit raw HTML and return a `c("tabxplor_kable", "knitr_kable")` character object, and `tabxplor/R/tab-render-html.R:554` records that it deliberately uses none of kableExtra's themes. (`kable_tabxplor_style()` is **defunct** in 2.0.0 --- it calls `lifecycle::deprecate_stop()` and always errors.)
 
-⚠ Not a like-for-like swap. The current block hand-writes `row_spec()`/`column_spec()` borders that have to be re-expressed in tabxplor's stylesheet vocabulary.
+⚠ Not a like-for-like swap, and the input format has to change too. `tab_html()` accepts a plain tibble but **silently degrades to an unstyled table**: it needs `tabxplor_fmt` columns plus a factor row-variable to style anything, and there is no public `row_spec()`/`column_spec()` equivalent --- borders and bold are derived from tabxplor's own semantics. `pca_interpret()` at `:5144` is the in-file template.
 
 ## Tier 3 --- base-R migrations
 
@@ -107,18 +107,18 @@ Four live sites, every one an unescape of a literal: `R/utils.R:136` (`"\u202f"`
 
 188 live sites, 12 functions. The mapping, with the traps that cause silent breakage:
 
-| stringr | n | base R | trap |
-|---|---:|---|---|
-| `str_c` | 86 | `paste0` | `str_c` returns `NA` if any input is `NA`; `paste0` yields `"NA"` |
-| `str_detect` | 21 | `grepl` | argument order reverses |
-| `str_replace` / `str_replace_all` | 23 | `sub` / `gsub` | pattern comes first |
-| `str_remove` / `str_remove_all` | 27 | `sub` / `gsub` with `""` | --- |
-| `str_pad` | 10 | `formatC(width =, flag =)` | negative width pads on the right |
-| `str_length` | 7 | `nchar(type = "chars")` | --- |
-| `str_extract` | 6 | `regmatches(x, regexpr(p, x))` | drops non-matches instead of returning `NA` |
-| `str_sub` | 4 | `substr` | negative indices behave differently |
-| `str_squish` | 2 | `trimws(gsub("\\s+", " ", x))` | --- |
-| `str_to_upper` | 2 | `toupper` | locale-sensitive |
+| stringr                           |  n | base R                         | trap                                                              |
+|-----------------------------------|---:|--------------------------------|-------------------------------------------------------------------|
+| `str_c`                           | 86 | `paste0`                       | `str_c` returns `NA` if any input is `NA`; `paste0` yields `"NA"` |
+| `str_detect`                      | 21 | `grepl`                        | argument order reverses                                           |
+| `str_replace` / `str_replace_all` | 23 | `sub` / `gsub`                 | pattern comes first                                               |
+| `str_remove` / `str_remove_all`   | 27 | `sub` / `gsub` with `""`       | ---                                                               |
+| `str_pad`                         | 10 | `formatC(width =, flag =)`     | negative width pads on the right                                  |
+| `str_length`                      |  7 | `nchar(type = "chars")`        | ---                                                               |
+| `str_extract`                     |  6 | `regmatches(x, regexpr(p, x))` | drops non-matches instead of returning `NA`                       |
+| `str_sub`                         |  4 | `substr`                       | negative indices behave differently                               |
+| `str_squish`                      |  2 | `trimws(gsub("\\s+", " ", x))` | ---                                                               |
+| `str_to_upper`                    |  2 | `toupper`                      | locale-sensitive                                                  |
 
 ⚠ The one that will actually bite: stringr uses ICU regex, base R defaults to TRE. `cleannames_condition()` at `R/utils.R:44` contains a lookbehind, `(?<![[:lower:]])`, which base R accepts only with **`perl = TRUE`**. Every base call built from that pattern needs the flag.
 
@@ -162,9 +162,19 @@ Recorded so the question is not reopened.
 
 ## Recommended end state
 
-- `Imports` --- drop `gridExtra`, `ggforce`, `magrittr`, `stringr`; add `stats`, `grDevices`, `scales`; raise `ggplot2` to `>= 3.4.0`.
-- `Suggests` --- drop `finalfit`, `kableExtra`, `stringi`; keep `plotly`, `htmlwidgets`, `widgetframe`.
+Applied in 0.4.0, except the kableExtra work which is its own phase:
 
-Declared dependencies fall from 26 to 20. The installed tree falls from **164 packages / 243.7 MB to 128 packages / 198.2 MB** --- 36 fewer packages, 45.5 MB less, about 19 %, with six fewer compiled from source.
+- `Imports` --- dropped `gridExtra`, `ggforce`, `stringr`; added `stats`, `grDevices`, `scales`;
+  `ggplot2` raised to `>= 3.4.0` and `R` to `>= 4.1.0` (the package already used `|>`, which 4.0
+  does not have).
+- `Suggests` --- dropped `finalfit`, `stringi`; added `testthat`. `kableExtra` stays until its
+  phase; `plotly`, `htmlwidgets` and `widgetframe` stay for good.
+- `magrittr` stays one deprecation cycle: every internal use is now `|>`, but `%>%` is still
+  re-exported for users. It costs 0 MB, so there is no hurry.
 
-The honest ceiling: with FactoMineR and ggiraph both untouchable, ~198 MB is ggfacto's floor, and ~47 MB of that is FactoMineR's unused tail.
+Measured after the change: **164 packages / 243.7 MB to 133 / 203.7 MB** --- 31 fewer packages,
+40.0 MB less, about 16 %. Dropping kableExtra takes it to 129 / 198.3 MB (-35 packages, -45.4 MB),
+and retiring the `%>%` re-export removes the last declared dependency that no code uses.
+
+The honest ceiling: with FactoMineR and ggiraph both untouchable, ~198 MB is ggfacto's floor, and
+~47 MB of that is FactoMineR's unused statistical tail.

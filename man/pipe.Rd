@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{\%>\%}
 \alias{\%>\%}
-\title{Pipe operator}
+\title{Pipe operator (deprecated)}
 \usage{
 lhs \%>\% rhs
 }
@@ -15,6 +15,11 @@ lhs \%>\% rhs
 Pipe an object forward into a function or call expression.
 }
 \description{
+Re-exported from magrittr for backward compatibility. Deprecated: use the base pipe
+\code{|>} instead. ggfacto uses \code{|>} everywhere internally, and this re-export will be
+removed in a future release, taking the magrittr dependency with it.
+}
+\details{
 See \code{magrittr::\link[magrittr:pipe]{\%>\%}} for details.
 }
 \keyword{internal}

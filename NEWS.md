@@ -17,6 +17,28 @@ Every table is now built with `tabxplor::tab()` and the 2.0.0 vocabulary.
 * `ggca()` and the README now build the correspondence-analysis input with
   `as.matrix(tabxplor::tab(data, row_var, col_var))`, which drops the totals for you.
 
+## A lighter dependency tree
+
+Installing ggfacto with its `Suggests` now pulls **133 packages instead of 164, 204 MB instead of
+244** --- 31 fewer packages, four fewer of them compiled from source. Nothing about the API
+changes.
+
+* `finalfit` and `gridExtra` are gone. They were only ever used by `pers_or_plot()`, which has been
+  removed --- regression tables belong to tabxplor now. This is the bulk of the saving: 27 packages.
+* `ggforce` is gone. It drew one circle, the PCA correlation circle, which is now a `geom_path()`.
+  As a side effect that circle is drawn once instead of once per row of the plot's data.
+* `stringr` and `stringi` are gone, replaced by base-R helpers that keep stringr's semantics
+  (`NA` propagation, padding width and fill) rather than base R's.
+* `scales`, `stats` and `grDevices` move from `Suggests` to `Imports`, where their use always
+  belonged; `grid` was used but never declared. `ggplot2` now requires 3.4.0 or later, and R 4.1.0
+  or later --- the package already used the base pipe, which R 4.0 does not have.
+
+## Deprecations
+
+* Piping with `%>%` is deprecated. ggfacto uses the base pipe `|>` throughout, and re-exports
+  `%>%` only for backward compatibility; the re-export, and the magrittr dependency with it, will
+  be removed in a future release. Use `|>`.
+
 ## Bug corrections
 
 * `ggmca(active_tables = )` / `ggmca(sup_vars = )` gave every level an empty tooltip.

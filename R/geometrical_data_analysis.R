@@ -1,3 +1,14 @@
+# PURPOSE: Every user-facing function of the package -- MCA/PCA/CA wrappers, their interactive
+#   ggplot2/ggiraph graphs, the 3D plotly graphs, and the interpretation tables.
+# ROLE: The package. Calls R/utils.R for factor, colour and string helpers.
+# KEY CONSTRAINTS:
+#   - String work goes through the helpers in R/utils.R (str_c, str_pad, ...), never stringr and
+#     never bare paste0/sub: the helpers keep stringr's NA and padding semantics, which tooltip
+#     text and monospace alignment depend on.
+#   - Use the base pipe |>. `.` is a lambda pronoun here, never a magrittr placeholder.
+#   - Tables are tabxplor's job; do not reach for kableExtra, DT or gt.
+# See: dev/dependency-audit.md.
+
 #Import data.table in NAMESPACE :
 #' Internal data.table methods
 #' @import data.table
@@ -59,7 +70,7 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
   new_excl <- character()
   if (!missing(excl)) {
     if (any(is.na(excl))) {
-      data <- data %>%
+      data <- data |>
         dplyr::mutate(dplyr::across(tidyselect::all_of(names(active_vars)),
                                     ~ forcats::fct_na_value_to_level(., "NA")
         ))
@@ -69,10 +80,10 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 
     if (length(excl) != 0) {
       lvs <- purrr::imap_dfr(data, ~ tibble::tibble(var = .y, lvs = levels(.x)))
-      lvs <- lvs %>%
-        dplyr::mutate(excl = stringr::str_detect(.data$lvs, paste0(excl, collapse = "|")),
+      lvs <- lvs |>
+        dplyr::mutate(excl = str_detect(.data$lvs, paste0(excl, collapse = "|")),
                       lvs2 = paste0(.data$var, "_", .data$lvs)
-        ) %>%
+        ) |>
         dplyr::filter(excl)
 
       new_excl <- c(lvs$lvs, lvs$lvs2, new_excl)
@@ -335,15 +346,15 @@ ggmca_data <-
     }
     stopifnot(length(max_profiles) < 2)
 
-    active_vars <- stringr::str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
+    active_vars <- str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
     excl <- names(res.mca$call$Xtot)[res.mca$call$excl]
 
-    if (length(sup_vars)    != 0 )      sup_vars <- sup_vars %>%
-      purrr::discard(. %in% active_vars)
-    if (length(tooltip_vars_1lv) != 0 ) tooltip_vars_1lv <- tooltip_vars_1lv %>%
-      purrr::discard(. %in% active_vars) #| . %in% sup_vars
-    if (length(tooltip_vars) != 0 )     tooltip_vars <- tooltip_vars %>%
-      purrr::discard(. %in% active_vars | . %in% tooltip_vars_1lv) #| . %in% sup_vars
+    if (length(sup_vars)    != 0 )      sup_vars <- sup_vars |>
+      purrr::discard(\(x) x %in% active_vars)
+    if (length(tooltip_vars_1lv) != 0 ) tooltip_vars_1lv <- tooltip_vars_1lv |>
+      purrr::discard(\(x) x %in% active_vars) #| . %in% sup_vars
+    if (length(tooltip_vars) != 0 )     tooltip_vars <- tooltip_vars |>
+      purrr::discard(\(x) x %in% active_vars | x %in% tooltip_vars_1lv) #| . %in% sup_vars
 
 
     #if (names_darker == "auto") {      # if (type[1] == "points") names_darker <- TRUE
@@ -357,40 +368,40 @@ ggmca_data <-
 
     # Active variables --------------------------------------------------------------------
     active_var_levels <-
-      purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) %>%
-                   as.factor() %>% levels()) %>%
-      purrr::set_names(active_vars) %>%
+      purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) |>
+                   as.factor() |> levels()) |>
+      purrr::set_names(active_vars) |>
       purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs = .x))
 
 
     freqs    <- tibble::enframe(res.mca$call$marge.col, "lvs", "freq")
     coords   <- tibble::as_tibble(res.mca$var$coord, rownames = "lvs")
-    contribs <- tibble::as_tibble(res.mca$var$contrib, rownames = "lvs") %>%
-      dplyr::rename_with(~ stringr::str_replace(., "^Dim ", "contrib"))
+    contribs <- tibble::as_tibble(res.mca$var$contrib, rownames = "lvs") |>
+      dplyr::rename_with(~ str_replace(., "^Dim ", "contrib"))
 
-    active_vars_data <- active_var_levels %>%
-      dplyr::left_join(freqs, by = "lvs") %>%
-      dplyr::left_join(coords, by = "lvs") %>%
-      dplyr::left_join(contribs, by = "lvs") %>%
+    active_vars_data <- active_var_levels |>
+      dplyr::left_join(freqs, by = "lvs") |>
+      dplyr::left_join(coords, by = "lvs") |>
+      dplyr::left_join(contribs, by = "lvs") |>
       tidyr::nest(contribs = tidyselect::starts_with("contrib"))
 
-    active_vars_data <- active_vars_data %>%
-      dplyr::group_by(.data$vars) %>%
-      dplyr::mutate(freq = round(.data$freq/sum(.data$freq) * 100, 0)) %>%
+    active_vars_data <- active_vars_data |>
+      dplyr::group_by(.data$vars) |>
+      dplyr::mutate(freq = round(.data$freq/sum(.data$freq) * 100, 0)) |>
       dplyr::ungroup()
 
-    dimensions <- names(active_vars_data)[stringr::str_detect(names(active_vars_data), "Dim ")] %>%
-      purrr::set_names(.) %>%
+    dimensions <- names(active_vars_data)[str_detect(names(active_vars_data), "Dim ")] |>
+      purrr::set_names() |>
       purrr::map_dfc(~ 0)
 
-    active_vars_data <- active_vars_data %>%
-      dplyr::filter(!is.na(.data$`Dim 1`)) %>%  #Remove excluded levels of active variables
-      dplyr::mutate(lvs = stringr::str_remove(.data$lvs, stringr::str_c("^", .data$vars, "_")))
+    active_vars_data <- active_vars_data |>
+      dplyr::filter(!is.na(.data$`Dim 1`)) |>  #Remove excluded levels of active variables
+      dplyr::mutate(lvs = str_remove(.data$lvs, str_c("^", .data$vars, "_")))
 
-    if (cleannames == TRUE) active_vars_data <- active_vars_data %>%
-      dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove_all(., cleannames_condition())))
+    if (cleannames == TRUE) active_vars_data <- active_vars_data |>
+      dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ str_remove_all(., cleannames_condition())))
 
-    active_vars_data <- active_vars_data %>%
+    active_vars_data <- active_vars_data |>
       dplyr::mutate(color_group = factor("active_vars"),
                     id = as.integer(forcats::as_factor(.data$vars)) + 1000L)
 
@@ -404,15 +415,15 @@ ggmca_data <-
     # Supplementary variables -------------------------------------------------------------
     if (length(sup_vars) != 0) {
 
-      sup_vars_data <- purrr::map(sup_vars, ~ varsup(res.mca, dat[[.]]) ) %>%
+      sup_vars_data <- purrr::map(sup_vars, ~ varsup(res.mca, dat[[.]]) ) |>
         purrr::set_names(sup_vars)
 
       # Do something with "within" et "between" variance ? ($var)
 
       sup_vars_data <-
         purrr::imap(sup_vars_data,
-                    ~ tibble::as_tibble(.x$coord, rownames = "lvs") %>%
-                      dplyr::mutate(vars = .y) %>%
+                    ~ tibble::as_tibble(.x$coord, rownames = "lvs") |>
+                      dplyr::mutate(vars = .y) |>
                       dplyr::select("vars", tidyselect::everything())
         )
 
@@ -436,36 +447,36 @@ ggmca_data <-
       }
       # print(purrr::set_names(color_groups, sup_vars))
 
-      sup_vars_data <- sup_vars_data %>%
+      sup_vars_data <- sup_vars_data |>
         purrr::map2(color_groups,
-                    ~ dplyr::mutate(.x, color_group = forcats::as_factor(stringr::str_c(
-                      .data$vars, "_", stringr::str_extract(.data$lvs, .y)
-                    ) %>%
-                      stringr::str_remove("_$")
+                    ~ dplyr::mutate(.x, color_group = forcats::as_factor(str_c(
+                      .data$vars, "_", str_extract(.data$lvs, .y)
+                    ) |>
+                      str_remove("_$")
                     ))
         )
 
 
-      if (length(keep_levels   ) >= 1L) sup_vars_data <- sup_vars_data %>%
-        purrr::map(~ dplyr::filter(., stringr::str_detect(.data$lvs, keep_levels)
+      if (length(keep_levels   ) >= 1L) sup_vars_data <- sup_vars_data |>
+        purrr::map(~ dplyr::filter(., str_detect(.data$lvs, keep_levels)
         ) )
-      if (length(discard_levels) >= 1L) sup_vars_data <- sup_vars_data %>%
+      if (length(discard_levels) >= 1L) sup_vars_data <- sup_vars_data |>
         purrr::map(
-          ~ dplyr::filter(., !stringr::str_detect(.data$lvs,
-                                                  stringr::str_c(discard_levels,
+          ~ dplyr::filter(., !str_detect(.data$lvs,
+                                                  str_c(discard_levels,
                                                                  collapse = "|"))
           )
         )
 
-      if (cleannames) sup_vars_data <- sup_vars_data %>%
+      if (cleannames) sup_vars_data <- sup_vars_data |>
         purrr::map(~ dplyr::mutate(
           .,
-          lvs = forcats::fct_relabel(.data$lvs, ~ stringr::str_remove_all(., cleannames_condition()))
+          lvs = forcats::fct_relabel(.data$lvs, ~ str_remove_all(., cleannames_condition()))
         ))
 
-      dimensions <- names(sup_vars_data[[1]]) %>%
-        purrr::keep(stringr::str_detect(., "Dim ")) %>%
-        purrr::set_names(.) %>%
+      dimensions <- names(sup_vars_data[[1]]) |>
+        purrr::keep(\(x) str_detect(x, "Dim ")) |>
+        purrr::set_names() |>
         purrr::map_dfc(~ 0)
 
 
@@ -473,27 +484,27 @@ ggmca_data <-
       # les deux seront colores lorsqu'on survolera l'un ou l'autre
       #sup_vars_data <- sup_vars_data %>% purrr::imap(~ dplyr::mutate(.x, sup_var = .y))
       if (length(cah) != 0) {
-        if (cah %in% sup_vars) sup_vars_data <- sup_vars_data %>%
-            purrr::map_if(names(.) == cah,
+        if (cah %in% sup_vars) sup_vars_data <- sup_vars_data |>
+            (\(l) purrr::map_if(l, names(l) == cah,
                           ~ dplyr::mutate(., cah_id = as.integer(.data$lvs) + 10000L),
-                          .else = ~ dplyr::mutate(., cah_id = NA_integer_))
+                          .else = ~ dplyr::mutate(., cah_id = NA_integer_)))()
       }
 
       #Bind sup_vars data
-      sup_vars_data <- sup_vars_data %>% dplyr::bind_rows()
+      sup_vars_data <- sup_vars_data |> dplyr::bind_rows()
 
       # ID numbers to use with ggiraph to highlight elements at hover
       if (length(cah) != 0) {
         if (cah %in% sup_vars) {
-          sup_vars_data <- sup_vars_data %>%
+          sup_vars_data <- sup_vars_data |>
             dplyr::mutate(id = dplyr::if_else(is.na(.data$cah_id),
                                               dplyr::row_number(),
                                               .data$cah_id))
         } else {
-          sup_vars_data <- sup_vars_data %>% dplyr::mutate(id = dplyr::row_number())
+          sup_vars_data <- sup_vars_data |> dplyr::mutate(id = dplyr::row_number())
         }
       } else {
-        sup_vars_data <- sup_vars_data %>% dplyr::mutate(id = dplyr::row_number())
+        sup_vars_data <- sup_vars_data |> dplyr::mutate(id = dplyr::row_number())
       }
 
       #Useful functions :
@@ -502,9 +513,9 @@ ggmca_data <-
       #tab_spread <- function(data) dplyr::mutate_at(data, dplyr::vars(-1, -ncol(data)), ~. - dplyr::last(.))
       # tab_spread_chr <- function(data) {
       #   dplyr::mutate_at(data, dplyr::vars(-1, -tidyselect::any_of("Total")), ~ dplyr::case_when(
-      #     dplyr::row_number() == nrow(data) ~ stringr::str_c(., "%"),
-      #     . - dplyr::last(.) > 0         ~ stringr::str_c("(", stringr::str_pad(stringr::str_c("+" , sign(. - dplyr::last(.)) * (. - dplyr::last(.))), 3 + get_digits(.)), "%) ", stringr::str_pad(., 2 + get_digits(.)), "%"),
-      #     TRUE                    ~ stringr::str_c("(", stringr::str_pad(stringr::str_c(" -", sign(. - dplyr::last(.)) * (. - dplyr::last(.))), 4 + get_digits(.)), "%) ", stringr::str_pad(., 2 + get_digits(.)), "%") )
+      #     dplyr::row_number() == nrow(data) ~ str_c(., "%"),
+      #     . - dplyr::last(.) > 0         ~ str_c("(", str_pad(str_c("+" , sign(. - dplyr::last(.)) * (. - dplyr::last(.))), 3 + get_digits(.)), "%) ", str_pad(., 2 + get_digits(.)), "%"),
+      #     TRUE                    ~ str_c("(", str_pad(str_c(" -", sign(. - dplyr::last(.)) * (. - dplyr::last(.))), 4 + get_digits(.)), "%) ", str_pad(., 2 + get_digits(.)), "%") )
       #   )
       # }
 
@@ -516,17 +527,17 @@ ggmca_data <-
     }
 
     #Add central point
-    vars_data <- vars_data %>%
+    vars_data <- vars_data |>
       dplyr::add_row(vars        = "All",
                      lvs         = factor("Central point"),
-                     color_group = factor("Central point")) %>%
+                     color_group = factor("Central point")) |>
       dplyr::mutate(dplyr::across(
         tidyselect::starts_with("Dim "),
         ~ dplyr::if_else(.data$lvs == "Central point", 0, .)
       ))
 
     #Reorder variables in vars_data
-    vars_data <- vars_data %>%
+    vars_data <- vars_data |>
       dplyr::relocate(tidyselect::starts_with("Dim "), tidyselect::any_of("contribs"),
                       .after = dplyr::last_col())
 
@@ -545,9 +556,9 @@ ggmca_data <-
     #sel3 <- tooltip_vars[!tooltip_vars %in% c(sel1, active_vars)]
     #dat3 <- dat %>% dplyr::select(tidyselect::all_of(sel3))
 
-    dat <- dat %>%
-      dplyr::mutate(dplyr::across(where(is.character), as.factor)) %>%
-      dplyr::mutate(dplyr::across(where(is.factor), forcats::fct_drop)) %>%
+    dat <- dat |>
+      dplyr::mutate(dplyr::across(where(is.character), as.factor)) |>
+      dplyr::mutate(dplyr::across(where(is.factor), forcats::fct_drop)) |>
       tibble::add_column(row.w = res.mca$call$row.w)
 
     #Remove excluded levels (now, or after by renaming them here)
@@ -555,7 +566,7 @@ ggmca_data <-
       purrr::imap_dfr(dat[active_vars],
                       ~ tibble::tibble(active_vars = .y, lvs = levels(.x))
                       ) |>
-      #dplyr::mutate(lvs2 = stringr::str_c(.data$active_vars, "_",.data$ lvs)) |>
+      #dplyr::mutate(lvs2 = str_c(.data$active_vars, "_",.data$ lvs)) |>
       dplyr::filter(.data$lvs %in% excl) #| .data$lvs2 %in% excl
 
     excl_levels <- excl_levels |>
@@ -567,29 +578,29 @@ ggmca_data <-
     active_var_real_levels <-
       purrr::imap(dat[active_vars], ~ tibble::tibble(active_vars = .y, lvs = levels(.x)))
 
-    active_vars_excl <- active_var_real_levels %>%
-      purrr::map(~ dplyr::filter(., .data$lvs %in% excl) %>% dplyr::pull(.data$lvs))
+    active_vars_excl <- active_var_real_levels |>
+      purrr::map(~ dplyr::filter(., .data$lvs %in% excl) |> dplyr::pull(.data$lvs))
     active_vars_excl <- active_vars_excl[purrr::map_lgl(active_vars_excl, ~ length(.) != 0)]
 
-    dat <- dat %>%
+    dat <- dat |>
       dplyr::mutate(dplyr::across(
         tidyselect::all_of(names(active_vars_excl)),
-        ~ forcats::fct_relevel(., active_vars_excl[[dplyr::cur_column()]], after = Inf) %>%
+        ~ forcats::fct_relevel(., active_vars_excl[[dplyr::cur_column()]], after = Inf) |>
           forcats::fct_recode(rlang::splice(purrr::set_names(active_vars_excl[[dplyr::cur_column()]],
                                                              "Remove_levels")))
       ))
 
     #When MCA() added variable name at the beginning of levels names, remove it
-    dat <- dat %>%
+    dat <- dat |>
       dplyr::mutate(dplyr::across(
         tidyselect::all_of(active_vars),
-        ~ forcats::fct_relabel(., ~ stringr::str_remove(., paste0("^", dplyr::cur_column(), "_")))
+        ~ forcats::fct_relabel(., ~ str_remove(., paste0("^", dplyr::cur_column(), "_")))
       ))
 
-    if (cleannames == TRUE) dat <- dat %>%
+    if (cleannames == TRUE) dat <- dat |>
       dplyr::mutate(dplyr::across(
         where(~is.factor(.) | is.character(.)),
-        ~ forcats::fct_relabel(., ~stringr::str_remove_all(., cleannames_condition()))
+        ~ forcats::fct_relabel(., ~str_remove_all(., cleannames_condition()))
       ))
 
 
@@ -622,15 +633,15 @@ ggmca_data <-
 
       text_vars <- names(interactive_text)[purrr::map_lgl(interactive_text, is.character)]
 
-      vars_data <- vars_data %>% dplyr::left_join(interactive_text, by = c("vars", "lvs"))
+      vars_data <- vars_data |> dplyr::left_join(interactive_text, by = c("vars", "lvs"))
 
     } else {
       text_vars <- "begin_text"
-      vars_data <- vars_data %>% dplyr::mutate(begin_text = NA_character_)
+      vars_data <- vars_data |> dplyr::mutate(begin_text = NA_character_)
     }
 
     if (length(active_vars_without_crosstables) != 0) {
-      vars_data <- vars_data %>%
+      vars_data <- vars_data |>
         dplyr::mutate(begin_text = dplyr::if_else(
           .data$vars %in% active_vars_without_crosstables,
           true  = paste0("<b>", .data$lvs,"</b>\n", .data$vars,
@@ -645,24 +656,24 @@ ggmca_data <-
 
     # if(length(tables_to_do) == 0) {
     if (length(active_tables) == 0) {
-      mean_point_interactive_text <- vars_data %>%
+      mean_point_interactive_text <- vars_data |>
         dplyr::ungroup() |>
-        dplyr::filter(.data$color_group == "active_vars") %>%
+        dplyr::filter(.data$color_group == "active_vars") |>
         dplyr::mutate(
-          text = stringr::str_c("\n", .data$lvs, " : ", .data$freq,"%")
-        ) %>%
+          text = str_c("\n", .data$lvs, " : ", .data$freq,"%")
+        ) |>
         dplyr::summarise(
-          text = stringr::str_c(.data$text, collapse = "")
-        ) %>%
+          text = str_c(.data$text, collapse = "")
+        ) |>
         dplyr::pull(.data$text)
 
       mean_point_interactive_text <-
-        stringr::str_c("<b>Central point</b>",
+        str_c("<b>Central point</b>",
                        "\nFrequency: 100%",
                        "\n\n<b>Active variables :</b>",
                        mean_point_interactive_text)
 
-      vars_data <- vars_data %>%
+      vars_data <- vars_data |>
         dplyr::mutate(begin_text = dplyr::if_else(
           .data$lvs == "Central point",
           true  = mean_point_interactive_text,
@@ -747,7 +758,7 @@ ggmca_data <-
       # if (cleannames == TRUE) ind_data <- ind_data %>%
       #   dplyr::mutate(dplyr::across(
       #     where(is.factor),
-      #     ~ forcats::fct_relabel(~ stringr::str_remove_all(., cleannames_condition()))
+      #     ~ forcats::fct_relabel(~ str_remove_all(., cleannames_condition()))
       #     ))
 
       # If NA in HCPC clust : for each combination of active_vars, we attribute
@@ -787,13 +798,13 @@ ggmca_data <-
 
         cah_levels <- dplyr::pull(ind_data, cah) |> levels()
 
-        ind_data <- ind_data %>%
+        ind_data <- ind_data |>
           dplyr::mutate(!!rlang::sym(cah) := as.character(!!rlang::sym(cah) ) ) |>
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
                       row.w    = "row.w",
                       coord    = tidyselect::all_of(coord_names),
                       cah      = !!rlang::sym(cah)
-          ) %>%
+          ) |>
           dplyr::mutate(
             count  = purrr::map_int(.data$row.w, ~ nrow(.)),
 
@@ -801,102 +812,102 @@ ggmca_data <-
 
             cah    = purrr::map_chr(.data$cah, ~ dplyr::first(dplyr::pull(., 1))) |>
               as.factor() |> forcats::fct_relevel(cah_levels)
-          ) %>%
+          ) |>
           dplyr::arrange(-.data$wcount)
         # 0.661149 secs (much longer in data.table here)
 
 
 
-        if (length(max_profiles) != 0) ind_data <- ind_data %>% dplyr::slice(1:max_profiles)
+        if (length(max_profiles) != 0) ind_data <- ind_data |> dplyr::slice(1:max_profiles)
 
-        ind_data <- ind_data %>%
+        ind_data <- ind_data |>
           dplyr::mutate(nb = dplyr::row_number(),
-                        cah_id = as.integer(.data$cah)) %>%
-          dplyr::group_by(.data$cah) %>%
+                        cah_id = as.integer(.data$cah)) |>
+          dplyr::group_by(.data$cah) |>
           dplyr::mutate(nb_in_cah = dplyr::row_number(),
-                        nb_tot_cah = dplyr::n()) %>%
-          dplyr::ungroup() %>%
-          dplyr::mutate(coord = purrr::map(.data$coord, ~ .[1,])) %>%
+                        nb_tot_cah = dplyr::n()) |>
+          dplyr::ungroup() |>
+          dplyr::mutate(coord = purrr::map(.data$coord, ~ .[1,])) |>
           tidyr::unnest("coord")
 
 
       } else {
-        ind_data <- ind_data %>%
+        ind_data <- ind_data |>
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
                       row.w    = .data$row.w,
                       coord    = tidyselect::all_of(coord_names)
 
-          ) %>%
+          ) |>
           dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
                         wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
-          ) %>%
+          ) |>
           dplyr::arrange(-.data$wcount)
 
-        if (length(max_profiles) != 0) ind_data <- ind_data %>% dplyr::slice(1:max_profiles)
+        if (length(max_profiles) != 0) ind_data <- ind_data |> dplyr::slice(1:max_profiles)
 
-        ind_data <- ind_data %>%
+        ind_data <- ind_data |>
           dplyr::mutate(nb    = dplyr::row_number(),
-                        coord = purrr::map(.data$coord, ~ .[1,])) %>%
+                        coord = purrr::map(.data$coord, ~ .[1,])) |>
           tidyr::unnest(.data$coord)
       }
 
-      ind_data <- ind_data %>%
+      ind_data <- ind_data |>
         dplyr::mutate(dplyr::across(tidyselect::all_of(active_vars),
-                                    ~ fct_detect_replace(., profiles_tooltip_discard, "#"))) %>%
+                                    ~ fct_detect_replace(., profiles_tooltip_discard, "#"))) |>
         dplyr::mutate(dplyr::across(where(is.factor), as.character))
 
 
       if (length(cah) != 0) {
-        ind_data <- ind_data %>%
+        ind_data <- ind_data |>
           dplyr::mutate(
             cah_base = .data$cah,
             count_base = .data$count,
             wcount_base = .data$wcount,
-            cah        = stringr::str_c("<b>Cah: ", .data$cah, "</b>"),
-            profile_nb = stringr::str_c("<b>Answer profile n",
-                                        stringi::stri_unescape_unicode("\\u00b0"),
+            cah        = str_c("<b>Cah: ", .data$cah, "</b>"),
+            profile_nb = str_c("<b>Answer profile n",
+                                        "\u00b0",
                                         .data$nb_in_cah, "/", .data$nb_tot_cah, "</b>"),
-            count      = stringr::str_c("n: ", format(round(.data$count, 0),
+            count      = str_c("n: ", format(round(.data$count, 0),
                                                       trim = TRUE, big.mark = " ")),
             wcount     = dplyr::if_else(
               condition = .data$count == .data$wcount,
               true      = "",
-              false     = stringr::str_c("weighted n: ",
+              false     = str_c("weighted n: ",
                                          format(round(.data$wcount, 0),
                                                 trim = TRUE, big.mark = " "), "\n")
             )
 
-          ) %>%
+          ) |>
           tidyr::nest(interactive_text = tidyselect::all_of(c("cah", "profile_nb", "count", "wcount",
-                                                              active_vars))) %>%
+                                                              active_vars))) |>
           dplyr::rename("cah" = "cah_base", "count" = "count_base",
                         "wcount" = "wcount_base")
 
       } else {
-        ind_data <- ind_data %>%
+        ind_data <- ind_data |>
           dplyr::mutate(
             count_base  = .data$count,
             wcount_base = .data$wcount,
-            profile_nb  = stringr::str_c("<b>Answer profile n",
-                                         stringi::stri_unescape_unicode("\\u00b0"),
+            profile_nb  = str_c("<b>Answer profile n",
+                                         "\u00b0",
                                          nb = .data$nb,  "</b>"),
-            count       = stringr::str_c("n: ", format(round(.data$count, 0),
+            count       = str_c("n: ", format(round(.data$count, 0),
                                                        trim = TRUE, big.mark = " ")),
             wcount      = dplyr::if_else(
               condition = .data$count == .data$wcount,
               true      = "",
-              false     = stringr::str_c("weighted n: ",
+              false     = str_c("weighted n: ",
                                          format(round(.data$wcount, 0),
                                                 trim = TRUE, big.mark = " "), "\n")
             )
-          ) %>%
+          ) |>
           tidyr::nest(interactive_text = c("profile_nb", "count", "wcount",
-                                           tidyselect::all_of(active_vars))) %>%
+                                           tidyselect::all_of(active_vars))) |>
           dplyr::rename("count" = "count_base", "wcount" = "wcount_base")
       }
 
-      ind_data <- ind_data %>%
-        dplyr::select(-tidyselect::any_of(c("nb_in_cah", "nb_tot_cah"))) %>%
+      ind_data <- ind_data |>
+        dplyr::select(-tidyselect::any_of(c("nb_in_cah", "nb_tot_cah"))) |>
         dplyr::relocate(tidyselect::any_of(c("nb", "count", "wcount", "cah", "cah_id",
                                              "interactive_text", "sup_vars", "row.w")),
                         .before = 1)
@@ -946,7 +957,7 @@ ggmca_plot <- function(data,
   #sup_vars_data    <- data$sup_vars_data
   #mean_point_data  <- data$mean_point_data
   cah              <- data$cah
-  sup_vars         <- vars_data %>%
+  sup_vars         <- vars_data |>
     dplyr::filter(!.data$color_group %in% c("active_vars", "Central point")) |>
     dplyr::pull(.data$vars) |> unique()
   res.mca          <- data$res.mca
@@ -954,11 +965,11 @@ ggmca_plot <- function(data,
   if (!is.null(axes_names)) res.mca$axes_names <- axes_names
   if (!is.null(ellipses)) stopifnot(ellipses > 0 & ellipses <= 1)
 
-  dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
-  dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+  dim1 <- rlang::sym(str_c("Dim ", axes[1]))
+  dim2 <- rlang::sym(str_c("Dim ", axes[2]))
 
-  contrib1 <- rlang::sym(stringr::str_c("contrib", axes[1]))
-  contrib2 <- rlang::sym(stringr::str_c("contrib", axes[2]))
+  contrib1 <- rlang::sym(str_c("contrib", axes[1]))
+  contrib2 <- rlang::sym(str_c("contrib", axes[2]))
 
   # if (length(color_profiles) == 0) {
   #   if (length(cah) != 0) {
@@ -987,7 +998,7 @@ ggmca_plot <- function(data,
     dims_reverse <- unique(c(rlang::as_name(dim1), rlang::as_name(dim2))[axes_reverse])
 
     reverse_axe <- function(coord) {
-      coord %>% dplyr::mutate(dplyr::across(tidyselect::all_of(dims_reverse), ~ - .))
+      coord |> dplyr::mutate(dplyr::across(tidyselect::all_of(dims_reverse), ~ - .))
     }
 
     vars_data <- reverse_axe(vars_data)
@@ -997,25 +1008,25 @@ ggmca_plot <- function(data,
 
 
   #Add contribs in tooltips for active_vars ----
-  vars_data <- vars_data %>%
+  vars_data <- vars_data |>
     dplyr::mutate(
       contribs = purrr::map_if(
         .data$contribs, !purrr::map_lgl(.data$contribs, is.null),
-        ~ dplyr::mutate(., text = stringr::str_c(
-          "\nContrib axe ", axes[1], " : ", stringr::str_pad(round(!!contrib1, 0), 2), "%",
-          "\nContrib axe ", axes[2], " : ", stringr::str_pad(round(!!contrib2, 0), 2), "%"
-        )) %>%
+        ~ dplyr::mutate(., text = str_c(
+          "\nContrib axe ", axes[1], " : ", str_pad(round(!!contrib1, 0), 2), "%",
+          "\nContrib axe ", axes[2], " : ", str_pad(round(!!contrib2, 0), 2), "%"
+        )) |>
           dplyr::pull("text"),
 
         .else = ~ ""
-      ) %>%
+      ) |>
         purrr::flatten_chr(),
 
       interactive_text = purrr::map2(
         .data$interactive_text, .data$contribs,
-        ~ dplyr::mutate(.x, begin_text = stringr::str_c(.data$begin_text, .y))
+        ~ dplyr::mutate(.x, begin_text = str_c(.data$begin_text, .y))
       )
-    ) %>%
+    ) |>
     dplyr::select(-"contribs") # ??????????????????
 
 
@@ -1033,32 +1044,31 @@ ggmca_plot <- function(data,
   #   ))
 
   #Add linebreak at end if text finish by html </font>, otherwise no line breaks
-  vars_data <- vars_data %>%
-    dplyr::mutate(interactive_text = stringr::str_replace(.data$interactive_text,
-                                                          "</font>$", "</font>\\u202f") %>%
-                    stringi::stri_unescape_unicode())
+  vars_data <- vars_data |>
+    dplyr::mutate(interactive_text = str_replace(.data$interactive_text,
+                                                 "</font>$", paste0("</font>", unbrk)))
 
   # Set colors :
   if (type[1] == "facets" | !is.null(ellipses)) {
-    vars_data <- vars_data %>%
+    vars_data <- vars_data |>
       dplyr::mutate(color_group = forcats::as_factor(dplyr::if_else(
         condition = .data$vars == sup_vars[1],
-        true      = paste0(.data$color_group, "_", .data$lvs), #forcats::fct_expand(paste0(.data$color_group, "_", .data$lvs) %>% as.factor(),
+        true      = paste0(.data$color_group, "_", .data$lvs), #forcats::fct_expand(paste0(.data$color_group, "_", .data$lvs) |> as.factor(),
         #                    levels(.data$color_group)),
         false     = as.character(.data$color_group)
       )))
   }
 
-  if (length(colornames_recode) > 0) vars_data <- vars_data %>%
+  if (length(colornames_recode) > 0) vars_data <- vars_data |>
     dplyr::mutate(color_group = forcats::fct_recode(.data$color_group,
                                                     !!!colornames_recode))
-  if (shift_colors != 0) vars_data <- vars_data %>%
+  if (shift_colors != 0) vars_data <- vars_data |>
     dplyr::mutate(color_group = forcats::fct_shift(.data$color_group, shift_colors))
   colorvar_recode <- levels(vars_data$color_group)
   colorvar_recode <- colorvar_recode[!colorvar_recode %in% c("active_vars", "Central point")]
   if (length(colorvar_recode) >= 2) {
-    message(stringr::str_c("colors based on the following categories (rename with colornames_recode): '",
-                           stringr::str_c(colorvar_recode, collapse = "', '"), "'",
+    message(str_c("colors based on the following categories (rename with colornames_recode): '",
+                           str_c(colorvar_recode, collapse = "', '"), "'",
                            collapse = ""))
   }
 
@@ -1070,11 +1080,11 @@ ggmca_plot <- function(data,
   }
 
 
-  scale_color_points <- scale_color_light %>%
+  scale_color_points <- scale_color_light |>
     purrr::set_names(colorvar_recode[1:length(scale_color_light)])
 
-  scale_color_names <- scale_color_dark %>%
-    purrr::set_names(stringr::str_c("names_", colorvar_recode[1:length(scale_color_dark)]))
+  scale_color_names <- scale_color_dark |>
+    purrr::set_names(str_c("names_", colorvar_recode[1:length(scale_color_dark)]))
 
   if(length(scale_color_light) > length(scale_color_dark)) {
     scale_color_light <- scale_color_light[1:length(scale_color_dark)]
@@ -1084,13 +1094,13 @@ ggmca_plot <- function(data,
 
   if (length(colorvar_recode[-(1:length(scale_color_light))]) > 0) {
     levels_in_more <- colorvar_recode[-(1:length(scale_color_light))]
-    scale_color_points <- scale_color_points %>%
-      append(rep(.[length(.)], length(levels_in_more)) %>%
-               purrr::set_names(levels_in_more))
-    scale_color_names <- scale_color_names %>%
-      append(rep(.[length(.)], length(levels_in_more)) %>%
-               purrr::set_names(levels_in_more))
-    warning(stringr::str_c("too much colors, all the last ones were set to last color. Max ", length(scale_color_light)))
+    scale_color_points <- scale_color_points |>
+      (\(v) append(v, rep(v[length(v)], length(levels_in_more)) |>
+               purrr::set_names(levels_in_more)))()
+    scale_color_names <- scale_color_names |>
+      (\(v) append(v, rep(v[length(v)], length(levels_in_more)) |>
+               purrr::set_names(levels_in_more)))()
+    warning(str_c("too much colors, all the last ones were set to last color. Max ", length(scale_color_light)))
   }
 
   if (is.null(base_profiles_color)) base_profiles_color <- "#ffffff"
@@ -1103,8 +1113,8 @@ ggmca_plot <- function(data,
                                 "Central point"       = "black"
   )
 
-  if (type[1] %in% c("points", "numbers"))  vars_data <- vars_data %>%
-    dplyr::mutate(colorvar_names = as.factor(stringr::str_c("names_", .data$color_group)))
+  if (type[1] %in% c("points", "numbers"))  vars_data <- vars_data |>
+    dplyr::mutate(colorvar_names = as.factor(str_c("names_", .data$color_group)))
   #} else { sup_vars_data <- sup_vars_data %>% dplyr::mutate(colorvar_names =  color_group) }
 
 
@@ -1115,11 +1125,11 @@ ggmca_plot <- function(data,
   #Calculate limits of graph (arguments to be passed in ggi() to set htmlwidget size)
   min_max_lims <- dplyr::select(vars_data, !!dim1, !!dim2)
 
-  if (!missing(xlim)) min_max_lims <- min_max_lims %>%
-    tibble::add_row(!!dim1 := xlim[1]) %>% tibble::add_row(!!dim1 := xlim[2])
-  if (!missing(ylim)) min_max_lims <- min_max_lims %>%
-    tibble::add_row(!!dim2 := ylim[1]) %>% tibble::add_row(!!dim2 := ylim[2])
-  heigth_width_ratio <- min_max_lims %>%
+  if (!missing(xlim)) min_max_lims <- min_max_lims |>
+    tibble::add_row(!!dim1 := xlim[1]) |> tibble::add_row(!!dim1 := xlim[2])
+  if (!missing(ylim)) min_max_lims <- min_max_lims |>
+    tibble::add_row(!!dim2 := ylim[1]) |> tibble::add_row(!!dim2 := ylim[2])
+  heigth_width_ratio <- min_max_lims |>
     dplyr::summarise_all(~ max(., na.rm = TRUE) - min(., na.rm = TRUE), .groups = "drop")
   min_max_lims <-
     dplyr::bind_rows(dplyr::summarise_all(min_max_lims,
@@ -1129,8 +1139,8 @@ ggmca_plot <- function(data,
                                           ~ max(., na.rm = TRUE),
                                           .groups = "drop"))
   width_range <- dplyr::pull(heigth_width_ratio, 1)[1]
-  heigth_width_ratio <- heigth_width_ratio %>%
-    dplyr::summarise(heigth_width_ratio = !!dim2/!!dim1, .groups = "drop") %>%
+  heigth_width_ratio <- heigth_width_ratio |>
+    dplyr::summarise(heigth_width_ratio = !!dim2/!!dim1, .groups = "drop") |>
     tibble::deframe()
 
   if (dist_labels[1] == "auto") dist_labels <- width_range/40
@@ -1160,14 +1170,14 @@ ggmca_plot <- function(data,
 
   outlims <- function(data, lim, dim) {
     dim <- rlang::enquo(dim)
-    if (!is.na(lim[1])) data <- data %>% dplyr::filter(!!dim > lim[1])
-    if (!is.na(lim[2])) data <- data %>% dplyr::filter(!!dim < lim[2])
+    if (!is.na(lim[1])) data <- data |> dplyr::filter(!!dim > lim[1])
+    if (!is.na(lim[2])) data <- data |> dplyr::filter(!!dim < lim[2])
     return(data)
   }
 
   if (text_repel == FALSE | out_lims_move == FALSE) {
-    if (!missing(xlim)) vars_data <- vars_data %>% outlims(xlim, !!dim1)
-    if (!missing(ylim)) vars_data <- vars_data %>% outlims(ylim, !!dim2)
+    if (!missing(xlim)) vars_data <- vars_data |> outlims(xlim, !!dim1)
+    if (!missing(ylim)) vars_data <- vars_data |> outlims(ylim, !!dim2)
   }
 
 
@@ -1180,7 +1190,7 @@ ggmca_plot <- function(data,
       dplyr::mutate(interactive_text = dplyr::bind_rows(.data$interactive_text) |>
                       tidyr::unite("interactive_text", sep = "\n", na.rm = TRUE) |>
                       dplyr::pull("interactive_text") |>
-                      stringr::str_remove_all("\n#"),
+                      str_remove_all("\n#"),
       )
 
     # ind_data <- ind_data %>%
@@ -1188,7 +1198,7 @@ ggmca_plot <- function(data,
     #     .data$interactive_text,
     #     ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
     #   ) %>%
-    #     stringr::str_remove_all("\n#")
+    #     str_remove_all("\n#")
     #   )
 
     if (length(cah) != 0) { #& type[1] != "facets"
@@ -1198,8 +1208,8 @@ ggmca_plot <- function(data,
 
           #Discard the points that are out of limits
           profiles_coord <- ind_data
-          if (!missing(xlim)) profiles_coord <- profiles_coord %>% outlims(xlim, !!dim1)
-          if (!missing(ylim)) profiles_coord <- profiles_coord %>% outlims(ylim, !!dim2)
+          if (!missing(xlim)) profiles_coord <- profiles_coord |> outlims(xlim, !!dim1)
+          if (!missing(ylim)) profiles_coord <- profiles_coord |> outlims(ylim, !!dim2)
 
           profiles <- ggiraph::geom_point_interactive(
             data = profiles_coord,
@@ -1214,66 +1224,66 @@ ggmca_plot <- function(data,
 
 
       } else {
-        ind_cah_levels <- ind_data %>% dplyr::pull(cah) %>% unique() %>%
-          purrr::discard(is.na(.)) %>% purrr::discard(. == "NA")
+        ind_cah_levels <- ind_data |> dplyr::pull(cah) |> unique() |>
+          purrr::discard(is.na) |> purrr::discard(\(x) x == "NA")
 
-        not_in_color_profiles <- ind_cah_levels %>%
-          purrr::discard(. %in% color_profiles) %>%
-          purrr::set_names(rep("base_profiles_color", length(.) ))
+        not_in_color_profiles <- ind_cah_levels |>
+          purrr::discard(\(x) x %in% color_profiles) |>
+          (\(v) purrr::set_names(v, rep("base_profiles_color", length(v))))()
 
         if (cah %in% sup_vars) {
-          sup_cah_colorvar <- vars_data %>%
-            dplyr::select("lvs", "color_group") %>%
-            dplyr::filter(stringr::str_detect(.data$color_group, paste0("^", cah))) %>%
-            dplyr::mutate(color_group = .data$lvs %>% purrr::set_names(.data$color_group)) %>%
+          sup_cah_colorvar <- vars_data |>
+            dplyr::select("lvs", "color_group") |>
+            dplyr::filter(str_detect(.data$color_group, paste0("^", cah))) |>
+            dplyr::mutate(color_group = .data$lvs |> purrr::set_names(.data$color_group)) |>
             dplyr::pull("color_group") |>
             forcats::fct_drop()
 
           sup_cah_colorvar <- purrr::set_names(as.character(sup_cah_colorvar),
                                                names(sup_cah_colorvar))
 
-          color_profiles_in_colorvar <- sup_cah_colorvar %>%
-            purrr::keep(. %in% ind_cah_levels) %>%
-            purrr::keep(. %in% color_profiles)
+          color_profiles_in_colorvar <- sup_cah_colorvar |>
+            purrr::keep(\(x) x %in% ind_cah_levels) |>
+            purrr::keep(\(x) x %in% color_profiles)
 
-          color_profiles_not_in_colorvar <- color_profiles %>%
-            purrr::keep(. %in% ind_cah_levels) %>%
-            purrr::discard(. %in% sup_cah_colorvar)
+          color_profiles_not_in_colorvar <- color_profiles |>
+            purrr::keep(\(x) x %in% ind_cah_levels) |>
+            purrr::discard(\(x) x %in% sup_cah_colorvar)
 
         } else {
           color_profiles_in_colorvar <- character()
-          color_profiles_not_in_colorvar <-  color_profiles %>%
-            purrr::keep(. %in% ind_cah_levels)
+          color_profiles_not_in_colorvar <-  color_profiles |>
+            purrr::keep(\(x) x %in% ind_cah_levels)
         }
 
 
         if (length(color_profiles_not_in_colorvar) != 0) {
-          named_color_profiles <- color_profiles_not_in_colorvar %>%
-            purrr::keep(!is.null(names(.)))
+          named_color_profiles <- color_profiles_not_in_colorvar |>
+            (\(v) purrr::keep(v, !is.null(names(v))))()
 
           if (length(named_color_profiles) != 0 ) {
-            new_colors_in_scale <- names(named_color_profiles) %>%
+            new_colors_in_scale <- names(named_color_profiles) |>
               purrr::set_names(named_color_profiles)
 
-            named_color_profiles <- named_color_profiles %>%
-              purrr::set_names(., .)
+            named_color_profiles <- named_color_profiles |>
+              purrr::set_names()
 
-            scale_color_named_vector <- scale_color_named_vector %>%
+            scale_color_named_vector <- scale_color_named_vector |>
               append(new_colors_in_scale)
           }
 
 
-          unnamed_color_profiles <- color_profiles_not_in_colorvar %>%
-            purrr::keep(is.null(names(.)))
+          unnamed_color_profiles <- color_profiles_not_in_colorvar |>
+            (\(v) purrr::keep(v, is.null(names(v))))()
 
           if (length(unnamed_color_profiles) > 0) {
-            remaining_colors <- material_colors_light() %>%
-              purrr::discard(. %in% scale_color_named_vector)
+            remaining_colors <- material_colors_light() |>
+              purrr::discard(\(x) x %in% scale_color_named_vector)
 
-            unnamed_color_profiles <- unnamed_color_profiles %>%
-              purrr::set_names(., .)
+            unnamed_color_profiles <- unnamed_color_profiles |>
+              purrr::set_names()
 
-            scale_color_named_vector <- scale_color_named_vector %>%
+            scale_color_named_vector <- scale_color_named_vector |>
               append(purrr::set_names(remaining_colors[1:length(unnamed_color_profiles)], unnamed_color_profiles))
 
             if  (length(remaining_colors) < length(unnamed_color_profiles)) {
@@ -1285,21 +1295,21 @@ ggmca_plot <- function(data,
           unnamed_color_profiles <- character()
         }
 
-        cah_colorvar_recode <- named_color_profiles %>%
-          append(unnamed_color_profiles) %>%
-          append(not_in_color_profiles) %>%
+        cah_colorvar_recode <- named_color_profiles |>
+          append(unnamed_color_profiles) |>
+          append(not_in_color_profiles) |>
           append(color_profiles_in_colorvar)
 
 
-        ind_data <- ind_data %>%
+        ind_data <- ind_data |>
           dplyr::mutate(color_group = forcats::fct_recode(.data$cah,
                                                           !!!cah_colorvar_recode))
         # ind_data |> dplyr::select(color_group) |> print(n = 40)
 
         #Discard the points that are out of limits
         profiles_coord <- ind_data
-        if (!missing(xlim)) profiles_coord <- profiles_coord %>% outlims(xlim, !!dim1)
-        if (!missing(ylim)) profiles_coord <- profiles_coord %>% outlims(ylim, !!dim2)
+        if (!missing(xlim)) profiles_coord <- profiles_coord |> outlims(xlim, !!dim1)
+        if (!missing(ylim)) profiles_coord <- profiles_coord |> outlims(ylim, !!dim2)
 
         profiles <- ggiraph::geom_point_interactive(
           data = profiles_coord,
@@ -1316,8 +1326,8 @@ ggmca_plot <- function(data,
 
         #Discard the points that are out of limits
         profiles_coord <- ind_data
-        if (!missing(xlim)) profiles_coord <- profiles_coord %>% outlims(xlim, !!dim1)
-        if (!missing(ylim)) profiles_coord <- profiles_coord %>% outlims(ylim, !!dim2)
+        if (!missing(xlim)) profiles_coord <- profiles_coord |> outlims(xlim, !!dim1)
+        if (!missing(ylim)) profiles_coord <- profiles_coord |> outlims(ylim, !!dim2)
 
         profiles <-
           ggiraph::geom_point_interactive(
@@ -1336,31 +1346,31 @@ ggmca_plot <- function(data,
 
     if(type[1] == "facets" | !is.null(ellipses) ) {
 
-      ind_data <- ind_data %>%
+      ind_data <- ind_data |>
         dplyr::mutate(sup_vars = purrr::map(.data$sup_vars,
-                                            ~ dplyr::select(., !!rlang::sym(sup_vars[1])))) %>%
+                                            ~ dplyr::select(., !!rlang::sym(sup_vars[1])))) |>
         tidyr::unnest(c(.data$sup_vars, .data$row.w))
 
       supvar1_lvs <-
-        dplyr::filter(vars_data, .data$vars == sup_vars[1]) %>%
-        dplyr::pull(.data$lvs) %>% as.character() %>% purrr::set_names(.)
+        dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
+        dplyr::pull(.data$lvs) |> as.character() |> purrr::set_names()
 
-      supvar1_colorvar <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) %>%
+      supvar1_colorvar <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
         dplyr::select(.data$lvs, .data$color_group)
-      supvar1_colorvar <- as.character(supvar1_colorvar$color_group) %>% purrr::set_names(supvar1_colorvar$lvs)
+      supvar1_colorvar <- as.character(supvar1_colorvar$color_group) |> purrr::set_names(supvar1_colorvar$lvs)
 
-      supvar1_infos <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) %>%
-        dplyr::mutate(nam = .data$lvs) %>%
-        dplyr::select(.data$nam, .data$lvs, .data$color_group, .data$id) %>%
+      supvar1_infos <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
+        dplyr::mutate(nam = .data$lvs) |>
+        dplyr::select(.data$nam, .data$lvs, .data$color_group, .data$id) |>
         tidyr::nest(infos = c(.data$lvs, .data$color_group, .data$id))
-      supvar1_infos <- supvar1_infos$infos %>% purrr::set_names(supvar1_infos$nam)
+      supvar1_infos <- supvar1_infos$infos |> purrr::set_names(supvar1_infos$nam)
 
       if (!is.null(ellipses)) {
-        ellipses_coord <- ind_data %>%
-          dplyr::select(!!dim1, !!dim2, .data$row.w, tidyselect::all_of(sup_vars[1]), tidyselect::any_of("lvs")) %>%
+        ellipses_coord <- ind_data |>
+          dplyr::select(!!dim1, !!dim2, .data$row.w, tidyselect::all_of(sup_vars[1]), tidyselect::any_of("lvs")) |>
           dplyr::mutate(infos = supvar1_infos[as.character(!!rlang::sym(sup_vars[1]))],
-          ) %>%
-          tidyr::unnest(cols = c(.data$infos)) %>%
+          ) |>
+          tidyr::unnest(cols = c(.data$infos)) |>
           dplyr::filter(!is.na(.data$lvs))
 
 
@@ -1395,21 +1405,21 @@ ggmca_plot <- function(data,
       }
 
       if(type[1] == "facets") {
-        ind_data <- ind_data %>%
-          tidyr::nest(row.w = .data$row.w) %>%
+        ind_data <- ind_data |>
+          tidyr::nest(row.w = .data$row.w) |>
           dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
                         wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
-          ) %>%
+          ) |>
           #dplyr::select(-.data$row.w) %>%
-          dplyr::arrange(!!rlang::sym(sup_vars[1]), -.data$wcount) %>%
+          dplyr::arrange(!!rlang::sym(sup_vars[1]), -.data$wcount) |>
           dplyr::mutate(lvs = purrr::map(!!rlang::sym(sup_vars[1]),
                                          ~ supvar1_lvs[as.character(.)]
-          ) %>% unlist(),
+          ) |> unlist(),
 
           color_group = purrr::map(!!rlang::sym(sup_vars[1]),
                                    ~ supvar1_colorvar[as.character(.)]
-          ) %>% unlist()
-          ) %>%
+          ) |> unlist()
+          ) |>
           dplyr::filter(!is.na(.data$lvs))
       }
     }
@@ -1428,7 +1438,7 @@ ggmca_plot <- function(data,
 
   # If type is text, put the active_vars on the same base than suplementary vars, to avoid overlapping of the two.
   #if (type[1] == "text" & length(sup_vars) != 0) {
-  vars_data <- vars_data %>%
+  vars_data <- vars_data |>
     dplyr::mutate(
       face = dplyr::case_when(
         color_group == "active_vars" & actives_in_bold ~ "bold" ,
@@ -1451,11 +1461,11 @@ ggmca_plot <- function(data,
       shape = 3, size = 5, stroke = 1.5,
       na.rm = TRUE, inherit.aes = FALSE
     )
-  vars_data <- vars_data %>% dplyr::filter(.data$lvs != "Central point")
+  vars_data <- vars_data |> dplyr::filter(.data$lvs != "Central point")
 
   #Theme
   if (!missing(title)) {
-    title_graph <- ggplot2::labs(title = title) #stringr::str_c("Les Active variables de l'ACM sur les axes ",axes[1], " et ", axes[2] )
+    title_graph <- ggplot2::labs(title = title) #str_c("Les Active variables de l'ACM sur les axes ",axes[1], " et ", axes[2] )
   } else {
     title_graph <- NULL
   }
@@ -1682,7 +1692,7 @@ ggmca_plot <- function(data,
     css_hover <- ggiraph::girafe_css("stroke:orange;stroke-width:2;",
                                      text = "color:gold4;stroke:none;")
 
-    plot_output <- plot_output %>%
+    plot_output <- plot_output |>
       append(c("css_hover" = css_hover))
 
   } else { stop('unknown type of graph') }
@@ -1697,8 +1707,8 @@ ggmca_plot <- function(data,
   #     append(c("css_hover" = css_hover))
   # }
 
-  plot_output <- plot_output %>%
-    append(c("heigth_width_ratio" = heigth_width_ratio)) %>%
+  plot_output <- plot_output |>
+    append(c("heigth_width_ratio" = heigth_width_ratio)) |>
     `attr<-`("class", c("gg", "ggplot"))
 
   return(plot_output)
@@ -1772,25 +1782,25 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 
   row.w <- res.mca$call$row.w
 
-  active_vars <- stringr::str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
+  active_vars <- str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
 
-  active_var_levels <- purrr::map(active_vars, ~ dplyr::pull(data, .) %>%
-                                    as.factor() %>%
+  active_var_levels <- purrr::map(active_vars, ~ dplyr::pull(data, .) |>
+                                    as.factor() |>
                                     forcats::fct_na_value_to_level("NA") |>
                                     levels()
   ) |>
-    purrr::set_names(active_vars) %>%
+    purrr::set_names(active_vars) |>
     purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs2 = .x))  |>
     dplyr::mutate(vars = forcats::as_factor(.data$vars))
 
   active_var_levels_disordered <-
-    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) %>%
-                 as.factor() %>% levels()) %>%
-    purrr::set_names(active_vars) %>%
+    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) |>
+                 as.factor() |> levels()) |>
+    purrr::set_names(active_vars) |>
     purrr::imap_dfr(~ tibble::tibble(
       vars = .y,
       lvs  = .x,
-      lvs2 = stringr::str_remove_all(.x, paste0("^", .y, "_") ),
+      lvs2 = str_remove_all(.x, paste0("^", .y, "_") ),
     )) |>
     dplyr::mutate(vars = forcats::as_factor(.data$vars))
 
@@ -1800,8 +1810,8 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
                      relationship = "one-to-one") |>
     dplyr::filter(!.data$lvs %in% mca_excl_done) |>
     dplyr::group_by(.data$vars) |>
-    dplyr::group_split() %>%
-    purrr::set_names(purrr::map_chr(., ~ as.character(dplyr::first(.$vars)))) |>
+    dplyr::group_split() |>
+    (\(g) purrr::set_names(g, purrr::map_chr(g, ~ as.character(dplyr::first(.$vars)))))() |>
     purrr::map(~ .$lvs)
 
 
@@ -1858,12 +1868,12 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
       ")"
 
     ) |>
-      stringr::str_remove(" *\\(\\)$")
+      str_remove(" *\\(\\)$")
     ) |>
     dplyr::mutate(vars_group = forcats::as_factor(.data$vars_group)) |>
     dplyr::group_by(.data$vars_group) |>
-    dplyr::group_split() %>%
-    purrr::set_names(purrr::map_chr(., ~ as.character(dplyr::first(.$vars_group)))) |>
+    dplyr::group_split() |>
+    (\(g) purrr::set_names(g, purrr::map_chr(g, ~ as.character(dplyr::first(.$vars_group)))))() |>
     purrr::map(~ list(vars = .$vars[1], vars_group = .$vars_group[1], lvs = .$lvs))
 
 
@@ -1880,7 +1890,7 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 
            if (cleannames) {
              disj <- disj |>
-               dplyr::rename_with(~ stringr::str_remove_all(., cleannames_condition()))
+               dplyr::rename_with(~ str_remove_all(., cleannames_condition()))
            }
 
            disj |>
@@ -1893,8 +1903,8 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
              dplyr::rowwise() |>
              dplyr::mutate(lvs = which(dplyr::c_across(tidyselect::everything()) == "1") |>
                              dplyr::first()) |>
-             dplyr::ungroup() %>%
-             dplyr::mutate(lvs = names(.)[.data$lvs]) |>
+             dplyr::ungroup() |>
+             (\(d) dplyr::mutate(d, lvs = names(d)[.data$lvs]))() |>
              dplyr::rename_with(~ paste0("x", 0:(length(.)-1)),
                                 .cols = -tidyselect::all_of(c("n", "wn", "lvs", "freq"))) |>
              dplyr::mutate(vars = ..1, vars_group = ..2, .before = 1)
@@ -2115,23 +2125,23 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
                                 keep = NULL) {
 
-  dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
-  dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+  dim1 <- rlang::sym(str_c("Dim ", axes[1]))
+  dim2 <- rlang::sym(str_c("Dim ", axes[2]))
 
   active_vars <-
-    stringr::str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
+    str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
 
 
   active_var_levels <-
-    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) %>%
-                 as.factor() %>% levels()) %>%
-    purrr::set_names(active_vars) %>%
+    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) |>
+                 as.factor() |> levels()) |>
+    purrr::set_names(active_vars) |>
     purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs = .x))
 
   freqs <- tibble::enframe(res.mca$call$marge.col * length(active_vars),
                            "lvs", "freq")
   freqs <- active_var_levels |> dplyr::left_join(freqs, by = "lvs") |>
-    dplyr::mutate(lvs = stringr::str_remove_all(.data$lvs,
+    dplyr::mutate(lvs = str_remove_all(.data$lvs,
                                                 cleannames_condition()))
 
 
@@ -2183,9 +2193,9 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
         .names = "proj_{.col}"
       ),
     ) |>
-    dplyr::rename_with(~stringr::str_remove(., "_Dim "),
+    dplyr::rename_with(~str_remove(., "_Dim "),
                        .cols = tidyselect::starts_with("proj_Dim")) |>
-    dplyr::rename_with(~stringr::str_remove(., "_Dim "),
+    dplyr::rename_with(~str_remove(., "_Dim "),
                        .cols = tidyselect::starts_with("start_angle_Dim")) |>
     dplyr::mutate(
       ang_x = .data$start_angle1 - dplyr::first(!!dim1),  # 2 left 3 down
@@ -2289,7 +2299,7 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
 
   acm_orga_from_base_ref |>
     ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
-    ggfacto::theme_facto(res.mca, no_color_scale = TRUE) +
+    theme_facto(res.mca, no_color_scale = TRUE) +
     #acm_orga_1_cah$graph_theme_acm +
     ggplot2::geom_point(
       data = tibble::tibble(!!dim1 := 0, !!dim2 := 0),
@@ -2363,8 +2373,8 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
 # ggmca_cah <- function(res.mca, dat, cah, axes = c(1, 2), text_size = 3,
 #                       color_groups, ...) {
 #
-#   dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
-#   dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+#   dim1 <- rlang::sym(str_c("Dim ", axes[1]))
+#   dim2 <- rlang::sym(str_c("Dim ", axes[2]))
 #
 #   if (missing(color_groups)) color_groups <- "^.{1}"
 #
@@ -2380,7 +2390,7 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
 #
 #
 #   acm_cah <- acm$vars_data |>
-#     dplyr::filter(stringr::str_detect(color_group, paste0("^", cah)))
+#     dplyr::filter(str_detect(color_group, paste0("^", cah)))
 #   acm_vars <- new_tab(acm$vars_data) |>
 #     dplyr::filter(vars != cah) |>
 #     dplyr::mutate(face = dplyr::if_else(color_group != "variables_actives", "italic", "bold") )
@@ -2518,8 +2528,8 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
   D2 <- length(axes) == 2 ; stopifnot(length(axes) %in% 2:3 )
   if (D2) axes <- c(axes, NA)
 
-  dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
-  dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
+  dim1 <- rlang::sym(str_c("Dim ", axes[1]))
+  dim2 <- rlang::sym(str_c("Dim ", axes[2]))
 
   # if (missing(color_groups)) color_groups <- "^.{1}"
 
@@ -2533,7 +2543,7 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
     )
 
   acm_cah <- acm$vars_data |>
-    dplyr::filter(stringr::str_detect(.data$color_group, paste0("^", cah)))
+    dplyr::filter(str_detect(.data$color_group, paste0("^", cah)))
   # a plain plotting tibble: no fmt column, so the tab class bought nothing
   acm_vars <- acm$vars_data |>
     dplyr::filter(!.data$vars %in% cah) |>
@@ -2577,7 +2587,7 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
                   pair_id = as.integer(.data$name),
 
     ) |>
-    dplyr::mutate(name = stringr::str_replace(.data$name, "Dim ", "Axe ") ) |>
+    dplyr::mutate(name = str_replace(.data$name, "Dim ", "Axe ") ) |>
     dplyr::select("name", "pair_id", "base_coord", tidyselect::starts_with("Dim ") )
 
   plot_range <-
@@ -2697,9 +2707,9 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
 
   ## Assemble plot ----
 
-  dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1]))
-  dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2]))
-  dim3 <- if (D2) {NULL} else {rlang::sym(stringr::str_c("Dim ", axes[3]))}
+  dim1 <- rlang::sym(str_c("Dim ", axes[1]))
+  dim2 <- rlang::sym(str_c("Dim ", axes[2]))
+  dim3 <- if (D2) {NULL} else {rlang::sym(str_c("Dim ", axes[3]))}
 
 
   # To get a fixed aspect ratio, put a point in max range * aspectratio on all axes
@@ -2732,7 +2742,7 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
   if (!missing(camera_view)) {
     camera_view <- camera_view |>
       purrr::set_names(paste0("scene", 1:length(camera_view)) |>
-                         stringr::str_replace("scene1", "scene") )
+                         str_replace("scene1", "scene") )
     scene_name <- names(camera_view)
 
   } else {
@@ -3270,25 +3280,25 @@ mca_interpret <- function(res.mca = res.mca,
                           type = c("html", "console")) {
   if (type[1] == "html") requireNamespace("kableExtra", quietly = TRUE)
 
-  contrib1 <- res.mca$var$contrib[,axes] %>%
-    tibble::as_tibble(rownames = "levels") %>%
+  contrib1 <- res.mca$var$contrib[,axes] |>
+    tibble::as_tibble(rownames = "levels") |>
     tidyr::pivot_longer(-.data$levels, names_prefix ="Dim ", names_to = "Axe",
-                        values_to = "Contrib_mod") %>%
-    dplyr::select(.data$Axe, tidyselect::everything()) %>% dplyr::arrange(.data$Axe) %>%
+                        values_to = "Contrib_mod") |>
+    dplyr::select(.data$Axe, tidyselect::everything()) |> dplyr::arrange(.data$Axe) |>
     dplyr::mutate(eig_value = res.mca$eig[as.integer(.data$Axe),1],
                   pct       = round(res.mca$eig[as.integer(.data$Axe),2], 1))
 
   data <- res.mca$call$X[res.mca$call$quali]
-  var_names <- names(data) %>% purrr::set_names(.)
-  var_names <- purrr::map(var_names, ~ levels(dplyr::pull(data, .x)) ) %>%
+  var_names <- purrr::set_names(names(data))
+  var_names <- purrr::map(var_names, ~ levels(dplyr::pull(data, .x)) ) |>
     purrr::imap(
-      ~ rep(.y, length(.x)) %>% purrr::set_names(.x)
-    ) %>%
+      ~ rep(.y, length(.x)) |> purrr::set_names(.x)
+    ) |>
     purrr::flatten_chr()
 
-  contrib1 <- contrib1 %>%
-    dplyr::mutate(Question = var_names[.data$levels]) %>%
-    dplyr::group_by(.data$Axe, .data$Question) %>%
+  contrib1 <- contrib1 |>
+    dplyr::mutate(Question = var_names[.data$levels]) |>
+    dplyr::group_by(.data$Axe, .data$Question) |>
     dplyr::mutate(contrib_q = sum(.data$Contrib_mod))
 
   #Coordonnees et frequences des levels (pour calculer contribution des ecarts)
@@ -3297,54 +3307,54 @@ mca_interpret <- function(res.mca = res.mca,
     tibble::tibble(levels = names(res.mca$call$marge.col),
                    fk = res.mca$call$marge.col),
     by = "levels"
-  ) %>%
+  ) |>
     tidyr::pivot_longer(c(-.data$levels, -.data$fk),
                         names_prefix = "Dim ", names_to = "Axe",
-                        values_to = "coord") %>%
+                        values_to = "coord") |>
     dplyr::arrange(.data$Axe)
 
 
   #Choisir les levels > a la moyenne, trier par coordonnees positives/negatives
-  contribsup <- contrib1 %>% dplyr::left_join(coord_fk, by = c("Axe", "levels")) %>%
-    dplyr::with_groups(NULL, ~ dplyr::mutate(., mean_ctr = mean(.data$Contrib_mod))) %>%
-    dplyr::filter(.data$Contrib_mod >= .data$mean_ctr) %>%
+  contribsup <- contrib1 |> dplyr::left_join(coord_fk, by = c("Axe", "levels")) |>
+    dplyr::with_groups(NULL, ~ dplyr::mutate(., mean_ctr = mean(.data$Contrib_mod))) |>
+    dplyr::filter(.data$Contrib_mod >= .data$mean_ctr) |>
     dplyr::arrange(.data$Axe, dplyr::desc(.data$contrib_q),
-                   dplyr::desc(.data$Contrib_mod)) %>%
+                   dplyr::desc(.data$Contrib_mod)) |>
     #dplyr::arrange(dplyr::desc(contrib_q)) %>%
     dplyr::mutate(levels_2 = .data$levels, ctr_neg = .data$Contrib_mod,
                   ctr_pos  = .data$Contrib_mod, fneg = .data$fk, fpos = .data$fk,
-                  coord_neg = .data$coord, coord_pos = .data$coord) %>%
-    dplyr::select(-.data$Contrib_mod) %>%
+                  coord_neg = .data$coord, coord_pos = .data$coord) |>
+    dplyr::select(-.data$Contrib_mod) |>
     dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels", "ctr_neg", "fneg",
                                                      "coord_neg")),
-                                ~ ifelse(.data$coord <= 0, ., NA))) %>%
+                                ~ ifelse(.data$coord <= 0, ., NA))) |>
     dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels_2", "ctr_pos", "fpos",
                                                      "coord_pos")),
-                                ~ ifelse(.data$coord > 0, ., NA))) %>%
+                                ~ ifelse(.data$coord > 0, ., NA))) |>
     dplyr::ungroup()
 
 
   #Ajouter les ecarts par Question (en % de la contribution de la question) :
-  contribsup <- contribsup %>%
-    dplyr::group_by(.data$Axe, .data$Question) %>%
+  contribsup <- contribsup |>
+    dplyr::group_by(.data$Axe, .data$Question) |>
     dplyr::mutate(coord_ecart_neg = stats::weighted.mean(.data$coord_neg,.data$fneg,
                                                          na.rm = TRUE),
                   coord_ecart_pos = stats::weighted.mean(.data$coord_pos,.data$fpos,
                                                          na.rm = T),
                   poids_ecart_neg = sum(.data$fneg, na.rm = T),
-                  poids_ecart_pos = sum(.data$fpos, na.rm = T)  ) %>%
-    dplyr::mutate(poids_ecart = 1/( 1/.data$poids_ecart_neg + 1/.data$poids_ecart_pos) ) %>%
+                  poids_ecart_pos = sum(.data$fpos, na.rm = T)  ) |>
+    dplyr::mutate(poids_ecart = 1/( 1/.data$poids_ecart_neg + 1/.data$poids_ecart_pos) ) |>
     dplyr::mutate(spread = .data$poids_ecart * 100 *
                     (.data$coord_ecart_pos - .data$coord_ecart_neg)^2 /
-                    (.data$eig_value*.data$contrib_q/100  ) ) %>%
+                    (.data$eig_value*.data$contrib_q/100  ) ) |>
     dplyr::select(-.data$coord,-.data$fk,-.data$coord_ecart_neg, -.data$coord_ecart_pos,
-                  -.data$poids_ecart_neg, -.data$poids_ecart_pos, -.data$poids_ecart) %>%
-    dplyr::ungroup() %>%
+                  -.data$poids_ecart_neg, -.data$poids_ecart_pos, -.data$poids_ecart) |>
+    dplyr::ungroup() |>
     dplyr::mutate(spread = ifelse(is.na(.data$spread), NA, .data$spread) )
 
   #Contributions totales (positif/negatif sur l'axe), contrib de l'ecart total :
-  total <- contribsup %>%
-    dplyr::group_by(.data$Axe) %>%
+  total <- contribsup |>
+    dplyr::group_by(.data$Axe) |>
     dplyr::summarise(ctr_neg = sum(.data$ctr_neg, na.rm = TRUE),
                      ctr_pos = sum(.data$ctr_pos, na.rm = TRUE),
                      coord_neg = stats::weighted.mean(.data$coord_neg, .data$fneg,
@@ -3356,9 +3366,9 @@ mca_interpret <- function(res.mca = res.mca,
                      poids_ecart = 1/( 1/.data$poids_neg + 1/.data$poids_pos), #fii' = 1/(1/fi + 1/fi').
                      spread = .data$poids_ecart * 100 *
                        (.data$coord_pos - .data$coord_neg)^2/mean(.data$eig_value) # = fii' (y l - y ')^2/??l )
-    ) %>% dplyr::select(-.data$coord_neg, -.data$coord_pos, -.data$poids_neg,
-                        -.data$poids_pos, - .data$poids_ecart) %>%
-    tibble::add_column(Question = "All levels") %>%
+    ) |> dplyr::select(-.data$coord_neg, -.data$coord_pos, -.data$poids_neg,
+                        -.data$poids_pos, - .data$poids_ecart) |>
+    tibble::add_column(Question = "All levels") |>
     dplyr::mutate(contrib_q = .data$ctr_neg + .data$ctr_pos)
 
   # #Total general (contributions sur l'axe positif + sur l'axe negatif)
@@ -3367,77 +3377,77 @@ mca_interpret <- function(res.mca = res.mca,
   #   dplyr::summarise(contrib_q = sum(.data$ctr_neg, na.rm = TRUE) + sum(.data$ctr_pos, na.rm = TRUE))
   # #total2 <-  dplyr::bind_rows(total2, total2["Axe"])
 
-  final_tab <- contribsup %>%
+  final_tab <- contribsup |>
     dplyr::select(-.data$fneg, -.data$fpos, -.data$coord_neg, -.data$coord_pos,
-                  -.data$eig_value) %>%
-    dplyr::bind_rows(total) %>%
-    dplyr::arrange(.data$Axe) %>%
+                  -.data$eig_value) |>
+    dplyr::bind_rows(total) |>
+    dplyr::arrange(.data$Axe) |>
     dplyr::select(tidyselect::all_of(c("Axe", "pct", "Question", "contrib" = "contrib_q",
                                        "Positive_levels" = "levels_2", "  " =  "ctr_pos",
                                        "Negative_levels" = "levels", "   " = "ctr_neg",
                                        "spread")))
 
   if (type[1] == "html") {
-    final_tab <- final_tab %>% dplyr::group_by(.data$Axe)
+    final_tab <- final_tab |> dplyr::group_by(.data$Axe)
 
     new_group <- dplyr::group_indices(final_tab)
     new_group <- which(new_group != dplyr::lag(new_group, default = 0))
 
     last_row <- nrow(final_tab)
 
-    totrows   <- final_tab %>%
+    totrows   <- final_tab |>
       dplyr::mutate(row = dplyr::row_number(),
-                    row = row == max(row)) %>%
-      dplyr::pull(row) %>% which()
+                    row = row == max(row)) |>
+      dplyr::pull(row) |> which()
 
-    questions <- final_tab %>% dplyr::group_by(.data$Axe, .data$Question) %>%
+    questions <- final_tab |> dplyr::group_by(.data$Axe, .data$Question) |>
       dplyr::group_indices()
     questions <- which(questions != dplyr::lag(questions, default = 0) &
                          !is.na(dplyr::pull(final_tab, .data$Question)))
     questions <- questions[!questions %in% new_group]
 
 
-    final_tab <- final_tab %>%
+    final_tab <- final_tab |>
       dplyr::mutate(dplyr::across(where(is.numeric),
-                                  ~ tidyr::replace_na(stringr::str_c(round(., 1), "%"), ""))) %>%
+                                  ~ tidyr::replace_na(str_c(round(., 1), "%"), ""))) |>
       dplyr::mutate(dplyr::across(where(is.character),
-                                  ~ tidyr::replace_na(., ""))) %>%
+                                  ~ tidyr::replace_na(., ""))) |>
       dplyr::mutate(dplyr::across(
         tidyselect::all_of(c("Question", "contrib", "spread")),
         ~ dplyr::if_else(condition = .data$Question != dplyr::lag(.data$Question, default = ".novalue."),
                          true      = .,
                          false     = "")
-      )) %>%
+      )) |>
       dplyr::mutate(Axe = dplyr::case_when(
         condition = dplyr::row_number() == 1    ~ paste0("Axe ", .data$Axe, ": ", pct),
         condition = dplyr::row_number() == 2    ~ "of variance",
         TRUE                             ~ ""
-      )) %>%
-      dplyr::rename(" " = "Axe") %>%
+      )) |>
+      dplyr::rename(" " = "Axe") |>
       dplyr::select(-tidyselect::all_of("pct"))
 
 
-    final_tab <- final_tab %>%
-      kableExtra::kable(format = "html") %>%
+    final_tab <- final_tab |>
+      kableExtra::kable(format = "html") |>
       kableExtra::kable_classic(lightable_options = "hover",
                                 #bootstrap_options = c("hover", "condensed", "responsive", "bordered"), #"striped",
                                 full_width = FALSE,
                                 html_font = "DejaVu Sans Condensed", # row_label_position
                                 fixed_thead = TRUE)
 
-    final_tab <- final_tab %>%
+    final_tab <- final_tab |>
       kableExtra::row_spec(
         0, bold = TRUE,
         extra_css = "border-top: 0px solid ; border-bottom: 1px solid ;"
-      ) %>%
-      kableExtra::row_spec(totrows, bold = TRUE) %>%
-      kableExtra::column_spec(c(1, 4, 6, 8), border_left = TRUE) %>%
-      kableExtra::column_spec(8, border_right = TRUE) %>%
-      kableExtra::row_spec(questions, extra_css = "border-top: 1px solid ;") %>%
+      ) |>
+      kableExtra::row_spec(totrows, bold = TRUE) |>
+      kableExtra::column_spec(c(1, 4, 6, 8), border_left = TRUE) |>
+      kableExtra::column_spec(8, border_right = TRUE) |>
+      kableExtra::row_spec(questions, extra_css = "border-top: 1px solid ;") |>
       kableExtra::column_spec(1, bold = TRUE,
-                              extra_css = "border-top: 0px solid ; border-bottom: 0px solid ;") %>%
+                              extra_css = "border-top: 0px solid ; border-bottom: 0px solid ;") |>
 
-      kableExtra::row_spec(new_group, extra_css = "border-top: 2px solid ;") %>%
+      kableExtra::row_spec(new_group, extra_css = "border-top: 2px solid ;") |>
       kableExtra::row_spec(last_row, extra_css = "border-bottom: 2px solid ;")
 
   }
@@ -3599,23 +3609,23 @@ ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
   requireNamespace("plotly", quietly = TRUE)
   if (exists("axes_names", where = res.pca)) {
     first_axe_title  <-
-      stringr::str_c(
+      str_c(
         "Axe ", axes[1]," (", round(res.pca$eig[axes[1],2], 1),
         "%)",
         if (!is.null(res.pca$axes_names[axes[1]]) ) paste0(" : ", res.pca$axes_names[axes[1]])
       )
     second_axe_title <-
-      stringr::str_c(
+      str_c(
         "Axe ", axes[2]," (", round(res.pca$eig[axes[2],2], 1),
         "%)",
         if (!is.null(res.pca$axes_names[axes[2]]) ) paste0(" : ", res.pca$axes_names[axes[2]])
       )
   } else {
     first_axe_title  <-
-      stringr::str_c("Axe ", axes[1]," (",
+      str_c("Axe ", axes[1]," (",
                      round(res.pca$eig[axes[1],2], 1), "%)")
     second_axe_title <-
-      stringr::str_c("Axe ", axes[2]," (",
+      str_c("Axe ", axes[2]," (",
                      round(res.pca$eig[axes[2],2], 1), "%)")
   }
 
@@ -3628,7 +3638,6 @@ ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
   data_circle <- res.pca$var$coord |> as.data.frame() |> tibble::rownames_to_column("name") |>
     tibble::as_tibble() |> dplyr::mutate(id = as.integer(as.factor(.data$name)))
 
-  #unbrk <- stringi::stri_unescape_unicode("\\u202f") # unbreakable space
 
   interactive_txt <-
     data_circle |>
@@ -3638,15 +3647,15 @@ ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
 
       dplyr::across(
         tidyselect::starts_with("Dim."),
-        ~ paste0("Coord", unbrk, "Axe", unbrk, stringr::str_sub(dplyr::cur_column(), -1, -1),
+        ~ paste0("Coord", unbrk, "Axe", unbrk, str_sub(dplyr::cur_column(), -1, -1),
                  ":", unbrk,
-                 stringr::str_pad(round(., 2), width = 5, side = "left") |>
-                   stringr::str_replace_all("-", paste0(unbrk, "-")),
+                 str_pad(round(., 2), width = 5, side = "left") |>
+                   str_replace_all("-", paste0(unbrk, "-")),
                  " (cor",
-                 stringr::str_pad(round(.*100, 0), width = 3, side = "left"),
+                 str_pad(round(.*100, 0), width = 3, side = "left"),
                  "%)\n") |>
-          stringr::str_replace_all("-", paste0(unbrk, "-") ) |>
-          stringr::str_replace_all(" ", paste0(unbrk, unbrk, unbrk))
+          str_replace_all("-", paste0(unbrk, "-") ) |>
+          str_replace_all(" ", paste0(unbrk, unbrk, unbrk))
       )) |>
     tidyr::unite(col = "interactive_text", sep = "")
 
@@ -3715,7 +3724,11 @@ ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
 
   plot_output <- data_circle |>
     ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
-    ggforce::geom_circle(ggplot2::aes(x0 = 0, y0 = 0, r = 1), color = "#d32f2f", linewidth = 1) +
+    ggplot2::geom_path(
+      data = data.frame(angle = seq(0, 2 * pi, length.out = 361)) |>
+        dplyr::mutate(x = cos(.data$angle), y = sin(.data$angle)),
+      mapping = ggplot2::aes(x = .data$x, y = .data$y), inherit.aes = FALSE,
+      color = "#d32f2f", linewidth = 1) +
     ggplot2::geom_hline(yintercept = 0, color="#d32f2f", linetype = "solid") +
     ggplot2::geom_vline(xintercept = 0, color="#d32f2f", linetype = "solid") +
     ggplot2::labs(x = first_axe_title, y =  second_axe_title) +
@@ -3736,7 +3749,7 @@ ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
     ggplot2::geom_segment(
       ggplot2::aes(xend = !!dim1, yend = !!dim2),
       x = 0, y = 0, color = "#0077c2",
-      arrow = grid::arrow(length = ggplot2::unit(0.25, "cm")), linewidth = 1
+      arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "cm")), linewidth = 1
     ) +
     ggiraph::geom_label_repel_interactive(
       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$name,
@@ -4039,10 +4052,10 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
 
   base_axis_in_princ <- ind.sup_coords |>
     as.data.frame() |> tibble::rownames_to_column("name") |>
-    # dplyr::filter(!stringr::str_detect(name, "mean$")) |>
+    # dplyr::filter(!str_detect(name, "mean$")) |>
     dplyr::left_join(base_axis_coords, by = "name") |>
     dplyr::mutate(
-      name    = forcats::as_factor(stringr::str_remove(.data$name, "_[^_]+$")),
+      name    = forcats::as_factor(str_remove(.data$name, "_[^_]+$")),
       pair_id = as.integer(as.factor(.data$name)) #,
     )
 
@@ -4051,11 +4064,11 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
 
 
   princ_axes <-
-    colnames(ind_coords)[stringr::str_detect(colnames(ind_coords), "Dim.")] |>
+    colnames(ind_coords)[str_detect(colnames(ind_coords), "Dim.")] |>
     purrr::map_dfr(~ tibble::tibble(
       !!rlang::sym(.x) := princ_axes_print,
       base_coord = princ_axes_print,
-      name       = stringr::str_replace(.x, "Dim.", "Axe "),
+      name       = str_replace(.x, "Dim.", "Axe "),
     )
     ) |>
     dplyr::mutate(
@@ -4114,15 +4127,15 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
                       ~ format(., justify = "right", digits = 1, big.mark = " ", trim = TRUE) #,  # nsmall = 0,
         ),
 
-        dplyr::across(tidyselect::all_of(active_vars), stringr::str_length, .names = "{.col}_length_str"),
+        dplyr::across(tidyselect::all_of(active_vars), str_length, .names = "{.col}_length_str"),
 
         max_length = pmax(!!!rlang::syms(paste0(active_vars, "_length_str")), na.rm = TRUE),
 
         dplyr::across(
           tidyselect::all_of(active_vars),
           ~ paste0(dplyr::cur_column(), ": ",
-                   stringr::str_pad(., width = max_length,  side = "left")) |>
-            stringr::str_replace("(^[^\\.]+\\.)", paste0(unbrk, "\\1") ) #,
+                   str_pad(., width = max_length,  side = "left")) |>
+            str_replace("(^[^\\.]+\\.)", paste0(unbrk, "\\1") ) #,
         )
       ) |>
       dplyr::select(-tidyselect::ends_with("_length_str"), -"max_length")
@@ -4136,16 +4149,16 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
         dplyr::across(tidyselect::all_of(active_vars),
                       ~ paste0(dplyr::if_else(. >= 0, "+", ""), #paste0(unbrk, "-")
                                format(., justify = "right", digits = 1, big.mark = " ", trim = TRUE) ) |>
-                        stringr::str_replace("\\+ ", "\\+")
+                        str_replace("\\+ ", "\\+")
         ),
 
-        dplyr::across(tidyselect::all_of(active_vars), stringr::str_length, .names = "{.col}_length_str"),
+        dplyr::across(tidyselect::all_of(active_vars), str_length, .names = "{.col}_length_str"),
         max_length = pmax(!!!rlang::syms(paste0(active_vars, "_length_str")), na.rm = TRUE),
 
         dplyr::across(tidyselect::all_of(active_vars),
-                      ~ stringr::str_pad(., width = max_length,  side = "left") |>
-                        stringr::str_replace("-", paste0(unbrk, "-")) |>
-                        stringr::str_replace("(^[^\\.]+\\.)", paste0(unbrk, "\\1") )
+                      ~ str_pad(., width = max_length,  side = "left") |>
+                        str_replace("-", paste0(unbrk, "-")) |>
+                        str_replace("(^[^\\.]+\\.)", paste0(unbrk, "\\1") )
         )
       ) |>
       dplyr::select(-tidyselect::ends_with("_length_str"), -"max_length") |>
@@ -4162,11 +4175,11 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
 
     ind_contrib <- res.pca$ind$contrib |> as.data.frame() |> tibble::rownames_to_column("name") |>
       tibble::as_tibble() |>
-      dplyr::rename_with(~ stringr::str_replace(., "Dim.", "ctr."), .cols = tidyselect::starts_with("Dim."))
+      dplyr::rename_with(~ str_replace(., "Dim.", "ctr."), .cols = tidyselect::starts_with("Dim."))
 
     ind_cos2 <- res.pca$ind$cos2 |> as.data.frame() |> tibble::rownames_to_column("name") |>
       tibble::as_tibble() |>
-      dplyr::rename_with(~ stringr::str_replace(., "Dim.", "cos2."), .cols = tidyselect::starts_with("Dim."))
+      dplyr::rename_with(~ str_replace(., "Dim.", "cos2."), .cols = tidyselect::starts_with("Dim."))
 
 
     ind_tooltips_coords <-  ind_coords |>
@@ -4176,7 +4189,7 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
       dplyr::mutate(
         dplyr::across(
           tidyselect::starts_with("Dim."),
-          ~ paste0("Axe ", stringr::str_remove(dplyr::cur_column(), "Dim."),  ": " ,
+          ~ paste0("Axe ", str_remove(dplyr::cur_column(), "Dim."),  ": " ,
                    format(round(., 1), justify = "right", nsmall = 1)#,  # nsmall = 0,
           )
         ),
@@ -4199,7 +4212,7 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
 
         dplyr::across(tidyselect::any_of(dplyr::first(tidyselect::starts_with("Dim."))), ~ paste0("<br>", .) )
       )
-    ind_coords_order <- purrr::set_names(names(ind_tooltips_coords)[-1] |> stringr::str_sub(-1, -1) ,
+    ind_coords_order <- purrr::set_names(names(ind_tooltips_coords)[-1] |> str_sub(-1, -1) ,
                                          names(ind_tooltips_coords)[-1]
     ) |> sort() |> names()
     ind_tooltips_coords <- ind_tooltips_coords |>
@@ -4210,7 +4223,7 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
       dplyr::mutate(
         dplyr::across(
           tidyselect::all_of(quali_sup),
-          ~ paste0(dplyr::cur_column(), ": ", ., "<br>") # stringr::str_pad(., max(stringr::str_length(.)), side = "right")
+          ~ paste0(dplyr::cur_column(), ": ", ., "<br>") # str_pad(., max(str_length(.)), side = "right")
         ),
 
         dplyr::across(
@@ -4244,7 +4257,7 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
 
     ind_tooltips <- ind_tooltips |>
       dplyr::mutate(
-        tooltip = stringr::str_replace_all(.data$tooltip, " ",
+        tooltip = str_replace_all(.data$tooltip, " ",
                                            paste0(unbrk, unbrk, unbrk))
       )
 
@@ -4286,9 +4299,9 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
 
   ## Assemble plot ----
 
-  dim1 <- rlang::sym(stringr::str_c("Dim.", axes[1]))
-  dim2 <- rlang::sym(stringr::str_c("Dim.", axes[2]))
-  dim3 <- if (D2) {NULL} else {rlang::sym(stringr::str_c("Dim.", axes[3]))}
+  dim1 <- rlang::sym(str_c("Dim.", axes[1]))
+  dim2 <- rlang::sym(str_c("Dim.", axes[2]))
+  dim3 <- if (D2) {NULL} else {rlang::sym(str_c("Dim.", axes[3]))}
 
 
   # To get a fixed aspect ratio, put a point in max range * aspectratio on all axes
@@ -4322,7 +4335,7 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
   if (!missing(camera_view)) {
     camera_view <- camera_view |>
       purrr::set_names(paste0("scene", 1:length(camera_view)) |>
-                         stringr::str_replace("scene1", "scene") )
+                         str_replace("scene1", "scene") )
     scene_name <- names(camera_view)
 
   } else {
@@ -4432,14 +4445,14 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
               dplyr::mutate(dplyr::across(
                 tidyselect::ends_with("_o"),
                 ~ rlang::eval_tidy(
-                  rlang::sym(stringr::str_remove(dplyr::cur_column(), "_o"))
+                  rlang::sym(str_remove(dplyr::cur_column(), "_o"))
                 ) - .
               )),
             scene = scene_name[i],
             x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
-            u = ~eval(rlang::sym(stringr::str_c("Dim.", axes[1], "_o"))),
-            v = ~eval(rlang::sym(stringr::str_c("Dim.", axes[2], "_o"))),
-            w = ~eval(rlang::sym(stringr::str_c("Dim.", axes[3], "_o"))),
+            u = ~eval(rlang::sym(str_c("Dim.", axes[1], "_o"))),
+            v = ~eval(rlang::sym(str_c("Dim.", axes[2], "_o"))),
+            w = ~eval(rlang::sym(str_c("Dim.", axes[3], "_o"))),
             sizeref = cone_size, sizemode = "absolute",
 
             colorscale = list(list(0, var_color), list(1, var_color)), # "black"
@@ -4653,11 +4666,11 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
 
     # Valeurs singulieres (racine carree des valeurs propres)
     if ("vs" %in% type) {
-      vs_diag <- diag(res.pca$svd$vs) |>
-        magrittr::set_colnames(paste0("Dim.", 1:length(res.pca$svd$vs))) |>
-        magrittr::set_rownames(paste0("Dim.", 1:length(res.pca$svd$vs))) |>
+      vs_diag <- diag(res.pca$svd$vs)
+      dimnames(vs_diag) <- rep(list(paste0("Dim.", 1:length(res.pca$svd$vs))), 2L)
+      vs_diag <- vs_diag |>
         as.data.frame() |> tibble::rownames_to_column("name") |> tibble::as_tibble() |>
-        dplyr::mutate(name = stringr::str_replace(.data$name, "Dim.", "vs"))
+        dplyr::mutate(name = str_replace(.data$name, "Dim.", "vs"))
 
       dual_plots[[i]] <- dual_plots[[i]] |>
         plotly::add_trace(
@@ -5159,8 +5172,8 @@ pca_interpret <- function(res.pca, axes = 1:3) {
     tidyr::pivot_wider(names_from = "type",
                        values_from = tidyselect::starts_with("Dim."),
                        names_sort = TRUE) |>
-    dplyr::rename_with(~stringr::str_remove(., "_coord") |>
-                         stringr::str_replace("Dim\\.([^_]+)_(.+)", "\\2.\\1")
+    dplyr::rename_with(~str_remove(., "_coord") |>
+                         str_replace("Dim\\.([^_]+)_(.+)", "\\2.\\1")
     )
 
   var_data |>
@@ -5185,7 +5198,7 @@ pca_interpret <- function(res.pca, axes = 1:3) {
                                     in_refrow = variable == "Total",
                                     digits  = 2L,
 
-                                    col_var   =  stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"),
+                                    col_var   =  str_extract(dplyr::cur_column(), "\\.[^\\.]+$"),
                                     color     = "difference",
                                     ref = "tot",
                     )
@@ -5199,7 +5212,7 @@ pca_interpret <- function(res.pca, axes = 1:3) {
                                     ctr       = ./100,
                                     row_kind  = dplyr::if_else(variable == "Total", "total", "data"),
 
-                                    col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
+                                    col_var   = str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
                                     color     = "contrib",
                                     ref = "tot",
                     )),
@@ -5213,7 +5226,7 @@ pca_interpret <- function(res.pca, axes = 1:3) {
                                     row_kind  = dplyr::if_else(variable == "Total", "total", "data"),
                                     in_refrow = variable == "Total",
 
-                                    col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
+                                    col_var   = str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
                                     color     = "difference",
                                     ref = "tot",
                     )
@@ -5285,10 +5298,10 @@ mean_sd_tab <- function(data, vars, wt) {
     dplyr::mutate(
       dplyr::across(
         tidyselect::ends_with(";mean"),
-        ~ rlang::eval_tidy(rlang::sym(stringr::str_replace(dplyr::cur_column(), ";mean", ";sd"))) / .,
+        ~ rlang::eval_tidy(rlang::sym(str_replace(dplyr::cur_column(), ";mean", ";sd"))) / .,
         .names = "{.col};sd/mean"),
     ) |>
-    dplyr::rename_with(~ stringr::str_replace(., "mean;sd/mean", "sd/mean"),
+    dplyr::rename_with(~ str_replace(., "mean;sd/mean", "sd/mean"),
                        .cols = tidyselect::contains("mean;sd/mean")) |>
     tidyr::pivot_longer(cols = tidyselect::everything(),
                         names_to = c("variables", "type"),
@@ -5406,204 +5419,204 @@ ggca <-
            text_size = 3.5, dist_labels = c("auto", 0.12), right_margin = 0,
            size_scale_max = 8, use_theme = TRUE) {  #, repel_max_iter = 10000
 
-    dim1 <- rlang::sym(stringr::str_c("Dim ", axes[1])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[1],"`"))))
-    dim2 <- rlang::sym(stringr::str_c("Dim ", axes[2])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[2],"`"))))
+    dim1 <- rlang::sym(str_c("Dim ", axes[1])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[1],"`"))))
+    dim2 <- rlang::sym(str_c("Dim ", axes[2])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[2],"`"))))
 
 
     #Lignes :
-    row_coord <- res.ca$row$coord %>% tibble::as_tibble(rownames = "lvs") %>%
-      dplyr::mutate(colorvar = "Active_row") %>%
-      dplyr::bind_rows(res.ca$row.sup$coord %>%
-                         tibble::as_tibble(rownames = "lvs") %>%
+    row_coord <- res.ca$row$coord |> tibble::as_tibble(rownames = "lvs") |>
+      dplyr::mutate(colorvar = "Active_row") |>
+      dplyr::bind_rows(res.ca$row.sup$coord |>
+                         tibble::as_tibble(rownames = "lvs") |>
                          dplyr::mutate(colorvar = "Sup_row") )
-    row_coord <- row_coord  %>%
-      dplyr::bind_cols(freq = rowSums(res.ca$call$Xtot) / sum(rowSums(res.ca$call$Xtot))) %>%
+    row_coord <- row_coord  |>
+      dplyr::bind_cols(freq = rowSums(res.ca$call$Xtot) / sum(rowSums(res.ca$call$Xtot))) |>
       dplyr::mutate(numbers = dplyr::case_when(
-        stringr::str_detect(.data$lvs, "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-")
-        ~ stringr::str_extract(.data$lvs, "^[^- ]+"),
+        str_detect(.data$lvs, "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-")
+        ~ str_extract(.data$lvs, "^[^- ]+"),
         TRUE ~ "" ))
 
     # Remove words in parenthesis and numbers
-    if (cleannames == TRUE) row_coord <- row_coord %>%
-      dplyr::mutate(lvs = stringr::str_remove_all(.data$lvs, cleannames_condition()))
+    if (cleannames == TRUE) row_coord <- row_coord |>
+      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition()))
 
     # Variable de couleur (colorvar) selon nb de caracteres indiques
-    row_coord <- row_coord  %>%
-      dplyr::mutate(row_colorvar = as.factor(stringr::str_sub(.data$numbers, 1,
+    row_coord <- row_coord  |>
+      dplyr::mutate(row_colorvar = as.factor(str_sub(.data$numbers, 1,
                                                               rowcolor_numbers)))
     row_colorvar_recode <- levels(row_coord$row_colorvar)
-    names(row_colorvar_recode) <- stringr::str_c(1:nlevels(row_coord$row_colorvar))
-    row_coord <- row_coord %>%
+    names(row_colorvar_recode) <- str_c(1:nlevels(row_coord$row_colorvar))
+    row_coord <- row_coord |>
       dplyr::mutate(row_colorvar = forcats::fct_recode(.data$row_colorvar,
-                                                       !!!row_colorvar_recode)) %>%
+                                                       !!!row_colorvar_recode)) |>
       dplyr::mutate(colorvar = ifelse(.data$colorvar == "Sup_row", .data$colorvar,
-                                      stringr::str_c(.data$colorvar,
-                                                     .data$row_colorvar))) %>%
-      dplyr::select(-.data$row_colorvar) %>%
+                                      str_c(.data$colorvar,
+                                                     .data$row_colorvar))) |>
+      dplyr::select(-.data$row_colorvar) |>
       # Afficher informations interactives au survol d'un point
-      dplyr::mutate(interactive_text = stringr::str_c("<b>", .data$lvs, "</b>", "\n",
+      dplyr::mutate(interactive_text = str_c("<b>", .data$lvs, "</b>", "\n",
                                                       "Frequency: ",
                                                       round(.data$freq*100, 0), "%"),
-                    lvs = stringr::str_replace_all(.data$lvs, "[^[:alnum:][:punct:]]",
-                                                   " ") %>% stringr::str_squish()  )
+                    lvs = str_replace_all(.data$lvs, "[^[:alnum:][:punct:]]",
+                                                   " ") |> str_squish()  )
 
     if ("row" %in% tooltips) {
       #Calculer les % par ligne (de la variable colonne)
-      row_frequencies <- res.ca$call$Xtot %>% tibble::as_tibble() %>%
+      row_frequencies <- res.ca$call$Xtot |> tibble::as_tibble() |>
         tibble::add_row(!!!colSums(res.ca$call$Xtot))
-      row_frequencies <- row_frequencies %>%
-        dplyr::mutate_all(~ ./rowSums(row_frequencies)) %>%
-        dplyr::rename_all(~ stringr::str_remove_all(., cleannames_condition()))
-      row_residuals <- row_frequencies %>%
-        dplyr::mutate_all(~ . - .[nrow(row_frequencies)]) %>%
+      row_frequencies <- row_frequencies |>
+        dplyr::mutate_all(~ ./rowSums(row_frequencies)) |>
+        dplyr::rename_all(~ str_remove_all(., cleannames_condition()))
+      row_residuals <- row_frequencies |>
+        dplyr::mutate_all(~ . - .[nrow(row_frequencies)]) |>
         dplyr::mutate_all(~ dplyr::case_when(
-          round(.*100,0) >= 0 ~ stringr::str_c("+", round(.*100, 0), "%"),
-          . < 0 ~ stringr::str_c(unbrk, #Unbreakable space
+          round(.*100,0) >= 0 ~ str_c("+", round(.*100, 0), "%"),
+          . < 0 ~ str_c(unbrk, #Unbreakable space
                                  "-", round(abs(.)*100, 0), "%")
-        )) %>% dplyr::slice(-nrow(row_frequencies))
-      row_frequencies <- row_frequencies %>%
-        dplyr::slice(-nrow(row_frequencies)) %>%
-        dplyr::mutate_all(~ stringr::str_c(round(.*100, 0), "%")) %>%
+        )) |> dplyr::slice(-nrow(row_frequencies))
+      row_frequencies <- row_frequencies |>
+        dplyr::slice(-nrow(row_frequencies)) |>
+        dplyr::mutate_all(~ str_c(round(.*100, 0), "%")) |>
         dplyr::mutate_all(~dplyr::case_when(
-          stringr::str_length(.) >= 3 ~ .,
-          stringr::str_length(.) < 3 ~ stringr::str_c(
+          str_length(.) >= 3 ~ .,
+          str_length(.) < 3 ~ str_c(
             unbrk, unbrk, . #2 unbreakable spaces
           ),
         ))
-      row_frequencies <- row_frequencies %>%
-        dplyr::bind_rows(row_residuals) %>%
+      row_frequencies <- row_frequencies |>
+        dplyr::bind_rows(row_residuals) |>
         dplyr::mutate(number_of_rows = dplyr::row_number())
-      row_frequencies <- row_frequencies %>%
+      row_frequencies <- row_frequencies |>
         dplyr::mutate_at(dplyr::vars(-.data$number_of_rows), ~dplyr::case_when(
           number_of_rows > nrow(row_frequencies)/2 ~ NA_character_,
-          TRUE ~ stringr::str_c("(",.[number_of_rows + nrow(row_frequencies)/2],") ", .),
-        )) %>%
-        dplyr::slice(1:(nrow(row_frequencies)/2)) %>% dplyr::select(-.data$number_of_rows)
+          TRUE ~ str_c("(",.[number_of_rows + nrow(row_frequencies)/2],") ", .),
+        )) |>
+        dplyr::slice(1:(nrow(row_frequencies)/2)) |> dplyr::select(-.data$number_of_rows)
       row_frequencies <- purrr::map_dfc(1:ncol(row_frequencies),
                                         ~dplyr::mutate_all(row_frequencies[.x],
-                                                           function(.) stringr::str_c(colnames(row_frequencies)[.x], " : ", .)
+                                                           function(.) str_c(colnames(row_frequencies)[.x], " : ", .)
                                         ))
-      row_frequencies <- row_frequencies %>%
-        tidyr::unite("row_text", sep = "\n") %>% dplyr::pull(.data$row_text)
-      row_coord <- row_coord %>%
-        dplyr::mutate(interactive_text = stringr::str_c(
+      row_frequencies <- row_frequencies |>
+        tidyr::unite("row_text", sep = "\n") |> dplyr::pull(.data$row_text)
+      row_coord <- row_coord |>
+        dplyr::mutate(interactive_text = str_c(
           .data$interactive_text, "\n\n", rowtips_subtitle, " :\n", row_frequencies))
     }
 
 
 
     #Colonnes :
-    col_coord <- res.ca$col$coord %>% tibble::as_tibble (rownames = "lvs") %>%
-      dplyr::mutate(colorvar = "Active_col") %>%
-      dplyr::bind_rows(res.ca$col.sup$coord %>%
-                         tibble::as_tibble(rownames = "lvs") %>%
-                         dplyr::mutate(colorvar = "Sup_col") ) %>%
+    col_coord <- res.ca$col$coord |> tibble::as_tibble (rownames = "lvs") |>
+      dplyr::mutate(colorvar = "Active_col") |>
+      dplyr::bind_rows(res.ca$col.sup$coord |>
+                         tibble::as_tibble(rownames = "lvs") |>
+                         dplyr::mutate(colorvar = "Sup_col") ) |>
       dplyr::bind_cols(freq = rowSums(t(res.ca$call$Xtot)) / sum(rowSums(t(res.ca$call$Xtot))))
-    col_coord <- col_coord %>%
+    col_coord <- col_coord |>
       dplyr::mutate(numbers = dplyr::case_when(
-        stringr::str_detect(.data$lvs, "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-")
-        ~ stringr::str_extract(.data$lvs, "^[^- ]+"),
+        str_detect(.data$lvs, "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-")
+        ~ str_extract(.data$lvs, "^[^- ]+"),
         TRUE ~ "" ))
 
     # Enlever les mots entre parentheses et les nombres
-    if (cleannames == TRUE) col_coord <- col_coord %>%
-      dplyr::mutate(lvs = stringr::str_remove_all(.data$lvs, cleannames_condition()))
+    if (cleannames == TRUE) col_coord <- col_coord |>
+      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition()))
 
     # Variable de couleur (colorvar) selon nb de caracteres indiques
-    col_coord <- col_coord %>%
-      dplyr::mutate(col_colorvar = as.factor(stringr::str_sub(.data$numbers, 1,
+    col_coord <- col_coord |>
+      dplyr::mutate(col_colorvar = as.factor(str_sub(.data$numbers, 1,
                                                               colcolor_numbers)))
     col_colorvar_recode <- levels(col_coord$col_colorvar)
-    names(col_colorvar_recode) <- stringr::str_c(1:nlevels(col_coord$col_colorvar))
-    col_coord <- col_coord %>%
+    names(col_colorvar_recode) <- str_c(1:nlevels(col_coord$col_colorvar))
+    col_coord <- col_coord |>
       dplyr::mutate(col_colorvar = forcats::fct_recode(.data$col_colorvar,
-                                                       !!!col_colorvar_recode)) %>%
+                                                       !!!col_colorvar_recode)) |>
       dplyr::mutate(colorvar = ifelse(.data$colorvar == "Sup_col", .data$colorvar,
-                                      stringr::str_c(.data$colorvar, .data$col_colorvar))) %>%
-      dplyr::select(-.data$col_colorvar) %>%
+                                      str_c(.data$colorvar, .data$col_colorvar))) |>
+      dplyr::select(-.data$col_colorvar) |>
       # Afficher informations interactives au survol d'un point
-      dplyr::mutate(interactive_text = stringr::str_c("<b>", .data$lvs, "</b>", "\n",
+      dplyr::mutate(interactive_text = str_c("<b>", .data$lvs, "</b>", "\n",
                                                       "Frequency: ",
                                                       round(.data$freq*100, 0), "%"),
-                    lvs = stringr::str_replace_all(.data$lvs, "[^[:alnum:][:punct:]]",
-                                                   " ") %>% stringr::str_squish()
+                    lvs = str_replace_all(.data$lvs, "[^[:alnum:][:punct:]]",
+                                                   " ") |> str_squish()
       )
 
 
     if ("col" %in% tooltips) {
       # Calculer les % par colonne (de la variable en ligne)
-      col_frequencies <- res.ca$call$Xtot %>% t %>% tibble::as_tibble() %>%
+      col_frequencies <- res.ca$call$Xtot |> t() |> tibble::as_tibble() |>
         tibble::add_row(!!!rowSums(res.ca$call$Xtot))
-      col_frequencies <- col_frequencies %>% dplyr::mutate_all(~ ./rowSums(col_frequencies)) %>%
-        dplyr::rename_all(~ stringr::str_remove_all(., cleannames_condition()))
-      col_residuals <- col_frequencies %>%
-        dplyr::mutate_all(~ . - .[nrow(col_frequencies)]) %>%
+      col_frequencies <- col_frequencies |> dplyr::mutate_all(~ ./rowSums(col_frequencies)) |>
+        dplyr::rename_all(~ str_remove_all(., cleannames_condition()))
+      col_residuals <- col_frequencies |>
+        dplyr::mutate_all(~ . - .[nrow(col_frequencies)]) |>
         dplyr::mutate_all(~ dplyr::case_when(
-          round(.*100,0) >= 0 ~ stringr::str_c("+", round(.*100, 0), "%"),
-          . < 0 ~ stringr::str_c(unbrk, #unbreakable space
+          round(.*100,0) >= 0 ~ str_c("+", round(.*100, 0), "%"),
+          . < 0 ~ str_c(unbrk, #unbreakable space
                                  "-", round(abs(.)*100, 0), "%")
-        )) %>% dplyr::slice(-nrow(col_frequencies))
-      col_frequencies <- col_frequencies %>%
-        dplyr::slice(-nrow(col_frequencies)) %>%
-        dplyr::mutate_all(~ stringr::str_c(round(.*100, 0), "%")) %>%
+        )) |> dplyr::slice(-nrow(col_frequencies))
+      col_frequencies <- col_frequencies |>
+        dplyr::slice(-nrow(col_frequencies)) |>
+        dplyr::mutate_all(~ str_c(round(.*100, 0), "%")) |>
         dplyr::mutate_all(~dplyr::case_when(
-          stringr::str_length(.) >= 3 ~ .,
-          stringr::str_length(.) < 3 ~ stringr::str_c(
+          str_length(.) >= 3 ~ .,
+          str_length(.) < 3 ~ str_c(
             unbrk, unbrk, .), #Two unbreakable spaces
         ))
-      col_frequencies <- col_frequencies %>%
-        dplyr::bind_rows(col_residuals) %>%
+      col_frequencies <- col_frequencies |>
+        dplyr::bind_rows(col_residuals) |>
         dplyr::mutate(number_of_rows = dplyr::row_number())
-      col_frequencies <- col_frequencies %>%
+      col_frequencies <- col_frequencies |>
         dplyr::mutate_at(dplyr::vars(-.data$number_of_rows), ~dplyr::case_when(
           number_of_rows > nrow(col_frequencies)/2 ~ NA_character_,
-          TRUE ~ stringr::str_c("(",.[.data$number_of_rows + nrow(col_frequencies)/2],") ", .),
-        )) %>%
-        dplyr::slice(1:(nrow(col_frequencies)/2)) %>% dplyr::select(-.data$number_of_rows)
+          TRUE ~ str_c("(",.[.data$number_of_rows + nrow(col_frequencies)/2],") ", .),
+        )) |>
+        dplyr::slice(1:(nrow(col_frequencies)/2)) |> dplyr::select(-.data$number_of_rows)
       col_frequencies <- purrr::map_dfc(1:ncol(col_frequencies),
                                         ~ dplyr::mutate_all(col_frequencies[.x],
-                                                            function(.) stringr::str_c(colnames(col_frequencies)[.x], " : ", .)
+                                                            function(.) str_c(colnames(col_frequencies)[.x], " : ", .)
                                         ))
-      col_frequencies <- col_frequencies %>%
-        tidyr::unite("col_text", sep = "\n") %>% dplyr::pull(.data$col_text)
-      col_coord <- col_coord %>%
-        dplyr::mutate(interactive_text = stringr::str_c(
+      col_frequencies <- col_frequencies |>
+        tidyr::unite("col_text", sep = "\n") |> dplyr::pull(.data$col_text)
+      col_coord <- col_coord |>
+        dplyr::mutate(interactive_text = str_c(
           .data$interactive_text, "\n\n", coltips_subtitle, " :\n", col_frequencies))
     }
 
     if (show_sup == FALSE) {
-      row_coord <- row_coord  %>%
-        dplyr::filter(!stringr::str_detect(.data$colorvar, "Sup"))
-      col_coord <- col_coord %>%
-        dplyr::filter(!stringr::str_detect(.data$colorvar, "Sup"))
+      row_coord <- row_coord  |>
+        dplyr::filter(!str_detect(.data$colorvar, "Sup"))
+      col_coord <- col_coord |>
+        dplyr::filter(!str_detect(.data$colorvar, "Sup"))
     }
 
 
     # Le Central point et son texte interactive :
-    col_freq_text <- rowSums(res.ca$call$Xtot) %>%
-      tibble::enframe(name = "lvs", value = "freq") %>%
-      dplyr::mutate(freq = stringr::str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) %>%
-      dplyr::mutate(lvs = stringr::str_remove_all(.data$lvs, cleannames_condition())) %>%
-      tidyr::unite("row_freq", sep = ": ") %>%  dplyr::pull(.data$row_freq) %>%
-      stringr::str_c(collapse = "\n")
+    col_freq_text <- rowSums(res.ca$call$Xtot) |>
+      tibble::enframe(name = "lvs", value = "freq") |>
+      dplyr::mutate(freq = str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) |>
+      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition())) |>
+      tidyr::unite("row_freq", sep = ": ") |>  dplyr::pull(.data$row_freq) |>
+      str_c(collapse = "\n")
 
-    row_freq_text <- rowSums(t(res.ca$call$Xtot)) %>%
-      tibble::enframe(name = "lvs", value = "freq") %>%
-      dplyr::mutate(freq = stringr::str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) %>%
-      dplyr::mutate(lvs = stringr::str_remove_all(.data$lvs, cleannames_condition())) %>%
-      tidyr::unite("col_freq", sep = ": ") %>% dplyr::pull(.data$col_freq) %>%
-      stringr::str_c(collapse = "\n")
+    row_freq_text <- rowSums(t(res.ca$call$Xtot)) |>
+      tibble::enframe(name = "lvs", value = "freq") |>
+      dplyr::mutate(freq = str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) |>
+      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition())) |>
+      tidyr::unite("col_freq", sep = ": ") |> dplyr::pull(.data$col_freq) |>
+      str_c(collapse = "\n")
 
-    mean_point_data <- row_coord %>% dplyr::slice(1) %>%
-      dplyr::mutate_at(dplyr::vars(tidyselect::starts_with("Dim")), ~ 0) %>%
+    mean_point_data <- row_coord |> dplyr::slice(1) |>
+      dplyr::mutate_at(dplyr::vars(tidyselect::starts_with("Dim")), ~ 0) |>
       dplyr::mutate(lvs = NA_character_, freq = 1, colorvar = "Central_point",
-                    numbers = NA_character_) %>%
-      dplyr::mutate(interactive_text = stringr::str_c(
-        "<b>Central point</b>\nFrequency: ", stringr::str_c(.data$freq*100, "%")))
+                    numbers = NA_character_) |>
+      dplyr::mutate(interactive_text = str_c(
+        "<b>Central point</b>\nFrequency: ", str_c(.data$freq*100, "%")))
 
     #if ("row" %in% tooltips) {     }     if ("col" %in% tooltips) {        }
-    mean_point_data <- mean_point_data %>%
-      dplyr::mutate(interactive_text = stringr::str_c(.data$interactive_text, "\n\n",
+    mean_point_data <- mean_point_data |>
+      dplyr::mutate(interactive_text = str_c(.data$interactive_text, "\n\n",
                                                       rowtips_subtitle, " :\n",
                                                       row_freq_text,
                                                       "\n\n", coltips_subtitle, " :\n",
@@ -5611,19 +5624,19 @@ ggca <-
 
     # Option pour afficher les lvs en majuscule (colonnes ou lignes) :
     if ("row" %in% uppercase) {
-      row_coord <- row_coord  %>%
-        dplyr::mutate(lvs = stringr::str_to_upper(.data$lvs, locale = "en"))
+      row_coord <- row_coord  |>
+        dplyr::mutate(lvs = str_to_upper(.data$lvs, locale = "en"))
     }
     if ("col" %in% uppercase) {
-      col_coord <- col_coord %>%
-        dplyr::mutate(lvs = stringr::str_to_upper(.data$lvs, locale = "en"))
+      col_coord <- col_coord |>
+        dplyr::mutate(lvs = str_to_upper(.data$lvs, locale = "en"))
     }
 
 
-    all_coord <- row_coord %>%
-      dplyr::bind_rows(col_coord) %>%
+    all_coord <- row_coord |>
+      dplyr::bind_rows(col_coord) |>
       dplyr::mutate(colorvar = as.factor(.data$colorvar),
-                    colorvar_names = as.factor(stringr::str_c("names_", .data$colorvar)),
+                    colorvar_names = as.factor(str_c("names_", .data$colorvar)),
                     id = dplyr::row_number()      )
 
 
@@ -5631,14 +5644,14 @@ ggca <-
     #Calculer les limites du graphique (argument a passer dans ggi pour regler la taille du htmlwidget)
     min_max_lims <- dplyr::select(all_coord, !!dim1, !!dim2)
 
-    if (!missing(xlim)) min_max_lims <- min_max_lims %>%  tibble::add_row(!!dim1 := xlim[1]) %>% tibble::add_row(!!dim1 := xlim[2])
-    if (!missing(ylim)) min_max_lims <- min_max_lims %>%  tibble::add_row(!!dim2 := ylim[1]) %>% tibble::add_row(!!dim2 := ylim[2])
-    heigth_width_ratio <- min_max_lims %>% dplyr::summarise_all(~ max(., na.rm = TRUE) - min(., na.rm = TRUE), .groups = "drop")
+    if (!missing(xlim)) min_max_lims <- min_max_lims |>  tibble::add_row(!!dim1 := xlim[1]) |> tibble::add_row(!!dim1 := xlim[2])
+    if (!missing(ylim)) min_max_lims <- min_max_lims |>  tibble::add_row(!!dim2 := ylim[1]) |> tibble::add_row(!!dim2 := ylim[2])
+    heigth_width_ratio <- min_max_lims |> dplyr::summarise_all(~ max(., na.rm = TRUE) - min(., na.rm = TRUE), .groups = "drop")
     min_max_lims <-
       dplyr::bind_rows(dplyr::summarise_all(min_max_lims, ~ min(., na.rm = TRUE), .groups = "drop"),
                        dplyr::summarise_all(min_max_lims, ~ max(., na.rm = TRUE), .groups = "drop"))
     width_range <- dplyr::pull(heigth_width_ratio, 1)[1]
-    heigth_width_ratio <- heigth_width_ratio %>% dplyr::summarise(heigth_width_ratio = !!dim2/!!dim1, .groups = "drop") %>% tibble::deframe()
+    heigth_width_ratio <- heigth_width_ratio |> dplyr::summarise(heigth_width_ratio = !!dim2/!!dim1, .groups = "drop") |> tibble::deframe()
     if (dist_labels[1] == "auto") dist_labels <- width_range/50
 
     theme_acm_with_lims <-
@@ -5667,14 +5680,14 @@ ggca <-
 
     outlims <- function(data, lim, dim) {
       dim <- rlang::enquo(dim)
-      if (!is.na(lim[1])) data <- data %>% dplyr::filter(!!dim > lim[1])
-      if (!is.na(lim[2])) data <- data %>% dplyr::filter(!!dim < lim[2])
+      if (!is.na(lim[1])) data <- data |> dplyr::filter(!!dim > lim[1])
+      if (!is.na(lim[2])) data <- data |> dplyr::filter(!!dim < lim[2])
       return(data)
     }
 
     if (text_repel == FALSE | out_lims_move == FALSE) {
-      if (!missing(xlim)) all_coord <- all_coord %>% outlims(xlim, !!dim1)
-      if (!missing(ylim)) all_coord <- all_coord %>% outlims(ylim, !!dim2)
+      if (!missing(xlim)) all_coord <- all_coord |> outlims(xlim, !!dim1)
+      if (!missing(ylim)) all_coord <- all_coord |> outlims(ylim, !!dim2)
     }
 
 
@@ -5716,7 +5729,7 @@ ggca <-
 
 
     if (!missing(title)) {
-      title_graph <- ggplot2::labs(title = title) #stringr::str_c("Les Active variables de l'ACM sur les axes ",axes[1], " et ", axes[2] )
+      title_graph <- ggplot2::labs(title = title) #str_c("Les Active variables de l'ACM sur les axes ",axes[1], " et ", axes[2] )
     } else {
       title_graph <- NULL
     }
@@ -5771,7 +5784,7 @@ ggca <-
 
       css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
                                        text = "color:gold4;stroke:none;")
-      plot_output <- plot_output %>% append(c("css_hover" = css_hover))
+      plot_output <- plot_output |> append(c("css_hover" = css_hover))
 
     } else if (type[1] == "text") {
       if (text_repel == FALSE) {
@@ -5821,8 +5834,8 @@ ggca <-
 
     #Add informations in the ggplot2::ggplot object, to be used into ggi() (without losing ggplot2::ggplot class)
     css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;color:black;" #
-    plot_output <- plot_output %>% append(c("css_tooltip" = css_tooltip)) %>%
-      append(c("heigth_width_ratio" = heigth_width_ratio)) %>%
+    plot_output <- plot_output |> append(c("css_tooltip" = css_tooltip)) |>
+      append(c("heigth_width_ratio" = heigth_width_ratio)) |>
       `attr<-`("class", c("gg", "ggplot"))
     return(plot_output)
   }
@@ -6027,7 +6040,7 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
   blocks <- c(blocks, list(pop_tab))
 
   purrr::reduce(blocks, dplyr::bind_rows) |>
-    dplyr::filter(!stringr::str_detect(as.character(.data$levels), "Remove levels")) |>
+    dplyr::filter(!str_detect(as.character(.data$levels), "Remove levels")) |>
     dplyr::mutate(dplyr::across(c("row_var", "levels"), ~ forcats::as_factor(as.character(.)))) |>
     dplyr::rename("variables" = "row_var", "lvs" = "levels", "Ensemble" = "Total") |>
     dplyr::group_by(.data$variables)
@@ -6070,23 +6083,23 @@ theme_facto <- function(res, axes = c(1,2), # res = res.mca
                         no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
   if (exists("axes_names", where = res)) {
     first_axe_title  <-
-      stringr::str_c(
+      str_c(
         "Axe ", axes[1]," (", round(res$eig[axes[1],2], 1),
         "%)",
         if (!is.null(res$axes_names[axes[1]]) ) paste0(" : ", res$axes_names[axes[1]])
       )
     second_axe_title <-
-      stringr::str_c(
+      str_c(
         "Axe ", axes[2]," (", round(res$eig[axes[2],2], 1),
         "%)",
         if (!is.null(res$axes_names[axes[2]]) ) paste0(" : ", res$axes_names[axes[2]])
       )
   } else {
     first_axe_title  <-
-      stringr::str_c("Axe ", axes[1]," (",
+      str_c("Axe ", axes[1]," (",
                      round(res$eig[axes[1],2], 1), "%)")
     second_axe_title <-
-      stringr::str_c("Axe ", axes[2]," (",
+      str_c("Axe ", axes[2]," (",
                      round(res$eig[axes[2],2], 1), "%)")
   }
 
@@ -6280,7 +6293,7 @@ ggi <- function(plot = ggplot2::last_plot(),
   # if(.Platform$OS.type == "windows") {
   #   css_tooltip <-
   #     paste0(css_tooltip, "font-family:", grDevices::windowsFonts("sans"), ";") #%>%
-  #   #stringr::str_replace("DejaVu Sans Condensed", "DejaVu Sans")
+  #   #str_replace("DejaVu Sans Condensed", "DejaVu Sans")
   # }
 
   if (is.null(width)) { #   if (missing(width)) {
@@ -6309,12 +6322,12 @@ ggi <- function(plot = ggplot2::last_plot(),
                     height_svg = height , #if_else(missing(height), width/2.563 * plot$heigth_width_ratio, height/2.563)
                     # fonts = ifelse(.Platform$OS.type == "windows",
                     #                grDevices::windowsFonts("sans") %>%
-                    #                  purrr::map(~stringr::str_replace(., "DejaVu Sans Condensed",
+                    #                  purrr::map(~str_replace(., "DejaVu Sans Condensed",
                     #                                                   "DejaVu Sans")),
                     #                NULL
                     # ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
                     ...
-    ) %>%
+    ) |>
     ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip), #, use_fill = TRUE, #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
                             ggiraph::opts_hover(css = css_hover)
                             # ggiraph::opts_zoom(max = 5) # bugue pas mal
@@ -6449,20 +6462,20 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
 
   path <- file.path(dir, basename(name))
 
-  path_name <- stringr::str_remove(path, "\\..+$")
-  if (! stringr::str_detect(path, "\\..+$")) path <- stringr::str_c(path, ".", extension)
+  path_name <- str_remove(path, "\\..+$")
+  if (! str_detect(path, "\\..+$")) path <- str_c(path, ".", extension)
   if (replace == FALSE) {
     i <- 0
     file_do_not_exist <- FALSE
     while (file_do_not_exist == FALSE) {
       if (file.exists(path)) {
         i = i+1
-        path <- stringr::str_c(path_name, i, ".", extension)
+        path <- str_c(path_name, i, ".", extension)
       } else {
         path <-
-          stringr::str_c(path_name, dplyr::if_else(i == 0,
+          str_c(path_name, dplyr::if_else(i == 0,
                                                    "",
-                                                   stringr::str_c(i)),
+                                                   str_c(i)),
                          ".", extension)
         file_do_not_exist <- TRUE
       }
@@ -6592,14 +6605,14 @@ interactive_tooltips <- function(dat,
     tooltip_vars_1lv_3levels <-
       purrr::map_lgl(dat, ~ nlevels(.) >= 3) &
       colnames(dat) %in% tooltip_vars_1lv
-    if (any(tooltip_vars_1lv_3levels)) dat <- dat %>%
+    if (any(tooltip_vars_1lv_3levels)) dat <- dat |>
         dplyr::mutate_if(tooltip_vars_1lv_3levels,
                          ~ forcats::fct_other(
                            .,
                            keep = levels(.)[1],
                            other_level = "Other_levels"
                          ))
-    dat <- dat %>%
+    dat <- dat |>
       dplyr::mutate(dplyr::across(
         tidyselect::all_of(tooltip_vars_1lv),
         ~ forcats::fct_recode(., rlang::splice(purrr::set_names(levels(.)[-1], "Remove_levels")))
@@ -6614,8 +6627,8 @@ interactive_tooltips <- function(dat,
 
   active_vars_2levels <- names(active_vars_2levels[active_vars_2levels])
 
-  active_vars_2levels <- dplyr::select(dat, tidyselect::all_of(active_vars_2levels)) %>%
-    purrr::map(~ levels(.)[2]) %>%
+  active_vars_2levels <- dplyr::select(dat, tidyselect::all_of(active_vars_2levels)) |>
+    purrr::map(~ levels(.)[2]) |>
     purrr::imap(~ c(.x, paste0(.y, "_", .x))) |>
     purrr::flatten_chr()
 
@@ -6645,15 +6658,15 @@ interactive_tooltips <- function(dat,
                       output_list = TRUE)
       })
 
-    tabs[vars %in% active_tables] <- tabs_active_tables %>%
+    tabs[vars %in% active_tables] <- tabs_active_tables |>
       purrr::map(
-        ~ dplyr::rename_with(., ~ "lvs", 1) %>%
-          dplyr::select(-tidyselect::any_of(active_vars_2levels)) %>%
-          dplyr::filter(!.data$lvs == "Remove_levels") %>%
+        ~ dplyr::rename_with(., ~ "lvs", 1) |>
+          dplyr::select(-tidyselect::any_of(active_vars_2levels)) |>
+          dplyr::filter(!.data$lvs == "Remove_levels") |>
           dplyr::mutate(
             n      = as.double(vctrs::field(.data$Total, "n")),
             wcount = dplyr::coalesce(as.double(vctrs::field(.data$Total, "wn")), .data$n)
-          ) %>%
+          ) |>
           dplyr::select(-tidyselect::any_of("Total"))
       )
   }
@@ -6669,15 +6682,15 @@ interactive_tooltips <- function(dat,
                       output_list = TRUE)
       })
 
-    tabs[!vars %in% active_tables] <- tabs_no_active_tables %>%
+    tabs[!vars %in% active_tables] <- tabs_no_active_tables |>
       purrr::map(
-        ~ dplyr::rename_with(., ~ "lvs", 1) %>%
-          dplyr::filter(!.data$lvs == "Remove_levels") %>%
+        ~ dplyr::rename_with(., ~ "lvs", 1) |>
+          dplyr::filter(!.data$lvs == "Remove_levels") |>
           dplyr::mutate(
             wcount = dplyr::coalesce(as.double(vctrs::field(.data$n, "wn")),
                                      as.double(vctrs::field(.data$n, "n"))),
             n      = as.double(vctrs::field(.data$n, "n"))
-          ) %>%
+          ) |>
           dplyr::select(-tidyselect::any_of(c("wn", "pct")))
       )
   }
@@ -6690,8 +6703,8 @@ interactive_tooltips <- function(dat,
   # can have applied to.
   unlv <- function(x) {
     x <- as.character(x)
-    hit <- stringr::str_detect(x, "_lv$") & stringr::str_remove(x, "_lv$") %in% names(dat)
-    dplyr::if_else(hit, stringr::str_remove(x, "_lv$"), x)
+    hit <- str_detect(x, "_lv$") & str_remove(x, "_lv$") %in% names(dat)
+    dplyr::if_else(hit, str_remove(x, "_lv$"), x)
   }
   # WARNING: through fct_relabel(), so `lvs` stays a FACTOR -- everything downstream picks the
   #   tooltip pieces out by `is.character()`, and a character `lvs` would be nested away with them.
@@ -6744,7 +6757,7 @@ interactive_tooltips <- function(dat,
   #   color_styles <- tabxplor:::get_color_style("color_code", type = "text", theme = "light")[color_styles]
   #
   #   color_positions <- color_selection %>%
-  #     purrr::map2(color_styles, ~ purrr::set_names(.x, stringr::str_to_upper(.y))) %>%
+  #     purrr::map2(color_styles, ~ purrr::set_names(.x, str_to_upper(.y))) %>%
   #     purrr::flatten_int()
   #
   #   no_color <- 1:length(var)
@@ -6755,10 +6768,10 @@ interactive_tooltips <- function(dat,
   # #replace by tabxplor::fmt_get_color_code()
 
   format_pct <- function(diff, pct, colname, color_code) {
-    pct <- stringr::str_pad(pct, 3, pad = "@")
+    pct <- str_pad(pct, 3, pad = "@")
 
     pct[!is.na(color_code)] <-
-      stringr::str_c("<font color=\"",
+      str_c("<font color=\"",
                      color_code[!is.na(color_code)],
                      "\">",
                      "<b>",
@@ -6776,28 +6789,27 @@ interactive_tooltips <- function(dat,
 
       diff >  0 ~ paste0(
         colname, ": ", #"\n",
-        "(", stringr::str_pad(paste0(
+        "(", str_pad(paste0(
           "+" , abs(diff)), 3, pad = "@"),"%) ",
         pct),
 
       diff <  0 ~ paste0(
         colname, ": ", #"\n",
-        "(", stringr::str_pad(paste0(
+        "(", str_pad(paste0(
           "-" , abs(diff)), 4, pad = "@"),"%) ",
         pct)
-    ) %>%
-      stringr::str_replace_all(
+    ) |>
+      str_replace_all(
         "@",
         paste0(unbrk, unbrk, collapse = "")
-      ) #%>%
-     # stringi::stri_unescape_unicode()
+      ) #|>
   }
 
 
   tooltip_vars_1lv_levels <- purrr::map_chr(tooltip_vars_1lv, ~ levels(dat[[.]])[1])
 
   first_active <- levels(dat[[active_vars[[1]]]])
-  first_active <- purrr::map(first_active, ~ c(., paste0(., "_", active_vars[[1]]))) %>%
+  first_active <- purrr::map(first_active, ~ c(., paste0(., "_", active_vars[[1]]))) |>
     purrr::flatten_chr()
 
   last_var_with_active_tables <- tidyr::replace_na(
@@ -6818,10 +6830,10 @@ interactive_tooltips <- function(dat,
 
   interactive_text <-
     purrr::imap(tabs,
-                ~ dplyr::mutate(.x, vars = factor(.y)) %>%
+                ~ dplyr::mutate(.x, vars = factor(.y)) |>
                   dplyr::relocate(.data$vars, .before = 1)
-    ) %>%
-    purrr::map_if(last_var_with_active_tables, ~ dplyr::filter(., lvs != "Total")) %>%
+    ) |>
+    purrr::map_if(last_var_with_active_tables, ~ dplyr::filter(., lvs != "Total")) |>
     dplyr::bind_rows()
 
 
@@ -6838,41 +6850,41 @@ interactive_tooltips <- function(dat,
   #
 
 
-  interactive_text <- interactive_text %>%
-    dplyr::mutate(vars = dplyr::if_else(stringr::str_detect(.data$lvs, "^Total"),
+  interactive_text <- interactive_text |>
+    dplyr::mutate(vars = dplyr::if_else(str_detect(.data$lvs, "^Total"),
                                         true  = factor("All", c(levels(.data$vars), "All")),
                                         false = .data$vars),
 
-                  lvs  = dplyr::if_else(stringr::str_detect(.data$lvs, "^Total"),
+                  lvs  = dplyr::if_else(str_detect(.data$lvs, "^Total"),
                                         true  = factor("Central point", c(levels(.data$lvs), "Central point")),
                                         false = .data$lvs)
     )
 
   # `n` / `wcount` are already plain numbers, normalised per table above.
 
-  interactive_text <- interactive_text %>%
+  interactive_text <- interactive_text |>
     dplyr::mutate(actives_text = dplyr::if_else(vars %in% active_tables,
                                                 true  = "\n<b>Active variables:</b>",
-                                                false = NA_character_)) %>%
+                                                false = NA_character_)) |>
     dplyr::mutate(begin_text = paste0(
       "<b>", .data$lvs,"</b>",
       dplyr::if_else(.data$lvs != "Central point", true = paste0("\n", .data$vars), false = ""),
       "\nFrequency (n=", .data$n, "): ",
       paste0(format(round(.data$wcount / pop_wcount * 100, 0)), "%")
-    ) ) %>%
-    dplyr::select(-.data$n) %>%
+    ) ) |>
+    dplyr::select(-.data$n) |>
     dplyr::select(.data$vars, .data$lvs, .data$wcount, .data$begin_text,
                   tidyselect::any_of(tooltip_vars_1lv_levels),
                   tidyselect::any_of("actives_text"),
                   tidyselect::any_of(first_active),
-                  tidyselect::everything()) %>%
+                  tidyselect::everything()) |>
     dplyr::mutate(dplyr::across(
       where(tabxplor::is_fmt),
       ~ format_pct(diff       = round(vctrs::field(., "diff") * 100, 0),
                    pct        = format(.),
                    colname    = dplyr::cur_column(),
                    color_code = tabxplor::fmt_get_color_code(.))
-    )) %>%
+    )) |>
     dplyr::mutate(dplyr::across(
       tidyselect::any_of(names(tooltip_first_levels)),
       ~ dplyr::if_else(.data$vars %in% active_tables,
@@ -6980,9 +6992,9 @@ PCA_princ_coord_in_base <- function(coords, res.pca) {
 
   # princ_coord_in_base <- (x0j + mean_mat[col(x0j)]) |> # ajouter moyenne a chaque colonne
   #   as.data.frame() |> tibble::rownames_to_column("name") |> tibble::as_tibble() |>
-  #   # dplyr::rename_with(stringr::str_to_lower) |>
-  #   dplyr::mutate(princ_coord = stringr::str_extract(name, "[^|]+$"),
-  #          name        = as.factor(stringr::str_extract(name, "^[^|]+")),
+  #   # dplyr::rename_with(str_to_lower) |>
+  #   dplyr::mutate(princ_coord = str_extract(name, "[^|]+$"),
+  #          name        = as.factor(str_extract(name, "^[^|]+")),
   #   ) |>
   #   separate_wider_delim(cols  = princ_coord,
   #                        delim = ";",

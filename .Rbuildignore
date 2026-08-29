@@ -5,6 +5,7 @@
 ^readme_plot\.png$
 docs
 ^dev$
+^CLAUDE\.md$
 ^\.github$
 ^cran-comments\.md$
 ^CRAN-RELEASE$

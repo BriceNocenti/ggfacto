@@ -8,8 +8,8 @@ Authors@R:
            email = "brice.nocenti@gmail.com")
 Description: Readable, complete and pretty graphs for correspondence analysis made 
     with 'FactoMineR'. They can be rendered as interactive 'HTML' plots, showing useful
-    informations at mouse hover. The interest is not mainly visual but statistical:
-    it helps the reader to keep in mind the data contained in the cross-table or Burt
+    informations at mouse hover. The interest is not mainly visual but statistical.
+    It helps the reader to keep in mind the data contained in the cross-table or Burt
     table while reading the correspondence analysis, thus preventing over-interpretation.
     Most graphs are made with 'ggplot2', which means that you can use the + syntax to 
     manually add as many graphical pieces you want, or change theme elements. 3D 
@@ -22,33 +22,30 @@ LazyData: true
 Imports: 
     FactoMineR (>= 2.0.0),
     ggiraph (>= 0.8.2),
-    ggplot2 (>= 3.0.0),
+    ggplot2 (>= 3.4.0),
     dplyr (>= 1.0.0),
     forcats (>= 0.5.0),
     purrr (>= 0.3.0),
     rlang (>= 0.4.0),
-    stringr (>= 1.4.0),
     tibble (>= 3.0.0),
     tidyr (>= 1.0.0),
     tidyselect (>= 1.1.0),
     vctrs (>= 0.3.0),
     ggrepel (>= 0.9.0),
-    gridExtra (>= 2.0),
     tabxplor (>= 2.0.0),
     withr (>= 2.0.0),
     magrittr (>= 1.5.0),
     data.table (>= 1.12.0),
-    ggforce (>= 0.4.0)
+    grDevices (>= 4.0.0),
+    stats (>= 4.0.0),
+    scales (>= 1.1.0)
 Suggests: 
     widgetframe (>= 0.3.0),
     htmlwidgets (>= 1.4.0),
-    finalfit (>= 1.0.0),
     kableExtra (>= 1.3.0),
     plotly (>= 4.1.0),
-    stats (>= 4.0.0),
-    grDevices (>= 4.0.0),
-    stringi (>= 1.4.6),
-    scales (>= 1.1.0)
+    testthat (>= 3.0.0)
 Depends:
-    R (>= 4.0.1)
+    R (>= 4.1.0)
+Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
