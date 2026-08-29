@@ -66,16 +66,16 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 #' res.mca <- MCA2(tea, active_vars = 1:18)
 #' mca_interpret(res.mca)
 #' }
-mca_interpret <- function(res.mca = res.mca,
+mca_interpret <- function(res.mca,
                           axes = 1:min(res.mca$call$ncp, 5),
                           type = c("html", "console")) {
   if (type[1] == "html") requireNamespace("kableExtra", quietly = TRUE)
 
   contrib1 <- res.mca$var$contrib[,axes] |>
     tibble::as_tibble(rownames = "levels") |>
-    tidyr::pivot_longer(-.data$levels, names_prefix ="Dim ", names_to = "Axe",
+    tidyr::pivot_longer(-"levels", names_prefix ="Dim ", names_to = "Axe",
                         values_to = "Contrib_mod") |>
-    dplyr::select(.data$Axe, tidyselect::everything()) |> dplyr::arrange(.data$Axe) |>
+    dplyr::select("Axe", tidyselect::everything()) |> dplyr::arrange(.data$Axe) |>
     dplyr::mutate(eig_value = res.mca$eig[as.integer(.data$Axe),1],
                   pct       = round(res.mca$eig[as.integer(.data$Axe),2], 1))
 
@@ -99,7 +99,7 @@ mca_interpret <- function(res.mca = res.mca,
                    fk = res.mca$call$marge.col),
     by = "levels"
   ) |>
-    tidyr::pivot_longer(c(-.data$levels, -.data$fk),
+    tidyr::pivot_longer(c(-"levels", -"fk"),
                         names_prefix = "Dim ", names_to = "Axe",
                         values_to = "coord") |>
     dplyr::arrange(.data$Axe)
@@ -115,7 +115,7 @@ mca_interpret <- function(res.mca = res.mca,
     dplyr::mutate(levels_2 = .data$levels, ctr_neg = .data$Contrib_mod,
                   ctr_pos  = .data$Contrib_mod, fneg = .data$fk, fpos = .data$fk,
                   coord_neg = .data$coord, coord_pos = .data$coord) |>
-    dplyr::select(-.data$Contrib_mod) |>
+    dplyr::select(-"Contrib_mod") |>
     dplyr::mutate(dplyr::across(tidyselect::all_of(c("levels", "ctr_neg", "fneg",
                                                      "coord_neg")),
                                 ~ ifelse(.data$coord <= 0, ., NA))) |>
@@ -138,8 +138,8 @@ mca_interpret <- function(res.mca = res.mca,
     dplyr::mutate(spread = .data$poids_ecart * 100 *
                     (.data$coord_ecart_pos - .data$coord_ecart_neg)^2 /
                     (.data$eig_value*.data$contrib_q/100  ) ) |>
-    dplyr::select(-.data$coord,-.data$fk,-.data$coord_ecart_neg, -.data$coord_ecart_pos,
-                  -.data$poids_ecart_neg, -.data$poids_ecart_pos, -.data$poids_ecart) |>
+    dplyr::select(-"coord",-"fk",-"coord_ecart_neg", -"coord_ecart_pos",
+                  -"poids_ecart_neg", -"poids_ecart_pos", -"poids_ecart") |>
     dplyr::ungroup() |>
     dplyr::mutate(spread = ifelse(is.na(.data$spread), NA, .data$spread) )
 
@@ -157,8 +157,8 @@ mca_interpret <- function(res.mca = res.mca,
                      poids_ecart = 1/( 1/.data$poids_neg + 1/.data$poids_pos), #fii' = 1/(1/fi + 1/fi').
                      spread = .data$poids_ecart * 100 *
                        (.data$coord_pos - .data$coord_neg)^2/mean(.data$eig_value) # = fii' (y l - y ')^2/??l )
-    ) |> dplyr::select(-.data$coord_neg, -.data$coord_pos, -.data$poids_neg,
-                        -.data$poids_pos, - .data$poids_ecart) |>
+    ) |> dplyr::select(-"coord_neg", -"coord_pos", -"poids_neg",
+                        -"poids_pos", - "poids_ecart") |>
     tibble::add_column(Question = "All levels") |>
     dplyr::mutate(contrib_q = .data$ctr_neg + .data$ctr_pos)
 
@@ -169,8 +169,8 @@ mca_interpret <- function(res.mca = res.mca,
   # #total2 <-  dplyr::bind_rows(total2, total2["Axe"])
 
   final_tab <- contribsup |>
-    dplyr::select(-.data$fneg, -.data$fpos, -.data$coord_neg, -.data$coord_pos,
-                  -.data$eig_value) |>
+    dplyr::select(-"fneg", -"fpos", -"coord_neg", -"coord_pos",
+                  -"eig_value") |>
     dplyr::bind_rows(total) |>
     dplyr::arrange(.data$Axe) |>
     dplyr::select(tidyselect::all_of(c("Axe", "pct", "Question", "contrib" = "contrib_q",
@@ -194,7 +194,7 @@ mca_interpret <- function(res.mca = res.mca,
     questions <- final_tab |> dplyr::group_by(.data$Axe, .data$Question) |>
       dplyr::group_indices()
     questions <- which(questions != dplyr::lag(questions, default = 0) &
-                         !is.na(dplyr::pull(final_tab, .data$Question)))
+                         !is.na(dplyr::pull(final_tab, "Question")))
     questions <- questions[!questions %in% new_group]
 
 

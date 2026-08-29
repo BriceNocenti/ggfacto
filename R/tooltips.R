@@ -257,7 +257,7 @@ interactive_tooltips <- function(dat,
   interactive_text <-
     purrr::imap(tabs,
                 ~ dplyr::mutate(.x, vars = factor(.y)) |>
-                  dplyr::relocate(.data$vars, .before = 1)
+                  dplyr::relocate("vars", .before = 1)
     ) |>
     purrr::map_if(last_var_with_active_tables, ~ dplyr::filter(., lvs != "Total")) |>
     dplyr::bind_rows()
@@ -298,8 +298,8 @@ interactive_tooltips <- function(dat,
       "\nFrequency (n=", .data$n, "): ",
       paste0(format(round(.data$wcount / pop_wcount * 100, 0)), "%")
     ) ) |>
-    dplyr::select(-.data$n) |>
-    dplyr::select(.data$vars, .data$lvs, .data$wcount, .data$begin_text,
+    dplyr::select(-"n") |>
+    dplyr::select("vars", "lvs", "wcount", "begin_text",
                   tidyselect::any_of(tooltip_vars_1lv_levels),
                   tidyselect::any_of("actives_text"),
                   tidyselect::any_of(first_active),

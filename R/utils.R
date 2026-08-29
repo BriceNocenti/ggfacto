@@ -245,3 +245,23 @@ weighted.var <- function(x, wt, na.rm = FALSE) {
     10)
   #((Nwt_non_zero - 1) / Nwt_non_zero) *
 } #Same results as sqrt(Hmisc::wtd.var(!!num_var, !!wt, na.rm = TRUE, method = "ML")
+
+
+# Soft-deprecated argument names ------------------------------------
+
+# One warning per session per (function, argument), the way lifecycle::deprecate_soft() behaves,
+# without taking lifecycle as a dependency.
+deprecated_args_warned <- new.env(parent = emptyenv())
+
+# Route a renamed argument to its new name. Callers pass the OLD argument's value and get it back,
+# having warned once; the caller does the missing() test, since missing() only works in its own frame.
+#' @keywords internal
+renamed_arg <- function(value, old, new, fn) {
+  key <- str_c(fn, "::", old)
+  if (!isTRUE(deprecated_args_warned[[key]])) {
+    assign(key, TRUE, envir = deprecated_args_warned)
+    warning("The `", old, "` argument of ", fn, "() is deprecated; use `", new, "` instead.",
+            call. = FALSE)
+  }
+  value
+}

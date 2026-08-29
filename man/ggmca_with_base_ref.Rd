@@ -4,10 +4,14 @@
 \alias{ggmca_with_base_ref}
 \title{Plot Initial Dimensions (Active Variables) on a Multiple Correspondence Analyses}
 \usage{
-ggmca_with_base_ref(res.mca = res.mca, axes = c(1, 2), keep = NULL)
+ggmca_with_base_ref(res.mca, data, axes = c(1, 2), keep = NULL)
 }
 \arguments{
 \item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.}
+
+\item{data}{The data the analysis was made on. Optional: this graph draws only
+active variables, which are read from `res.mca`, so it changes nothing. It is
+accepted so that every `ggmca_*` function takes `(res.mca, data)`.}
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 

@@ -6,7 +6,7 @@
 \usage{
 ggmca_3d(
   res.mca,
-  dat,
+  data,
   cah,
   axes = 1:3,
   base_zoom = 1,
@@ -18,13 +18,14 @@ ggmca_3d(
   title,
   ind_name.size = 10,
   max_point_size = 30,
-  ...
+  ...,
+  dat
 )
 }
 \arguments{
 \item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.}
 
-\item{dat}{The data in which to find the cah variable, etc.}
+\item{data}{The data in which to find the cah variable, etc.}
 
 \item{cah}{A variable made with \code{\link[FactoMineR]{HCPC}}, to link
 the answers-profiles points who share the same HCPC class (will be colored
@@ -58,6 +59,9 @@ eigenvalues.}
 \item{max_point_size}{The size of the biggest point.}
 
 \item{...}{Additional arguments to pass to \code{\link[ggfacto:ggmca]{ggmca}}.}
+
+\item{dat}{Deprecated former name of `data`. Still accepted, with a warning;
+use `data` instead.}
 }
 \value{
 A \code{\link[plotly]{plotly}} html interactive 3d (or 2d) graph.
@@ -75,6 +79,6 @@ ggmca_3d(res.mca)
 res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
 cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
 tea$clust <- cah$data.clust$clust
-ggmca_3d(res.mca, dat = tea, cah = "clust")
+ggmca_3d(res.mca, data = tea, cah = "clust")
 }
 }

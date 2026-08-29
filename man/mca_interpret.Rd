@@ -5,7 +5,7 @@
 \title{Helper table to interpret multiple correspondence analysis}
 \usage{
 mca_interpret(
-  res.mca = res.mca,
+  res.mca,
   axes = 1:min(res.mca$call$ncp, 5),
   type = c("html", "console")
 )

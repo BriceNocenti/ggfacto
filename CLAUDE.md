@@ -47,7 +47,7 @@ Twelve files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / # 
 - `utils.R` — factor helpers, the base-R string shim that replaced stringr, `weighted.var()`, vendored `where()`.
 - `ggfacto-package.R` — imports, global bindings, `.onLoad()`, the deprecated `%>%` re-export.
 
-**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the string shim and the ASCII/Rd rules; see the roadmap for what is still missing) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md`).
+**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md`).
 
 ---
 
@@ -98,7 +98,7 @@ The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fit
 
 `theme_facto()` returns a **list** of ggplot objects, not a theme — axis titles carrying the eigenvalue percentages, scales, `coord_fixed()` — so it is `+`-ed as a whole; `ggmca_plot()` always calls it with `no_color_scale = TRUE` so the manual palette wins.
 
-`ggmca_plot()` and `ggca()` then smuggle render hints onto the returned object as extra list slots — `css_hover`, `css_tooltip`, `height_width_ratio` — and re-stamp `class` by hand, because `append()` strips it. `ggi()` and `ggsave2()` read those slots back; both must tolerate their absence, since a plain ggplot has none. Hover linking rests on a `data_id` convention: the ids are offset into disjoint bands — active variables from `1000`, HCPC clusters and answer profiles from `10000` — so that every point of one cluster shares an id and hovering any of them lights them all.
+`ggmca_plot()` and `ggca()` then carry render hints on the returned object as **attributes** — `css_hover`, `css_tooltip`, `height_width_ratio` — which `ggi()` and `ggsave2()` read back; both must tolerate their absence, since a plain ggplot has none. Attributes rather than list slots because the object must stay a real ggplot: `append()` flattens the S7 object into a plain list wearing `c("gg", "ggplot")`, and then `ggplot_build()`, `grid.draw()` and so `ggsave2()` stop dispatching, while `print()` draws only as a side effect of `print.default()` recursing into the nested plot. The hints survive `+`, so a user can keep extending the graph. Hover linking rests on a `data_id` convention: the ids are offset into disjoint bands — active variables from `1000`, HCPC clusters and answer profiles from `10000` — so that every point of one cluster shares an id and hovering any of them lights them all.
 
 ### Tables are tabxplor's
 
@@ -109,8 +109,9 @@ The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fit
 - **All string work goes through the `utils.R` shim**, never stringr and never bare `paste0`/`sub`: the shim keeps stringr's `NA` and padding semantics, which several call sites use as guards.
 - **`.` is a lambda pronoun, never a magrittr placeholder.** The package-level `. = NULL` binding turns a stranded placeholder into a wrong answer instead of an error.
 - **A tooltip denominator is the population**, computed once, before any binding.
-- **The plot object carries render hints.** Never rebuild it with a bare `append()` without re-stamping the class.
+- **The plot object carries render hints as attributes.** Never move them back into list slots, and never rebuild the object with `append()`: either turns it from a ggplot into a list and silently breaks `ggsave2()`.
 - **Tables are tabxplor's job** — no kableExtra, DT or gt.
+- **One name per thing across the MCA family.** The microdata is `data` everywhere; the plot model is `plot_data`. The old `dat` (and `ggmca_plot(data =)`) are soft-deprecated aliases routed through `renamed_arg()`, warning once per session.
 - **`data.table` is used in exactly one function**, `complete_cah()`, where a grouped `.N` over many columns runs on the full individual-level data. The benchmark comment beside the adjacent `tidyr::nest()` records that data.table was *slower* there; do not generalise it.
 - **plotly and widgetframe are `Suggests`** and every entry point guards with `requireNamespace()`.
 
@@ -145,9 +146,15 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 ## Testing
 
-`tests/testthat/` is the package's **contract**: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit. Two files exist so far — `test-str-shim.R` (the base-R string helpers' parity with stringr) and `test-non-ascii.R` (the ASCII rule for `R/` and `tests/`, and the LaTeX-safe glyph rule for `man/*.Rd`). Everything else is Phase 1b.
+`tests/testthat/` is the package's **contract**: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit. Seven files: `helper-fixtures.R` (the cached analyses and plot models), `test-mca2-pca2.R` (the ingress normalisers), `test-ggmca-data.R` (the plot model and the argument matrix), `test-tooltips.R` (the crosstabs behind the hover), `test-plots.R` (that every graph builds, and the render-hint seam), `test-tables.R` (the five table functions), plus `test-str-shim.R` and `test-non-ascii.R` from 1a.
 
-The suite is **small and serial**: two files, 54 assertions, seconds to run, no `Config/testthat/parallel`, no `setup.R`, no i18n. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
+**Argument coverage is the point, not function coverage.** Several arguments are inert alone and only act alongside an enabling one — `keep_levels`/`discard_levels` need `sup_vars`, `tooltip_vars`/`tooltip_vars_1lv` need a table to be built at all, `cah` needs `profiles`. A test that omits the enabler passes while exercising nothing; the vacuous paths are pinned deliberately so nobody "simplifies" them back into nothing.
+
+**Fixtures are `tea[1:6]`, never `tea[1:18]`.** Tooltip crosstabs are quadratic in the number of active variables: `active_tables = "active"` costs 1.2 s on six and 10.4 s on eighteen. Six reaches every code path. The models the suite reuses are memoised in `helper-fixtures.R`; the whole suite runs in about 30 s.
+
+The suite is **small and serial**: 213 assertions, no `Config/testthat/parallel`, no `setup.R`, no i18n. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
+
+**Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text and the two interpretation tables. `mca_interpret(type = "html")` is deliberately not snapshotted — Phase 1c rewrites it.
 
 ```bash
 #In a temp .R file (outside tests/), then: OMP_NUM_THREADS=1 Rscript that_file.R
@@ -157,8 +164,6 @@ The suite is **small and serial**: two files, 54 assertions, seconds to run, no 
 ```
 
 ⚠ **`devtools::document()` needs `dangerouslyDisableSandbox`** — bwrap `--ro-bind`s `NAMESPACE` and `man/`.
-
-⚠ **A plot must be forced to be tested.** `ggmca()`/`ggca()` return an object built with `append()`, so under ggplot2 4.x it is a plain list wearing `c("gg", "ggplot")` and the S7 generics (`ggplot_build()`, `grid.draw()`) do not dispatch on it. `print(p)` inside `pdf(tempfile())` is the path that works, and it is the path users take. See "The plot-object seam" above.
 
 ⚠ **`Rscript` writes `Rplots.pdf` into the working directory** when a plot prints without an open device; it turns `R CMD check` into a NOTE. Open a `pdf(tempfile())` in any harness that draws.
 
@@ -187,29 +192,7 @@ A shim rather than a hand conversion because ~20 of the 188 stringr sites diverg
 
 Verification was a golden snapshot against a pristine `HEAD` extracted with `git archive`: 26 entries over `tea`, `mtcars` and `gss_cat`, deliberately including the `sup_vars` / `tooltip_vars` / `keep_levels` / `discard_levels` / `active_tables` / `cah` argument paths, since the plain calls reach none of the placeholders. **25 of 26 came back byte-identical**; the one diff, `pca_cor_circle`, is the intended ggforce change and was checked geometrically — both trace the unit circle through the same 361 unique points at radius exactly 1.0. `test-non-ascii.R`, copied from tabxplor, earned itself immediately by catching a literal U+202F typed into a test. Two pre-existing deprecations were left alone as out of scope: the `size` aesthetic for lines, and `select(cah)` on an external vector.
 
-#### Phase 1b — a real test suite
-
-`tests/` exists as of 1a but only guards the string helpers (`test-str-shim.R`, 42 parity assertions) and the ASCII/Rd rules (`test-non-ascii.R`, copied from tabxplor). Phase 1b turns that into the package's contract: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit.
-
-Cover the exported entry points — `MCA2`/`PCA2`, `ggmca_data` tooltips, `ggmca`, `ggca`, `HCPC_tab`, `mca_interpret`/`pca_interpret`, `mean_sd_tab`, `benzecri_mrv` — on the fixtures the roxygen examples already use (`tea`, `mtcars`, `gss_cat`). Golden tests only where the output is genuinely stable and the value beats the churn: tooltip strings and the interpret tables qualify, ggplot internals, and most internals in general, largely do not.
-
-⚠ **Argument coverage is the point, not function coverage.** 1a's migration left 25 magrittr `.` placeholders that a plain `ggmca_data(res.mca)` call cannot reach: every one lives on a `sup_vars` / `tooltip_vars` / `tooltip_vars_1lv` / `keep_levels` / `discard_levels` / `active_tables` / `cah` path, and they failed quietly rather than loudly. Port that argument matrix into `tests/testthat/`.
-
-Three calls in 1a's snapshot harness fail on argument shape rather than on behaviour — `ggmca_data(cah = )`, `HCPC_tab(clust = )` and `ggmca_with_base_ref()`. Resolve them while writing the tests: either the call is wrong or the roxygen is, and either way a user hits it first.
-
-Follow the locale, threads and orphan conventions in the Testing section above. The suite is small and runs serially; do not turn on `Config/testthat/parallel` for it.
-
-#### Phase 1c — drop kableExtra, render html tables with tabxplor
-
-`mca_interpret(type = "html")` (`R/tables.R`, the `kableExtra::` block) is the package's only kableExtra consumer, and the last hard rule still broken: tables are tabxplor's job. Removing it takes the tree from 133 packages / 203.7 MB to **129 / 198.3 MB**.
-
-⚠ **This is a rewrite of the html branch, not a rewiring.** `tabxplor::tab_html()` accepts a plain tibble but *silently degrades to an unstyled table*: `tab_render_vars()` requires `tabxplor_fmt` columns plus a factor row-variable, and there is no public `row_spec()`/`column_spec()` equivalent — borders, bold and block rules are all derived from tabxplor's own semantics. What `mca_interpret` currently hands over is a grouped tibble of eight pre-rendered character columns, which fails both tests and would render bare.
-
-`pca_interpret()`, in the same file, is the template: it already builds `tabxplor::fmt()` columns with `scale`, `col_var`, `row_kind`, `color` and `ref`. Do the same here — keep the contribution and spread columns as `fmt`, mark each axis's "All levels" row `row_kind = "total"`, use `col_var` to separate the positive and negative blocks so the side borders land, and make `Axe`/`Question` real factors so the row variable and the block boundaries are found. Then delete the manual `new_group` / `last_row` / `totrows` / `questions` index arithmetic just above the `kableExtra::kable()` call outright: tabxplor derives all four itself, and that arithmetic exists only to feed kableExtra.
-
-Anything the class vocabulary cannot express — the two-line `Axe 1: 18.4%` / `of variance` label cell, the thin rule above each question — is a few user CSS rules appended after `tab_css()`, which is explicitly supported. The `type = "console"` path shares the computation and must not change. ⚠ Do not reach for `kable_tabxplor_style()`: it is defunct in tabxplor 2.0.0 and always errors.
-
-#### Phase 1d — one file per subsystem
+#### Phase 1a2 — one file per subsystem
 
 `R/geometrical_data_analysis.R` was 7057 lines holding every user-facing function, which made a "Repository Map" of two files document nothing. It is now **eleven files plus `utils.R`**, cut along the section markers the file already carried, each with a `# PURPOSE / # ROLE / # KEY CONSTRAINTS` header. Pure code motion: signatures, defaults and bodies are untouched.
 
@@ -229,6 +212,41 @@ Carried in the same pass, all verified against the pre-existing `man/` byte-for-
 - **`ggpca_3d()` is 1227 lines in one function**, and `pca-3d.R` is only that function. Splitting a function is not a file-organisation task.
 - **`vignettes/` still does not exist**, though the documentation ecosystem names it as a layer.
 
+
+
+#### Phase 1b — a real test suite
+
+`tests/testthat/` went from 2 files / 54 assertions guarding only the string shim and the ASCII rules, to **7 files / 213 assertions** covering every exported entry point, running in about 30 s. Fixtures are memoised in `helper-fixtures.R` and built on **`tea[1:6]`, never `tea[1:18]`**: the tooltip crosstabs are quadratic in the number of active variables, measured at 1.2 s against 10.4 s, and six active variables reach every code path eighteen do.
+
+**The roadmap's premise for this phase was half stale, and checking it first changed the work.** A full AST scan of `R/` — walking every parse tree, discounting `~` and `\(.)` scopes — found **exactly one** bare `.`, the `. = NULL` declaration itself: 1a's 25 stranded placeholders are all gone, so the argument matrix is regression prevention rather than bug-hunting. Of the three "broken call shapes", two (`ggmca_data(cah =)`, `HCPC_tab(clust =)`) already worked and had simply been called wrongly by 1a's harness; only `ggmca_with_base_ref()` failed, because its signature was `(res.mca, axes, keep)` and a sibling-shaped call bound a 300-row data frame to `axes`.
+
+**Writing the tests turned up five defects the roadmap did not list**, each fixed rather than pinned, since a test that locks in a bug is worse than no test:
+
+- **`ggmca_initial_dims(keep =)` was a hard error** — `keep()` unqualified at a site where `purrr` is not imported, so a documented argument died with "could not find function". Shipping since 0.3.2.
+- **`ggmca_initial_dims()` could not render an all-binary MCA at all** — the `x*` columns are one per level of a variable *group*, so a battery of yes/no items (the ordinary MCA input) never yields an `x2`, and both branches plot `x2` against `x1`. The guard existed in the single-variable branch only; it is now hoisted above the branch.
+- **The weighted `n` was printed even when it equalled the unweighted one.** Inside one `mutate()`, `count` had already become the string `"n: 36"` before `if_else(count == wcount, ...)` compared it to a number, so the condition was always `FALSE`. Both branches now compare the `*_base` columns, and the documented invariant — a tooltip states the weighted n only when it differs — is finally true.
+- **Four exports defaulted an argument to itself** (`res.mca = res.mca` ×3, `res.ca = res.ca`), so omitting it gave "promise already under evaluation" instead of "argument is missing".
+- **`cah`'s roxygen invited the wrong call.** It reads as "pass the clusters"; passing them hit `cah %in% sup_vars` and died on "the condition has length > 1". `cah` is now documented as a column *name* and guarded with a message that says so.
+
+**The plot-object seam is fixed, not deferred.** `ggmca_plot()`/`ggca()` built their result with `append()`, which flattens the S7 ggplot into a plain list wearing `c("gg", "ggplot")`: `ggplot_build()`, `grid.draw()` and therefore `ggsave2()` stopped dispatching, and `print()` drew only as a side effect of `print.default()` recursing into the nested plot — while dumping the whole list to stdout. The three hints now ride as **attributes** (4 write sites, 4 read sites), the object stays a real ggplot, all four generics work again, `print()` is silent, and the hints survive `+`.
+
+**One name per thing across the MCA family.** The microdata is `data` everywhere (it was already the majority: `MCA2`, `PCA2`, `HCPC_tab`, `mean_sd_tab`, `ggmca_initial_dims`) and the plot model is `plot_data`. That pairing was forced: `ggmca_plot()`'s first argument was itself called `data`, and since `ggmca()`'s signature is `ggmca_data()`'s plus `ggmca_plot()`'s with no overlap, renaming `dat` alone would have given `ggmca()` two `data` arguments. `ggmca_with_base_ref()` gained `data` in second position, where callers expect it. All four old spellings are **soft-deprecated, not removed**: routed through one shared `renamed_arg()` helper in `utils.R` that warns once per session, the way `lifecycle::deprecate_soft()` does without taking the dependency. Old names sit last in each signature so no positional call can reach them, and a bare numeric in `ggmca_with_base_ref()`'s new `data` slot is routed back to `axes` — a data frame is never an `axes` and a bare numeric is never microdata, so the two are told apart safely.
+
+**Verification was a 41-entry behaviour digest** over `tea`/`mtcars`/`gss_cat`, captured from the pristine tree before any edit and diffed after: the argument matrix, the fitted-object slots, all five table functions, and the *built* layer data of ten graphs (built, not the object, so the comparison survives the seam change). **40 of 41 came back byte-identical**; the one change is `ggmca_initial_dims()` going from error to a working plot. Two vacuous paths were caught by the digest itself — `tooltip_vars` and `tooltip_vars_1lv` are byte-identical to a plain call without `active_tables`, which is exactly the trap the argument matrix exists to document.
+
+**Three more defects the plot tests turned up, all fixed.** `type = "points"` sized by `wcount`, which existed only once a tooltip table had been built, so a plain call failed; `wcount` is now derived from the column margin whenever the crosstabs do not supply it — `marge.col * (n active variables) * population`, verified to reproduce the crosstab figure exactly — and the central point takes the population as its weight. `type = "numbers"` mapped `label = .data$numbers`, a column nothing in the package ever creates, and so failed in **every** configuration; it never worked, nothing can depend on it, and it is removed from the `type` vocabulary rather than left as a trap. And `.data$x` inside a tidyselect context (`select`, `pull`, `relocate`, `nest`, `unnest`, `pivot_longer`, `dplyr::vars`) is deprecated by tidyselect 1.2.0: **59 sites** across six files, found with a paren-aware scanner rather than a line grep, because many calls span lines and several wrap the selection in `c(-x, -y)`. Data-masking `.data$x` — inside `mutate()`, `filter()`, `aes()` — is correct and untouched. ⚠ The distinction that matters: `dplyr::vars()` is a selection, **`ggplot2::vars()` is data-masking**, so `facet_wrap(vars(.data$lvs))` must keep its `.data$` or it facets by a constant string. The scanner conflated the two and was caught by reading its diff, which is the only reason this note exists. The suite's warning count fell from 330 to 38, the remainder being unrelated ggplot2 scale warnings.
+
+**Verification of those three was a tolerant object-level diff against a `git archive` of pristine `HEAD`**, not a hash: 20 cases loaded into separate sessions and compared column by column with `all.equal`. Exact hashing turned out to be the wrong instrument — the *same* pristine tree run twice in two processes differs bitwise by ~7e-15 in the MCA coordinates, which is FactoMineR/BLAS non-determinism, not a change. Under tolerance the only differences are the intended two: `vars_data$wcount` newly present or newly filled (15 cases), and the profile `interactive_text` losing its redundant weighted-n line (3 cases). All five table functions and every coordinate came back identical.
+
+#### Phase 1c — drop kableExtra, render html tables with tabxplor
+
+`mca_interpret(type = "html")` (`R/tables.R`, the `kableExtra::` block) is the package's only kableExtra consumer, and the last hard rule still broken: tables are tabxplor's job. Removing it takes the tree from 133 packages / 203.7 MB to **129 / 198.3 MB**.
+
+⚠ **This is a rewrite of the html branch, not a rewiring.** `tabxplor::tab_html()` accepts a plain tibble but *silently degrades to an unstyled table*: `tab_render_vars()` requires `tabxplor_fmt` columns plus a factor row-variable, and there is no public `row_spec()`/`column_spec()` equivalent — borders, bold and block rules are all derived from tabxplor's own semantics. What `mca_interpret` currently hands over is a grouped tibble of eight pre-rendered character columns, which fails both tests and would render bare.
+
+`pca_interpret()`, in the same file, is the template: it already builds `tabxplor::fmt()` columns with `scale`, `col_var`, `row_kind`, `color` and `ref`. Do the same here — keep the contribution and spread columns as `fmt`, mark each axis's "All levels" row `row_kind = "total"`, use `col_var` to separate the positive and negative blocks so the side borders land, and make `Axe`/`Question` real factors so the row variable and the block boundaries are found. Then delete the manual `new_group` / `last_row` / `totrows` / `questions` index arithmetic just above the `kableExtra::kable()` call outright: tabxplor derives all four itself, and that arithmetic exists only to feed kableExtra.
+
+Anything the class vocabulary cannot express — the two-line `Axe 1: 18.4%` / `of variance` label cell, the thin rule above each question — is a few user CSS rules appended after `tab_css()`, which is explicitly supported. The `type = "console"` path shares the computation and must not change. ⚠ Do not reach for `kable_tabxplor_style()`: it is defunct in tabxplor 2.0.0 and always errors.
 
 
 

@@ -5,7 +5,7 @@
 \title{Plot Initial Dimensions (Active Variables) of Multiple Correspondence Analysis}
 \usage{
 ggmca_initial_dims(
-  res.mca = res.mca,
+  res.mca,
   data,
   proj_just = c(1.5, 2),
   cleannames = TRUE,

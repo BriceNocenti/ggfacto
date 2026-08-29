@@ -8,7 +8,7 @@
 \usage{
 ggmca(
   res.mca,
-  dat,
+  data,
   sup_vars,
   active_tables,
   tooltip_vars_1lv,
@@ -16,7 +16,7 @@ ggmca(
   axes = c(1, 2),
   axes_names = NULL,
   axes_reverse = NULL,
-  type = c("text", "labels", "points", "numbers", "facets"),
+  type = c("text", "labels", "points", "facets"),
   color_groups = "^.{0}",
   cah_color_groups = "^.+$",
   keep_levels,
@@ -46,12 +46,13 @@ ggmca(
   dist_labels = c("auto", 0.04),
   right_margin = 0,
   use_theme = TRUE,
-  get_data = FALSE
+  get_data = FALSE,
+  dat
 )
 
 ggmca_data(
   res.mca,
-  dat,
+  data,
   sup_vars,
   active_tables,
   tooltip_vars_1lv,
@@ -64,15 +65,16 @@ ggmca_data(
   profiles = FALSE,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   cah,
-  max_profiles = 5000
+  max_profiles = 5000,
+  dat
 )
 
 ggmca_plot(
-  data,
+  plot_data,
   axes = c(1, 2),
   axes_names = NULL,
   axes_reverse = NULL,
-  type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
+  type = c("text", "points", "labels", "active_vars_only", "facets"),
   text_repel = FALSE,
   title,
   ellipses = NULL,
@@ -93,13 +95,14 @@ ggmca_plot(
   dist_labels = c("auto", 0.04),
   right_margin = 0,
   use_theme = TRUE,
-  get_data = FALSE
+  get_data = FALSE,
+  data
 )
 }
 \arguments{
 \item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.}
 
-\item{dat}{The data in which to find the supplementary variables, etc.}
+\item{data}{The data in which to find the supplementary variables, etc.}
 
 \item{sup_vars}{A character vectors of supplementary qualitative variables
 to print (they don't need to be passed in \code{\link[FactoMineR]{MCA}} before).}
@@ -136,7 +139,6 @@ a numeric vector : `1` to invert left and right ; `2` to invert up and down ;
   \item \code{"points"} : colored points with text legends
   \item \code{"labels"} : colored labels
   \item \code{"active_vars_only"} : no \code{sup_vars}
-  \item \code{"numbers"} : colored labels of prefix numbers, with small names
   \item \code{"facets"} : one graph of profiles of answer for each levels of the
   first \code{sup_vars}. A different color is used for each.
 }}
@@ -170,9 +172,11 @@ points of the same \code{\link[FactoMineR]{HCPC}} class.}
 among interactive tooltips for profiles of answers (ex. : levels expressing
 "no" answers).}
 
-\item{cah}{A HCPC clusters variable made with \code{\link[FactoMineR]{HCPC}}
-on `res.mca`, to link the answers-profiles points who share the same HCPC class
-(will be colored the same color and linked at mouse hover).}
+\item{cah}{The NAME of a column of `data` holding HCPC clusters, as a single
+string, to link the answers-profiles points who share the same HCPC class (they
+are colored alike and linked at mouse hover). Add the clusters to `data` first:
+`data$clust <- FactoMineR::HCPC(res.mca, graph = FALSE)$data.clust$clust`, then
+pass `cah = "clust"`. Only has an effect together with `profiles = TRUE`.}
 
 \item{max_profiles}{The maximum number of profiles points to print. Default to 5000.}
 
@@ -236,7 +240,10 @@ Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 
 \item{get_data}{Returns the data frame to create the plot instead of the plot itself.}
 
-\item{data}{A list of data frames made with \link{ggmca_data}.}
+\item{dat}{Deprecated former name of `data`. Still accepted, with a warning;
+use `data` instead.}
+
+\item{plot_data}{A list of data frames made with \link{ggmca_data}.}
 }
 \value{
 A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the

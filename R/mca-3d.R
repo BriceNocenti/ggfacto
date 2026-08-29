@@ -9,11 +9,13 @@
 #'  Interactive 3D Plot for Multiple Correspondence Analyses (plotly::)
 #'
 #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-#' @param dat The data in which to find the cah variable, etc.
+#' @param data The data in which to find the cah variable, etc.
 #' @param cah A variable made with \code{\link[FactoMineR]{HCPC}}, to link
 #' the answers-profiles points who share the same HCPC class (will be colored
 #' the same color and linked at mouse hover).
 #' @param axes The axes to print, as a numeric vector of length 3.
+#' @param dat Deprecated former name of `data`. Still accepted, with a warning;
+#' use `data` instead.
 #' @param base_zoom The base level of zoom.
 #' @param remove_buttons Set to TRUE to remove buttons to change view.
 #' @param cone_size The size of the conic arrow at the end of each axe.
@@ -45,15 +47,19 @@
 #' res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
 #' cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
 #' tea$clust <- cah$data.clust$clust
-#' ggmca_3d(res.mca, dat = tea, cah = "clust")
+#' ggmca_3d(res.mca, data = tea, cah = "clust")
 #' }
-ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
+ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
                      base_zoom = 1, remove_buttons = FALSE, cone_size = 0.15,
                      view = "All",
                      camera_view, aspectratio_from_eig = FALSE, title,
                      ind_name.size = 10, max_point_size = 30, # ind.size = 4,
-                     ...) {
+                     ...,
+                     dat) {
   requireNamespace("plotly", quietly = TRUE)
+
+  # `dat` was renamed `data` in 0.4.0; after `...` it can only be supplied by name.
+  if (!missing(dat) && missing(data)) data <- renamed_arg(dat, "dat", "data", "ggmca_3d")
 
   if (missing(cah)) cah <- character()
 
@@ -66,7 +72,7 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
   # if (missing(color_groups)) color_groups <- "^.{1}"
 
   acm <- res.mca |>
-    ggmca(dat = dat,
+    ggmca(data = data,
           cah = cah,
           # color_groups = color_groups,
           profiles = TRUE,

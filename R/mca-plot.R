@@ -2,9 +2,11 @@
 # ROLE: Consumes the plot model built by R/mca-data.R and emits a ggplot2/ggiraph object. It never
 #   sees the FactoMineR result, only the stripped list(eig, axes_names) it is handed.
 # KEY CONSTRAINTS:
-#   - The returned object carries render hints (css_hover, height_width_ratio) as extra list
-#     slots, read back by ggi()/ggsave2(). append() strips the ggplot class, which is why it is
-#     re-stamped by hand: never drop that step.
+#   - The returned object carries render hints (css_hover, height_width_ratio) as ATTRIBUTES,
+#     read back by ggi()/ggsave2(). They must not become list slots: append() flattens the S7
+#     ggplot into a plain list, and ggplot_build()/grid.draw()/ggsave2() stop dispatching on it.
+#   - Its first argument is `plot_data`, the model from ggmca_data(); `data` is reserved for the
+#     microdata across the ggmca_* family and survives only as a soft-deprecated alias.
 #   - theme_facto() is always called with no_color_scale = TRUE, so the manual palette built here
 #     wins over the theme's fallback.
 #   - This file must keep sorting AFTER mca-data.R in the C locale: `@describeIn ggmca` names
@@ -13,13 +15,13 @@
 
 #' @describeIn ggmca print MCA graph from data frames with parameters
 # @inheritParams ggmca
-#' @param data A list of data frames made with \link{ggmca_data}.
+#' @param plot_data A list of data frames made with \link{ggmca_data}.
 #'
 #' @return A \code{\link[ggplot2]{ggplot}} object.
 #' @export
-ggmca_plot <- function(data,
+ggmca_plot <- function(plot_data,
                        axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
-                       type = c("text", "points", "labels", "active_vars_only", "numbers", "facets"),
+                       type = c("text", "points", "labels", "active_vars_only", "facets"),
                        text_repel = FALSE, title, ellipses = NULL,
                        actives_in_bold = NULL, sup_in_italic = FALSE,
                        xlim, ylim, out_lims_move = FALSE,
@@ -29,18 +31,24 @@ ggmca_plot <- function(data,
                        scale_color_light = material_colors_light(),
                        scale_color_dark  = material_colors_dark(),
                        text_size = 3.5, size_scale_max = 4, dist_labels = c("auto", 0.04),
-                       right_margin = 0, use_theme = TRUE, get_data = FALSE) {
+                       right_margin = 0, use_theme = TRUE, get_data = FALSE,
+                       data) {
+  # `data` was renamed `plot_data` in 0.4.0, freeing `data` for the microdata across the ggmca_*
+  # family; it sits last so no positional call can reach it.
+  if (!missing(data) && missing(plot_data)) {
+    plot_data <- renamed_arg(data, "data", "plot_data", "ggmca_plot")
+  }
 
-  vars_data        <- data$vars_data
-  ind_data         <- data$ind_data
-  #active_vars_data <- data$active_vars_data
-  #sup_vars_data    <- data$sup_vars_data
-  #mean_point_data  <- data$mean_point_data
-  cah              <- data$cah
+  vars_data        <- plot_data$vars_data
+  ind_data         <- plot_data$ind_data
+  #active_vars_data <- plot_data$active_vars_data
+  #sup_vars_data    <- plot_data$sup_vars_data
+  #mean_point_data  <- plot_data$mean_point_data
+  cah              <- plot_data$cah
   sup_vars         <- vars_data |>
     dplyr::filter(!.data$color_group %in% c("active_vars", "Central point")) |>
-    dplyr::pull(.data$vars) |> unique()
-  res.mca          <- data$res.mca
+    dplyr::pull("vars") |> unique()
+  res.mca          <- plot_data$res.mca
 
   if (!is.null(axes_names)) res.mca$axes_names <- axes_names
   if (!is.null(ellipses)) stopifnot(ellipses > 0 & ellipses <= 1)
@@ -193,7 +201,7 @@ ggmca_plot <- function(data,
                                 "Central point"       = "black"
   )
 
-  if (type[1] %in% c("points", "numbers"))  vars_data <- vars_data |>
+  if (type[1] == "points")  vars_data <- vars_data |>
     dplyr::mutate(colorvar_names = as.factor(str_c("names_", .data$color_group)))
   #} else { sup_vars_data <- sup_vars_data %>% dplyr::mutate(colorvar_names =  color_group) }
 
@@ -422,28 +430,28 @@ ggmca_plot <- function(data,
       ind_data <- ind_data |>
         dplyr::mutate(sup_vars = purrr::map(.data$sup_vars,
                                             ~ dplyr::select(., !!rlang::sym(sup_vars[1])))) |>
-        tidyr::unnest(c(.data$sup_vars, .data$row.w))
+        tidyr::unnest(c("sup_vars", "row.w"))
 
       supvar1_lvs <-
         dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
-        dplyr::pull(.data$lvs) |> as.character() |> purrr::set_names()
+        dplyr::pull("lvs") |> as.character() |> purrr::set_names()
 
       supvar1_colorvar <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
-        dplyr::select(.data$lvs, .data$color_group)
+        dplyr::select("lvs", "color_group")
       supvar1_colorvar <- as.character(supvar1_colorvar$color_group) |> purrr::set_names(supvar1_colorvar$lvs)
 
       supvar1_infos <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
         dplyr::mutate(nam = .data$lvs) |>
-        dplyr::select(.data$nam, .data$lvs, .data$color_group, .data$id) |>
-        tidyr::nest(infos = c(.data$lvs, .data$color_group, .data$id))
+        dplyr::select("nam", "lvs", "color_group", "id") |>
+        tidyr::nest(infos = c("lvs", "color_group", "id"))
       supvar1_infos <- supvar1_infos$infos |> purrr::set_names(supvar1_infos$nam)
 
       if (!is.null(ellipses)) {
         ellipses_coord <- ind_data |>
-          dplyr::select(!!dim1, !!dim2, .data$row.w, tidyselect::all_of(sup_vars[1]), tidyselect::any_of("lvs")) |>
+          dplyr::select(!!dim1, !!dim2, "row.w", tidyselect::all_of(sup_vars[1]), tidyselect::any_of("lvs")) |>
           dplyr::mutate(infos = supvar1_infos[as.character(!!rlang::sym(sup_vars[1]))],
           ) |>
-          tidyr::unnest(cols = c(.data$infos)) |>
+          tidyr::unnest(cols = c("infos")) |>
           dplyr::filter(!is.na(.data$lvs))
 
 
@@ -479,7 +487,7 @@ ggmca_plot <- function(data,
 
       if(type[1] == "facets") {
         ind_data <- ind_data |>
-          tidyr::nest(row.w = .data$row.w) |>
+          tidyr::nest(row.w = "row.w") |>
           dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
                         wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
           ) |>
@@ -553,7 +561,7 @@ ggmca_plot <- function(data,
 
 
   #Separate graph for active_vars with type != "text"
-  if (type[1] %in% c("points", "labels", "numbers")) {
+  if (type[1] %in% c("points", "labels")) {
     active_graph <-
       if (text_repel == FALSE) {
         ggiraph::geom_text_interactive(
@@ -717,31 +725,6 @@ ggmca_plot <- function(data,
 
 
 
-  } else if (type[1] == "numbers") {
-    plot_output <-
-      ggplot2::ggplot(dplyr::filter(vars_data, .data$color_group != "active_vars"),
-                      ggplot2::aes(x = !!dim1, y = !!dim2,
-                                   tooltip = .data$interactive_text,
-                                   data_id = .data$id)) +
-      graph_theme_acm + profiles + ellipses +
-      ggiraph::geom_label_interactive(
-        data = dplyr::filter(vars_data, .data$color_group == "active_vars"),
-        ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
-                     tooltip = .data$interactive_text, data_id = .data$id + 1000),
-        size = text_size, color = "black", na.rm = TRUE, inherit.aes = FALSE
-      ) +
-      ggiraph::geom_text_interactive(
-        ggplot2::aes(label = .data$lvs, color = .data$color_group),  #colorvar_names
-        size = text_size/1.2, hjust = "left", nudge_x = dist_labels[1],
-        na.rm = TRUE
-      ) + #fontface = "bold"
-      ggiraph::geom_label_interactive(
-        ggplot2::aes(label = .data$numbers, color = .data$color_group),
-        size = text_size*1.2, fontface = "bold", na.rm = TRUE
-      ) +
-      mean_point_graph
-
-
   } else if(type[1] == "facets") {
     #facets : profiles by sup_vars, no active vars
     #for each sup_var, for the first ?
@@ -765,24 +748,15 @@ ggmca_plot <- function(data,
     css_hover <- ggiraph::girafe_css("stroke:orange;stroke-width:2;",
                                      text = "color:gold4;stroke:none;")
 
-    plot_output <- plot_output |>
-      append(c("css_hover" = css_hover))
+    attr(plot_output, "css_hover") <- css_hover
 
   } else { stop('unknown type of graph') }
 
-  # DESIGN: render hints ride on the ggplot object as extra list slots, read back by ggi() and
-  # ggsave2(). append() drops the class, so it is re-stamped by hand; keep both steps together.
+  # DESIGN: render hints ride on the ggplot object as attributes, read back by ggi() and ggsave2().
+  # They must NOT be list slots: append() would flatten the S7 ggplot into a plain list, and the
+  # ggplot generics (ggplot_build(), grid.draw(), and so ggsave2()) would stop dispatching on it.
 
-  # if(!is.null(ellipses) & type[1] != "facets") {
-  #   css_hover <- ggiraph::girafe_css("stroke:orange;stroke-width:2;",
-  #                                    text = "color:gold4;stroke:none;")
-  #   plot_output <- plot_output %>%
-  #     append(c("css_hover" = css_hover))
-  # }
-
-  plot_output <- plot_output |>
-    append(c("height_width_ratio" = height_width_ratio)) |>
-    `attr<-`("class", c("gg", "ggplot"))
+  attr(plot_output, "height_width_ratio") <- height_width_ratio
 
   return(plot_output)
 

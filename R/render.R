@@ -6,8 +6,8 @@
 #   - theme_facto() returns a LIST of ggplot objects, not a theme: it is `+`-ed as a whole.
 #   - "Jaune 800" is commented out of both palettes on purpose. It is reserved for the ggiraph
 #     hover colour, and a point already painted with it could not be seen to highlight.
-#   - ggi()/ggsave2() read css_hover, css_tooltip and height_width_ratio off the plot object.
-#     They are absent on a plain ggplot, so every read must tolerate NULL.
+#   - ggi()/ggsave2() read css_hover, css_tooltip and height_width_ratio from the plot object's
+#     ATTRIBUTES. They are absent on a plain ggplot, so every read must tolerate NULL.
 # See: CLAUDE.md section ggfacto architecture > The plot-object seam.
 
 #' A ggplot2 Theme for Geometrical Data Analysis
@@ -183,8 +183,10 @@ ggi <- function(plot = ggplot2::last_plot(),
 
   if (is.null(iframe)) iframe <- savewidget
 
-  if ("css_hover" %in% names(plot)) {
-    css_hover <- plot$css_hover
+  # Render hints are attributes set by ggmca_plot()/ggca(); a plain ggplot carries none, so every
+  # read below must tolerate NULL.
+  if (!is.null(attr(plot, "css_hover", exact = TRUE))) {
+    css_hover <- attr(plot, "css_hover", exact = TRUE)
   } else {
     css_hover <- ggiraph::girafe_css("fill:#d2b200;stroke:orange;",
                                      text  = "color:gold4;stroke:none;",
@@ -193,8 +195,8 @@ ggi <- function(plot = ggplot2::last_plot(),
   }
 
 
-  if ("css_tooltip" %in% names(plot)) {
-    css_tooltip <- plot$css_tooltip
+  if (!is.null(attr(plot, "css_tooltip", exact = TRUE))) {
+    css_tooltip <- attr(plot, "css_tooltip", exact = TRUE)
   } else {
     css_tooltip <- "color:#000000;text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
   }
@@ -212,8 +214,8 @@ ggi <- function(plot = ggplot2::last_plot(),
     width <- width/2.54
   }
 
-  if (keep_ratio == TRUE & !is.null(plot$height_width_ratio)) {
-    height <- width * plot$height_width_ratio
+  if (keep_ratio == TRUE & !is.null(attr(plot, "height_width_ratio", exact = TRUE))) {
+    height <- width * attr(plot, "height_width_ratio", exact = TRUE)
 
   } else {
     if (is.null(height)) { #     if (missing(height)) {
@@ -309,8 +311,8 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
                     replace = FALSE, open = rlang::is_interactive()) {
 
   if (missing(height)) {
-    if (!is.null(plot$height_width_ratio)) {
-      height <- width * plot$height_width_ratio
+    if (!is.null(attr(plot, "height_width_ratio", exact = TRUE))) {
+      height <- width * attr(plot, "height_width_ratio", exact = TRUE)
     } else {
       height <- width / 1.418919
     }

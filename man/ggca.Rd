@@ -5,7 +5,7 @@
 \title{Readable and Interactive graph for simple correspondence analysis}
 \usage{
 ggca(
-  res.ca = res.ca,
+  res.ca,
   axes = c(1, 2),
   show_sup = FALSE,
   xlim,

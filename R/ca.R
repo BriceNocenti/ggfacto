@@ -4,8 +4,8 @@
 # KEY CONSTRAINTS:
 #   - Its tooltips are the row and column percentages of the source table, computed here. It does
 #     NOT go through interactive_tooltips(), which is shaped for the MCA's Burt-table crosstabs.
-#   - Like ggmca_plot(), it smuggles css_tooltip and height_width_ratio onto the ggplot object
-#     and re-stamps the class that append() strips.
+#   - Like ggmca_plot(), it carries css_tooltip and height_width_ratio on the returned object as
+#     ATTRIBUTES, so the object stays a real ggplot and the ggplot generics keep dispatching.
 # See: CLAUDE.md section ggfacto architecture > How a graph is built, for why this is not split.
 
 #' Readable and Interactive graph for simple correspondence analysis
@@ -79,7 +79,7 @@
 #'      text_repel = TRUE)
 #'      }
 ggca <-
-  function(res.ca = res.ca, axes = c(1,2), show_sup = FALSE, xlim, ylim,
+  function(res.ca, axes = c(1,2), show_sup = FALSE, xlim, ylim,
            out_lims_move = FALSE,
            type = c("points", "text", "labels"), text_repel = FALSE, uppercase = "col",
            tooltips = c("row", "col"),
@@ -122,7 +122,7 @@ ggca <-
       dplyr::mutate(colorvar = ifelse(.data$colorvar == "Sup_row", .data$colorvar,
                                       str_c(.data$colorvar,
                                                      .data$row_colorvar))) |>
-      dplyr::select(-.data$row_colorvar) |>
+      dplyr::select(-"row_colorvar") |>
       # Afficher informations interactives au survol d'un point
       dplyr::mutate(interactive_text = str_c("<b>", .data$lvs, "</b>", "\n",
                                                       "Frequency: ",
@@ -157,17 +157,17 @@ ggca <-
         dplyr::bind_rows(row_residuals) |>
         dplyr::mutate(number_of_rows = dplyr::row_number())
       row_frequencies <- row_frequencies |>
-        dplyr::mutate_at(dplyr::vars(-.data$number_of_rows), ~dplyr::case_when(
+        dplyr::mutate_at(dplyr::vars(-"number_of_rows"), ~dplyr::case_when(
           number_of_rows > nrow(row_frequencies)/2 ~ NA_character_,
           TRUE ~ str_c("(",.[number_of_rows + nrow(row_frequencies)/2],") ", .),
         )) |>
-        dplyr::slice(1:(nrow(row_frequencies)/2)) |> dplyr::select(-.data$number_of_rows)
+        dplyr::slice(1:(nrow(row_frequencies)/2)) |> dplyr::select(-"number_of_rows")
       row_frequencies <- purrr::map_dfc(1:ncol(row_frequencies),
                                         ~dplyr::mutate_all(row_frequencies[.x],
                                                            function(.) str_c(colnames(row_frequencies)[.x], " : ", .)
                                         ))
       row_frequencies <- row_frequencies |>
-        tidyr::unite("row_text", sep = "\n") |> dplyr::pull(.data$row_text)
+        tidyr::unite("row_text", sep = "\n") |> dplyr::pull("row_text")
       row_coord <- row_coord |>
         dplyr::mutate(interactive_text = str_c(
           .data$interactive_text, "\n\n", rowtips_subtitle, " :\n", row_frequencies))
@@ -203,7 +203,7 @@ ggca <-
                                                        !!!col_colorvar_recode)) |>
       dplyr::mutate(colorvar = ifelse(.data$colorvar == "Sup_col", .data$colorvar,
                                       str_c(.data$colorvar, .data$col_colorvar))) |>
-      dplyr::select(-.data$col_colorvar) |>
+      dplyr::select(-"col_colorvar") |>
       # Afficher informations interactives au survol d'un point
       dplyr::mutate(interactive_text = str_c("<b>", .data$lvs, "</b>", "\n",
                                                       "Frequency: ",
@@ -238,17 +238,17 @@ ggca <-
         dplyr::bind_rows(col_residuals) |>
         dplyr::mutate(number_of_rows = dplyr::row_number())
       col_frequencies <- col_frequencies |>
-        dplyr::mutate_at(dplyr::vars(-.data$number_of_rows), ~dplyr::case_when(
+        dplyr::mutate_at(dplyr::vars(-"number_of_rows"), ~dplyr::case_when(
           number_of_rows > nrow(col_frequencies)/2 ~ NA_character_,
           TRUE ~ str_c("(",.[.data$number_of_rows + nrow(col_frequencies)/2],") ", .),
         )) |>
-        dplyr::slice(1:(nrow(col_frequencies)/2)) |> dplyr::select(-.data$number_of_rows)
+        dplyr::slice(1:(nrow(col_frequencies)/2)) |> dplyr::select(-"number_of_rows")
       col_frequencies <- purrr::map_dfc(1:ncol(col_frequencies),
                                         ~ dplyr::mutate_all(col_frequencies[.x],
                                                             function(.) str_c(colnames(col_frequencies)[.x], " : ", .)
                                         ))
       col_frequencies <- col_frequencies |>
-        tidyr::unite("col_text", sep = "\n") |> dplyr::pull(.data$col_text)
+        tidyr::unite("col_text", sep = "\n") |> dplyr::pull("col_text")
       col_coord <- col_coord |>
         dplyr::mutate(interactive_text = str_c(
           .data$interactive_text, "\n\n", coltips_subtitle, " :\n", col_frequencies))
@@ -267,14 +267,14 @@ ggca <-
       tibble::enframe(name = "lvs", value = "freq") |>
       dplyr::mutate(freq = str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) |>
       dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition())) |>
-      tidyr::unite("row_freq", sep = ": ") |>  dplyr::pull(.data$row_freq) |>
+      tidyr::unite("row_freq", sep = ": ") |>  dplyr::pull("row_freq") |>
       str_c(collapse = "\n")
 
     row_freq_text <- rowSums(t(res.ca$call$Xtot)) |>
       tibble::enframe(name = "lvs", value = "freq") |>
       dplyr::mutate(freq = str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) |>
       dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition())) |>
-      tidyr::unite("col_freq", sep = ": ") |> dplyr::pull(.data$col_freq) |>
+      tidyr::unite("col_freq", sep = ": ") |> dplyr::pull("col_freq") |>
       str_c(collapse = "\n")
 
     mean_point_data <- row_coord |> dplyr::slice(1) |>
@@ -447,7 +447,7 @@ ggca <-
 
       css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
                                        text = "color:gold4;stroke:none;")
-      plot_output <- plot_output |> append(c("css_hover" = css_hover))
+      attr(plot_output, "css_hover") <- css_hover
 
     } else if (type[1] == "text") {
       if (text_repel == FALSE) {
@@ -495,11 +495,11 @@ ggca <-
       plot_output <- ggplot2::ggplot() + graph_theme_acm + graph_text + graph_mean_point
     }
 
-    # DESIGN: render hints ride on the ggplot object as extra list slots, read back by ggi() and
-    # ggsave2(). append() drops the class, so it is re-stamped by hand; keep both steps together.
+    # DESIGN: render hints ride on the ggplot object as attributes, read back by ggi() and
+    # ggsave2(). They must NOT be list slots: append() would flatten the S7 ggplot into a plain
+    # list and the ggplot generics would stop dispatching on it. See R/mca-plot.R for the twin.
     css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;color:black;" #
-    plot_output <- plot_output |> append(c("css_tooltip" = css_tooltip)) |>
-      append(c("height_width_ratio" = height_width_ratio)) |>
-      `attr<-`("class", c("gg", "ggplot"))
+    attr(plot_output, "css_tooltip")        <- css_tooltip
+    attr(plot_output, "height_width_ratio") <- height_width_ratio
     return(plot_output)
   }

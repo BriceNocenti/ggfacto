@@ -3,10 +3,16 @@
 #   list(vars_data, ind_data, res.mca, cah). ggmca() itself is pure orchestration of the two
 #   halves and holds no logic.
 # KEY CONSTRAINTS:
-#   - Weights are read back from res.mca$call$row.w, never from `dat`, so a tooltip always
+#   - Weights are read back from res.mca$call$row.w, never from `data`, so a tooltip always
 #     describes the population the analysis was actually fitted on.
 #   - ggmca()'s signature is exactly ggmca_data()'s plus ggmca_plot()'s, with zero overlap. A new
-#     argument belongs to one half and must be routed to that half only.
+#     argument belongs to one half and must be routed to that half only. That is why the model is
+#     `plot_data` and the microdata is `data`: one name each, no collision.
+#   - vars_data always carries wcount, derived from the column margin when the tooltip crosstabs
+#     do not supply it: type = "points" sizes by it unconditionally.
+#   - Several arguments are inert on their own and only act alongside an enabling one --
+#     keep_levels/discard_levels need sup_vars, tooltip_vars/tooltip_vars_1lv need a table to be
+#     built at all, cah needs profiles. tests/testthat/test-ggmca-data.R pins both halves.
 #   - varsup() is vendored from GDAtools 1.7.2 (credited in place) and is the only extractor that
 #     dispatches on the analysis object's class.
 # See: CLAUDE.md section ggfacto architecture > The plot model.
@@ -111,7 +117,7 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' parameter in a MCA printing, then modify, and pass to \link{ggmca_plot}
 #' to draw the graph.
 #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-#' @param dat The data in which to find the supplementary variables, etc.
+#' @param data The data in which to find the supplementary variables, etc.
 #' @param sup_vars A character vectors of supplementary qualitative variables
 #' to print (they don't need to be passed in \code{\link[FactoMineR]{MCA}} before).
 #' @param tooltip_vars_1lv A character vectors of variables, whose first level
@@ -150,7 +156,6 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #'    \item \code{"points"} : colored points with text legends
 #'    \item \code{"labels"} : colored labels
 #'    \item \code{"active_vars_only"} : no \code{sup_vars}
-#'    \item \code{"numbers"} : colored labels of prefix numbers, with small names
 #'    \item \code{"facets"} : one graph of profiles of answer for each levels of the
 #'    first \code{sup_vars}. A different color is used for each.
 #'  }
@@ -165,10 +170,14 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @param profiles_tooltip_discard A regex pattern to remove useless levels
 #' among interactive tooltips for profiles of answers (ex. : levels expressing
 #' "no" answers).
-#' @param cah A HCPC clusters variable made with \code{\link[FactoMineR]{HCPC}}
-#' on `res.mca`, to link the answers-profiles points who share the same HCPC class
-#' (will be colored the same color and linked at mouse hover).
+#' @param cah The NAME of a column of `data` holding HCPC clusters, as a single
+#' string, to link the answers-profiles points who share the same HCPC class (they
+#' are colored alike and linked at mouse hover). Add the clusters to `data` first:
+#' `data$clust <- FactoMineR::HCPC(res.mca, graph = FALSE)$data.clust$clust`, then
+#' pass `cah = "clust"`. Only has an effect together with `profiles = TRUE`.
 #' @param max_profiles The maximum number of profiles points to print. Default to 5000.
+#' @param dat Deprecated former name of `data`. Still accepted, with a warning;
+#' use `data` instead.
 #' @param color_groups By default, there is one color group for all the levels
 #' of each `sup_vars`. It is  possible to color `sup_vars` with groups created
 #' upon their levels, with a regex matched against each level name.
@@ -249,9 +258,9 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #'   type = "facets", ellipses = 0.5, profiles = TRUE)
 #' }
 ggmca <-
-  function(res.mca, dat, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
+  function(res.mca, data, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
            axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
-           type = c("text", "labels", "points", "numbers", "facets"),
+           type = c("text", "labels", "points", "facets"),
 
            color_groups = "^.{0}", cah_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
@@ -268,11 +277,14 @@ ggmca <-
            scale_color_light = material_colors_light(),
            scale_color_dark  = material_colors_dark(),
            text_size = 3.5, size_scale_max = 4, dist_labels = c("auto", 0.04),
-           right_margin = 0, use_theme = TRUE, get_data = FALSE
+           right_margin = 0, use_theme = TRUE, get_data = FALSE,
+           dat
   ) {
+    # `dat` was renamed `data` in 0.4.0; it sits last so no positional call can reach it.
+    if (!missing(dat) && missing(data)) data <- renamed_arg(dat, "dat", "data", "ggmca")
 
-    data <- ggmca_data(
-      dat = dat,
+    plot_data <- ggmca_data(
+      data = data,
       res.mca = res.mca, sup_vars = sup_vars,
       active_tables = active_tables, tooltip_vars_1lv = tooltip_vars_1lv, tooltip_vars = tooltip_vars,
       cleannames = cleannames,
@@ -282,7 +294,7 @@ ggmca <-
       color_groups = color_groups, cah_color_groups = cah_color_groups
     )
 
-    ggmca_plot(data = data,
+    ggmca_plot(plot_data = plot_data,
                axes = axes, axes_names = axes_names, axes_reverse = axes_reverse,
                type = type,
                text_repel = text_repel, title = title,
@@ -306,14 +318,18 @@ ggmca <-
 #' @return A list containing the data frames to pass to \link{ggmca_plot}.
 #' @export
 ggmca_data <-
-  function(res.mca, dat, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
+  function(res.mca, data, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
 
            color_groups = "^.{0}", cah_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
 
            profiles = FALSE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-           cah, max_profiles = 5000
+           cah, max_profiles = 5000,
+           dat
   ) {
+    # `dat` was renamed `data` in 0.4.0; it sits last so no positional call can reach it.
+    if (!missing(dat) && missing(data)) data <- renamed_arg(dat, "dat", "data", "ggmca_data")
+
     if (missing(sup_vars))          sup_vars          <- character()
     if (missing(active_tables))     active_tables     <- character()
     if (missing(tooltip_vars_1lv))  tooltip_vars_1lv  <- character()
@@ -324,6 +340,13 @@ ggmca_data <-
       cah <- character()
     } else if (length(cah) == 0) {
       cah <- character()
+    } else if (!is.character(cah) || length(cah) != 1) {
+      # WARNING: cah is a column NAME, not the clusters themselves. Without this guard a factor or
+      # an HCPC object reaches `cah %in% sup_vars` below and dies on "the condition has length > 1".
+      stop("`cah` must be a single string naming a column of `data` that holds the HCPC clusters, ",
+           "not the clusters themselves. Add them first, e.g. ",
+           "`data$clust <- FactoMineR::HCPC(res.mca, graph = FALSE)$data.clust$clust`, ",
+           "then pass `cah = \"clust\"`.", call. = FALSE)
     } else if(! cah %in% sup_vars) {
       # warning(cah, " was not found among the supplementary variables of the mca")
       #cah <- character()
@@ -370,6 +393,16 @@ ggmca_data <-
       dplyr::left_join(contribs, by = "lvs") |>
       tidyr::nest(contribs = tidyselect::starts_with("contrib"))
 
+    # DESIGN: wcount is computed here, from the raw margin, so it exists on EVERY path -- the
+    # tooltip crosstabs supply it only for the variables they actually tabulate, but type =
+    # "points" sizes by it unconditionally. marge.col is the column margin, so
+    # marge.col * (n active variables) * population is the level's weighted count: the very number
+    # the crosstabs produce when they are built. Kept in its own mutate() because the next one
+    # overwrites `freq`.
+    active_vars_data <- active_vars_data |>
+      dplyr::mutate(wcount = .data$freq * length(active_vars) *
+                      sum(res.mca$call$row.w, na.rm = TRUE))
+
     active_vars_data <- active_vars_data |>
       dplyr::group_by(.data$vars) |>
       dplyr::mutate(freq = round(.data$freq/sum(.data$freq) * 100, 0)) |>
@@ -400,7 +433,7 @@ ggmca_data <-
     # Supplementary variables -------------------------------------------------------------
     if (length(sup_vars) != 0) {
 
-      sup_vars_data <- purrr::map(sup_vars, ~ varsup(res.mca, dat[[.]]) ) |>
+      sup_vars_data <- purrr::map(sup_vars, ~ varsup(res.mca, data[[.]]) ) |>
         purrr::set_names(sup_vars)
 
       # Do something with "within" et "between" variance ? ($var)
@@ -515,7 +548,9 @@ ggmca_data <-
     vars_data <- vars_data |>
       dplyr::add_row(vars        = "All",
                      lvs         = factor("Central point"),
-                     color_group = factor("Central point")) |>
+                     color_group = factor("Central point"),
+                     # The central point stands for the whole population, so that is its weight.
+                     wcount      = sum(res.mca$call$row.w, na.rm = TRUE)) |>
       dplyr::mutate(dplyr::across(
         tidyselect::starts_with("Dim "),
         ~ dplyr::if_else(.data$lvs == "Central point", 0, .)
@@ -533,22 +568,22 @@ ggmca_data <-
     ###Prepare data for tooltips and profiles ---
     non_active_vars <- c(sup_vars, tooltip_vars_1lv, tooltip_vars)
     if (length(non_active_vars) != 0 ) {
-      dat  <- dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]),
-                               dplyr::select(dat, tidyselect::all_of(non_active_vars)))
+      data  <- dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]),
+                               dplyr::select(data, tidyselect::all_of(non_active_vars)))
     } else {
-      dat <- tibble::as_tibble(res.mca$call$X[active_vars])
+      data <- tibble::as_tibble(res.mca$call$X[active_vars])
     }
     #sel3 <- tooltip_vars[!tooltip_vars %in% c(sel1, active_vars)]
-    #dat3 <- dat %>% dplyr::select(tidyselect::all_of(sel3))
+    #dat3 <- data %>% dplyr::select(tidyselect::all_of(sel3))
 
-    dat <- dat |>
+    data <- data |>
       dplyr::mutate(dplyr::across(where(is.character), as.factor)) |>
       dplyr::mutate(dplyr::across(where(is.factor), forcats::fct_drop)) |>
       tibble::add_column(row.w = res.mca$call$row.w)
 
     #Remove excluded levels (now, or after by renaming them here)
     excl_levels <-
-      purrr::imap_dfr(dat[active_vars],
+      purrr::imap_dfr(data[active_vars],
                       ~ tibble::tibble(active_vars = .y, lvs = levels(.x))
                       ) |>
       #dplyr::mutate(lvs2 = str_c(.data$active_vars, "_",.data$ lvs)) |>
@@ -561,13 +596,13 @@ ggmca_data <-
     excl_levels <- purrr::set_names(excl_levels$excl, excl_levels$active_vars)
 
     active_var_real_levels <-
-      purrr::imap(dat[active_vars], ~ tibble::tibble(active_vars = .y, lvs = levels(.x)))
+      purrr::imap(data[active_vars], ~ tibble::tibble(active_vars = .y, lvs = levels(.x)))
 
     active_vars_excl <- active_var_real_levels |>
-      purrr::map(~ dplyr::filter(., .data$lvs %in% excl) |> dplyr::pull(.data$lvs))
+      purrr::map(~ dplyr::filter(., .data$lvs %in% excl) |> dplyr::pull("lvs"))
     active_vars_excl <- active_vars_excl[purrr::map_lgl(active_vars_excl, ~ length(.) != 0)]
 
-    dat <- dat |>
+    data <- data |>
       dplyr::mutate(dplyr::across(
         tidyselect::all_of(names(active_vars_excl)),
         ~ forcats::fct_relevel(., active_vars_excl[[dplyr::cur_column()]], after = Inf) |>
@@ -576,13 +611,13 @@ ggmca_data <-
       ))
 
     #When MCA() added variable name at the beginning of levels names, remove it
-    dat <- dat |>
+    data <- data |>
       dplyr::mutate(dplyr::across(
         tidyselect::all_of(active_vars),
         ~ forcats::fct_relabel(., ~ str_remove(., paste0("^", dplyr::cur_column(), "_")))
       ))
 
-    if (cleannames == TRUE) dat <- dat |>
+    if (cleannames == TRUE) data <- data |>
       dplyr::mutate(dplyr::across(
         where(~is.factor(.) | is.character(.)),
         ~ forcats::fct_relabel(., ~str_remove_all(., cleannames_condition()))
@@ -608,7 +643,7 @@ ggmca_data <-
     tables_to_do <- c(active_tables[!active_tables %in% sup_vars], sup_vars)
     if(length(tables_to_do) != 0) {
 
-      interactive_text <- interactive_tooltips(dat,
+      interactive_text <- interactive_tooltips(data,
                                                sup_vars         = sup_vars,
                                                active_vars      = active_vars,
                                                active_tables    = active_tables,
@@ -618,7 +653,16 @@ ggmca_data <-
 
       text_vars <- names(interactive_text)[purrr::map_lgl(interactive_text, is.character)]
 
-      vars_data <- vars_data |> dplyr::left_join(interactive_text, by = c("vars", "lvs"))
+      # The crosstabs carry their own wcount; where they have one it wins, and the margin-derived
+      # one computed above fills in the variables they did not tabulate.
+      vars_data <- vars_data |>
+        dplyr::left_join(interactive_text, by = c("vars", "lvs"), suffix = c("_pre", ""))
+
+      if ("wcount_pre" %in% names(vars_data)) {
+        vars_data <- vars_data |>
+          dplyr::mutate(wcount = dplyr::coalesce(.data$wcount, .data$wcount_pre)) |>
+          dplyr::select(-"wcount_pre")
+      }
 
     } else {
       text_vars <- "begin_text"
@@ -650,7 +694,7 @@ ggmca_data <-
         dplyr::summarise(
           text = str_c(.data$text, collapse = "")
         ) |>
-        dplyr::pull(.data$text)
+        dplyr::pull("text")
 
       mean_point_interactive_text <-
         str_c("<b>Central point</b>",
@@ -709,7 +753,7 @@ ggmca_data <-
     #   dplyr::select(lvs, tidyselect::everything())
 
     # # Add tables of crossed active vars in tooltips
-    #  interactive_text <- interactive_tooltips(dat, sup_vars, active_vars,
+    #  interactive_text <- interactive_tooltips(data, sup_vars, active_vars,
     #                                           tooltip_vars_1lv, tooltip_vars)
     #
     #  interactive_text <- interactive_text %>%
@@ -724,7 +768,7 @@ ggmca_data <-
     #; weighted : nb of individuals * weight variable
     if (profiles) {
       ind_data <- dplyr::bind_cols(
-        dplyr::select(dat, -tidyselect::any_of(c(tooltip_vars_1lv[!tooltip_vars_1lv %in% sup_vars],
+        dplyr::select(data, -tidyselect::any_of(c(tooltip_vars_1lv[!tooltip_vars_1lv %in% sup_vars],
                                                  tooltip_vars[!tooltip_vars %in% sup_vars]))),
         tibble::as_tibble(res.mca$ind$coord)
       ) # |>
@@ -819,7 +863,7 @@ ggmca_data <-
       } else {
         ind_data <- ind_data |>
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
-                      row.w    = .data$row.w,
+                      row.w    = "row.w",
                       coord    = tidyselect::all_of(coord_names)
 
           ) |>
@@ -833,7 +877,7 @@ ggmca_data <-
         ind_data <- ind_data |>
           dplyr::mutate(nb    = dplyr::row_number(),
                         coord = purrr::map(.data$coord, ~ .[1,])) |>
-          tidyr::unnest(.data$coord)
+          tidyr::unnest("coord")
       }
 
       ind_data <- ind_data |>
@@ -854,8 +898,11 @@ ggmca_data <-
                                         .data$nb_in_cah, "/", .data$nb_tot_cah, "</b>"),
             count      = str_c("n: ", format(round(.data$count, 0),
                                                       trim = TRUE, big.mark = " ")),
+            # WARNING: compare the *_base columns, not count/wcount. Within one mutate() the
+            # `count` above has already become the string "n: 36", so comparing it to a number is
+            # always FALSE and the weighted n was printed even when it equalled the unweighted one.
             wcount     = dplyr::if_else(
-              condition = .data$count == .data$wcount,
+              condition = .data$count_base == .data$wcount_base,
               true      = "",
               false     = str_c("weighted n: ",
                                          format(round(.data$wcount, 0),
@@ -878,8 +925,9 @@ ggmca_data <-
                                          nb = .data$nb,  "</b>"),
             count       = str_c("n: ", format(round(.data$count, 0),
                                                        trim = TRUE, big.mark = " ")),
+            # WARNING: see the twin above -- compare the *_base columns, not the formatted ones.
             wcount      = dplyr::if_else(
-              condition = .data$count == .data$wcount,
+              condition = .data$count_base == .data$wcount_base,
               true      = "",
               false     = str_c("weighted n: ",
                                          format(round(.data$wcount, 0),
@@ -902,13 +950,13 @@ ggmca_data <-
     }
 
 
-    data <- list("vars_data"= vars_data,
-                 "ind_data" = ind_data,
-                 "res.mca"  = list(eig = res.mca$eig, axes_names = res.mca$axes_names),
-                 "cah"      = cah
+    plot_data <- list("vars_data" = vars_data,
+                      "ind_data"  = ind_data,
+                      "res.mca"   = list(eig = res.mca$eig, axes_names = res.mca$axes_names),
+                      "cah"       = cah
     )
 
-    data
+    plot_data
   }
 
 

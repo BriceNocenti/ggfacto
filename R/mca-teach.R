@@ -5,6 +5,12 @@
 # KEY CONSTRAINTS:
 #   - Both are only readable on a handful of variables at a time; `keep =` is the intended usage,
 #     not a refinement.
+#   - ggmca_initial_dims() plots x2 against x1, where the x* columns are one per level of a
+#     variable GROUP. A battery of binary variables never yields an x2, so it is defaulted before
+#     the branch rather than inside one of them.
+#   - ggmca_with_base_ref() takes `data` in second position for consistency with the rest of the
+#     ggmca_* family, and forwards it; it draws only active variables, read from res.mca, so the
+#     argument changes no output. A bare numeric there is routed to `axes` for back-compatibility.
 # See: CLAUDE.md section What ggfacto is, and why.
 
 #' Plot Initial Dimensions (Active Variables) of Multiple Correspondence Analysis
@@ -36,7 +42,7 @@
 #' res.mca <- MCA2(tea, active_vars = 1:18)
 #' ggmca_initial_dims(res.mca, data = tea)
 #' }
-ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
+ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
                                cleannames = TRUE, keep = NULL) {
 
   mca_excl_done <- names(res.mca$call$Xtot)[res.mca$call$excl]
@@ -77,7 +83,7 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 
 
   if(length(keep) > 0) active_var_levels <- active_var_levels |>
-    keep(names(active_var_levels) %in% keep)
+    purrr::keep(names(active_var_levels) %in% keep)
 
   active_var_levels_not_zero <-
     active_var_levels |>
@@ -202,6 +208,10 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 
   #  disj |> dplyr::filter(vars %in% c("VIDEOS", "MUSIQUE", "LIVRES")) |> new_tab() |> dplyr::group_by(vars)
 
+  # WARNING: the x* columns are one per level of a variable GROUP, so a battery of binary variables
+  # never produces an x2 -- and both branches below plot x2 against x1. Default it before branching.
+  if (! "x2" %in% names(disj)) disj <- disj |> dplyr::mutate(x2 = 0, mean_x2 = 0)
+
   if (length(unique(disj$vars_group)) > 1) {
     #(
     disj |>
@@ -212,7 +222,7 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
         ggplot2::aes(fill = .data$vars), color = NA, alpha = 0.1) +
       ggplot2::geom_segment(
         ggplot2::aes(xend = .data$x2 , yend = .data$x1), x = 0, y = 0,
-        size = 0.75, linetype = "dashed"
+        linewidth = 0.75, linetype = "dashed"
       ) +
       ggiraph::geom_point_interactive(
         ggplot2::aes(size    = .data$n,
@@ -271,9 +281,6 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
     # Juste une variable
   } else {
 
-    if (! "x2" %in% names(disj)) disj <- disj |>
-        dplyr::mutate(x2 = 0, mean_x2 = 0)
-
     #print(disj)
     #print(nrow(disj) > 2)
     #     print(if(nrow(disj) > 2) {seq(0, 1, 0.25)} else {0}
@@ -286,7 +293,7 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
       ggplot2::geom_polygon(ggplot2::aes(fill = .data$vars), color = NA, alpha = 0.1) +
       ggplot2::geom_segment(
         ggplot2::aes(xend = .data$x2 , yend = .data$x1), x = 0, y = 0,
-        size = 0.75, linetype = "dashed"
+        linewidth = 0.75, linetype = "dashed"
       ) +
       ggplot2::geom_point(ggplot2::aes(size = .data$n)) +
       ggplot2::geom_segment(
@@ -355,6 +362,9 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 #' in the space built by the analysis (principal axes). To see initial
 #' dimensions in their initial reference frame, use \code{\link[ggfacto]{ggmca_initial_dims}}.
 #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param data The data the analysis was made on. Optional: this graph draws only
+#' active variables, which are read from `res.mca`, so it changes nothing. It is
+#' accepted so that every `ggmca_*` function takes `(res.mca, data)`.
 #' @param axes The axes to print, as a numeric vector of length 2.
 #' @param keep A character vector of the name of active variables to keep.
 #'
@@ -383,8 +393,17 @@ ggmca_initial_dims <- function(res.mca = res.mca, data, proj_just = c(1.5, 2),
 #' lv6_vars <- dplyr::select(tea[1:18], where(~ nlevels(.) == 6)) |> names()
 #' ggmca_with_base_ref(res.mca, keep = lv6_vars)
 #' }
-ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
+ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
                                 keep = NULL) {
+
+  # DESIGN: `data` took second position in 0.4.0 so every ggmca_* entry point reads
+  # (res.mca, data, ...). A pre-0.4.0 call passed `axes` positionally there; a bare numeric is
+  # never microdata and a data frame is never an `axes`, so the two are told apart safely.
+  if (!missing(data) && is.numeric(data) && !is.data.frame(data) && length(data) <= 3) {
+    axes <- renamed_arg(data, "axes in 2nd position", "axes =", "ggmca_with_base_ref")
+    data <- NULL
+  }
+  if (missing(data)) data <- NULL
 
   dim1 <- rlang::sym(str_c("Dim ", axes[1]))
   dim2 <- rlang::sym(str_c("Dim ", axes[2]))
@@ -406,7 +425,8 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
                                                 cleannames_condition()))
 
 
-  vars_data <- ggmca_data(res.mca)$vars_data # get_data = TRUE
+  vars_data <- (if (is.null(data)) ggmca_data(res.mca) else
+                  ggmca_data(res.mca, data))$vars_data
   acm_orga_from_base_ref <- vars_data |>
     dplyr::filter(.data$color_group == "active_vars")
 
@@ -571,12 +591,12 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
       ggplot2::aes(xend = !!dim1, yend = !!dim2   ,
                    x = .data$`start_Dim 1` , y = .data$`start_Dim 2`,
                    color = .data$vars, group = .data$vars),
-      size = 1, arrow = ggplot2::arrow(length = ggplot2::unit(0.5, "lines")), na.rm = TRUE
+      linewidth = 1, arrow = ggplot2::arrow(length = ggplot2::unit(0.5, "lines")), na.rm = TRUE
     ) +
     ggplot2::geom_segment( # projections
       ggplot2::aes(xend = .data$proj1 , yend = .data$proj2,
                    color = .data$vars, group = .data$vars),
-      x = 0, y = 0, size = 0.5, linetype = "dashed",
+      x = 0, y = 0, linewidth = 0.5, linetype = "dashed",
     ) +
     #   ggplot2::geom_segment(data = mid_point_test, # projections
     #   ggplot2::aes(color = vars, group = vars),
@@ -586,7 +606,7 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
       ggplot2::aes(xend = .data$start_angle12_x , yend = .data$start_angle12_y,
                    x = .data$start_angle1 , y = .data$start_angle2,
                    color = .data$vars, group = .data$vars),
-      size = 0.5
+      linewidth = 0.5
     ) +
     #   ggplot2::geom_segment( # right angle on mean point
     #   ggplot2::aes(xend = .data$moy_angle12_x , yend = .data$moy_angle12_y,
@@ -599,17 +619,17 @@ ggmca_with_base_ref <- function(res.mca = res.mca, axes = c(1, 2),
       ggplot2::aes(xend = .data$proj_angle_x, yend = .data$proj_angle_y,
                    x = .data$proj_angle_c_x , y = .data$proj_angle_c_y,
                    color = .data$vars, group = .data$vars),
-      size = 0.5
+      linewidth = 0.5
     ) +
     ggplot2::geom_segment( # right angle on projections
       ggplot2::aes(xend = .data$proj_angle_b_x , yend = .data$proj_angle_b_y,
                    x = .data$proj_angle_c_x , y = .data$proj_angle_c_y,
                    color = .data$vars, group = .data$vars),
-      size = 0.5
+      linewidth = 0.5
     ) +
     ggplot2::geom_polygon(
       ggplot2::aes(fill = .data$vars, group = .data$vars),
-      size = 0.5, color = NA, alpha = 0.2,
+      linewidth = 0.5, color = NA, alpha = 0.2,
     ) +
     ggrepel::geom_label_repel(
       ggplot2::aes(x = dplyr::if_else(!!dim1 > 0, !!dim1 + 0.03, !!dim1 - 0.03),
