@@ -19,6 +19,6 @@ fct_detect_replace(factor, pattern, replacement, negate = FALSE)
 A factor.
 }
 \description{
-Recode factor levels using \code{\link[stringr]{str_detect}}.
+Recode factor levels whose name matches a regex.
 }
 \keyword{internal}

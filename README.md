@@ -77,7 +77,7 @@ interpret the MCA in close proximity with the underlying data.
 
 ``` r
 ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "active", 
-      ylim = c(NA, 1.2), text_repel = TRUE) %>%
+      ylim = c(NA, 1.2), text_repel = TRUE) |>
   ggi()
 ```
 
@@ -85,7 +85,7 @@ ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "active",
 
 ``` r
 ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "sup", 
-      ylim = c(NA, 1.2), text_repel = TRUE) %>%
+      ylim = c(NA, 1.2), text_repel = TRUE) |>
   ggi()
 ```
 
@@ -125,7 +125,7 @@ Interactive plot :
 
 ``` r
 graph.ca <- ggca(res.ca,
-                 title = "Race by marical : correspondence analysis",
+                 title = "Race by marital status: correspondence analysis",
                  tooltips = c("row", "col"))
 ggi(graph.ca)
 ```
@@ -134,13 +134,13 @@ Image plot (with `text_repel` to avoid overlapping of labels) :
 
 ``` r
 ggca(res.ca,
-     title = "Race by marical : correspondence analysis",
+     title = "Race by marital status: correspondence analysis",
      text_repel = TRUE, dist_labels = 0.02)
 ```
 
 <img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
 
-## Personnalize plots
+## Personalize plots
 
 Step-by-step functions can be used to create a database with all the
 necessary data, modify it, then use it to draw the plot:
@@ -151,7 +151,7 @@ library(ggplot2)
 
 plot_data <- ggmca_data(res.mca, tea, sup_vars = "SPC")
 
-plot_data$vars_data <- plot_data$vars_data %>% 
+plot_data$vars_data <- plot_data$vars_data |>
   filter(!lvs %in% c("other worker", "non-worker"))
 
 ggmca_plot(plot_data, ylim = c(NA, 1.2), text_repel = TRUE)

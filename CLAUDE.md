@@ -2,9 +2,21 @@
 
 ## What ggfacto is, and why
 
-`ggfacto` is a public CRAN R package (v0.3.2). It builds readable, complete and pretty graphs for correspondence analysis made with 'FactoMineR'. They can be rendered as interactive 'HTML' plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical: it helps the reader to keep in mind the data contained in the cross-table or Burt table while reading the correspondence analysis, thus preventing over-interpretation. Most graphs are made with 'ggplot2', which means that you can use the + syntax to  manually add as many graphical pieces you want, or change theme elements. 3D  graphs are made with 'plotly'.
+`ggfacto` is a public R package: **v0.3.2 on CRAN, 0.4.0 in development here**. It builds readable, complete and pretty graphs for correspondence analysis made with 'FactoMineR'. They can be rendered as interactive 'HTML' plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical: it helps the reader to keep in mind the data contained in the cross-table or Burt table while reading the correspondence analysis, thus preventing over-interpretation. Most graphs are made with 'ggplot2', which means that you can use the + syntax to  manually add as many graphical pieces you want, or change theme elements. 3D  graphs are made with 'plotly'.
 
 The target users are : 1. a "literary" social sciences student, not good at math, learning to read geometrical data analysis ; 2. a serious quantitative analyst — survey researcher, sociologist — often working with weighted survey data.
+
+### The one bet: the crosstable travels with the point
+
+"Not mainly visual but statistical" is one feature and three that support it. `ggmca(active_tables = "active")` crosses every active variable with every other one and prints those crosstables **inside the hover tooltip of each point** — that set of crosstables is the Burt table the MCA was computed from. Each percentage is coloured by its deviation from the mean, blue over-represented and red under, so a level at the edge of the cloud shows many colours and one near the centre shows few: the reader re-derives the geometry from the data instead of inventing a story for it. `active_tables = "sup"` does the same against the supplementary variables, and `profiles = TRUE` draws the cloud of individuals as distinct **answer profiles**, each hovering to show the answers it is made of. A graph you can interrogate is a graph you can be wrong about out loud.
+
+### What follows from the two audiences
+
+For the analyst, **survey weights ride one channel end to end** — `MCA2(wt =)` through FactoMineR's `row.w` and back out into every tooltip crosstab — so a weighted analysis is never described by unweighted numbers; `MCA2(excl =)` gives specific MCA, and `HCPC_tab()` describes clusters as a coloured table. For the student, `ggmca_initial_dims()` and `ggmca_with_base_ref()` exist only to *teach*: one draws the active variables in their initial reference frame, the other draws that frame inside the space the analysis built. `mca_interpret()` reads the axes by Le Roux and Rouanet's method, and `benzecri_mrv()` gives the modified rate of variance, because raw MCA eigenvalue percentages mislead.
+
+### Why not the neighbours
+
+Nothing here replaces FactoMineR — ggfacto never computes an analysis it was not handed, beyond the `MCA2()`/`PCA2()` wrappers. Against the rendering packages: `factoextra` draws the same clouds, prettily, but a point stays a point; `explor` puts the tables *beside* the graph in a Shiny app rather than inside it, and hands back no ggplot to extend; `Factoshiny` and `FactoInvestigate` automate the reading instead of showing the data behind it. `GDAtools` is the closest neighbour — the statistical toolbox of the same French school, and its `varsup()` is vendored here with credit — but it leaves rendering to others. ggfacto is the reading layer: it pins the graph back to the crosstable.
 
 For anything related to crosstables, it relies heavily on `~/github/tabxplor/`.
 
@@ -12,24 +24,110 @@ For anything related to crosstables, it relies heavily on `~/github/tabxplor/`.
 
 ## Repository Map
 
-To be written. See `~/github/tabxplor/CLAUDE.md` "## Repository Map" for an example.
+Twelve files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / # KEY CONSTRAINTS` header with fuller design detail: read it before the code.
+
+**The MCA pipeline** — the package's main path, and the only one that is staged.
+
+- `mca-data.R` — `MCA2()`, `ggmca()`, `ggmca_data()`: the entry points and the data half; plus `complete_cah()` and the vendored `varsup()`.
+- `mca-plot.R` — `ggmca_plot()`: the rendering half. ⚠ must keep sorting after `mca-data.R` (see its header).
+- `tooltips.R` — `interactive_tooltips()`: the crosstabs behind the hover, built with tabxplor.
+
+**The other analyses.**
+
+- `ca.R` — `ggca()`: simple correspondence analysis, one monolithic function.
+- `pca.R` — `PCA2()`, `ggpca_cor_circle()`, and the shared projector `PCA_ind.sup_coord()`.
+- `mca-teach.R` — `ggmca_initial_dims()`, `ggmca_with_base_ref()`: the two pedagogical plots.
+
+**3D** (plotly, `Suggests`-guarded): `mca-3d.R` — `ggmca_3d()` · `pca-3d.R` — `ggpca_3d()`.
+
+**Tables, rendering and plumbing.**
+
+- `tables.R` — everything returning a table: `benzecri_mrv()`, `mca_interpret()`, `pca_interpret()`, `mean_sd_tab()`, `HCPC_tab()`.
+- `render.R` — `theme_facto()`, the material palettes, `ggi()`, `ggsave2()`, `plot_path()`, `outlims()`.
+- `utils.R` — factor helpers, the base-R string shim that replaced stringr, `weighted.var()`, vendored `where()`.
+- `ggfacto-package.R` — imports, global bindings, `.onLoad()`, the deprecated `%>%` re-export.
+
+**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the string shim and the ASCII/Rd rules; see the roadmap for what is still missing) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md`).
+
+---
 
 ## ggfacto architecture
 
-To be written. See `~/github/tabxplor/CLAUDE.md` "## tabxplor architecture" for an example.
+### How a graph is built
+
+```text
+  FactoMineR result  ┐                     plot model                ggplot2 +
+  + the microdata    ┼──► ggmca_data() ──► list(vars_data,   ──► ggmca_plot() ──┬──► ggi()    → girafe widget
+  + survey weights   ┘                          ind_data, …)                    └──► print()  → Plots pane
+```
+
+`ggmca()` has a 25-line body of pure orchestration: its signature is exactly `ggmca_data()`'s plus `ggmca_plot()`'s, with no overlap, and it just routes each argument to its half. **The seam between the halves is public on purpose** — a user calls `ggmca_data()`, edits `plot_data$vars_data` (dropping a level, renaming one), and passes it to `ggmca_plot()`. Interactivity is a separate last step, so everything before `ggi()` is an ordinary ggplot you can `+` into.
+
+⚠ **Only MCA is on this pipeline.** `ggca()` is one function that rebuilds coordinates, tooltips and its colour vector inline; the PCA functions are independent leaves. Bringing CA onto the pipeline — a `ggca_data()`/`ggca_plot()` split — is the stated direction of travel, and it would reuse `theme_facto()`, the material palettes and the colour-group logic as they are; only the tooltip builder would need widening, since `interactive_tooltips()` is shaped for the MCA's Burt-table crosstabs and CA's tooltips are the row and column percentages of one table.
+
+### The plot model
+
+`ggmca_data()` returns a plain `list`, not a class:
+
+- **`vars_data`** — one row per level of every active and supplementary variable: its coordinates on every axis, its frequency, its colour group, its `data_id`, and a nested `interactive_text` tibble of tooltip fragments.
+- **`ind_data`** — one row per **answer profile**, with `count` / `wcount` and its own nested tooltip; `NULL` when `profiles = FALSE`.
+- **`res.mca`** — a stripped `list(eig, axes_names)`, deliberately not the FactoMineR object: the rendering half must not be able to recompute anything.
+- **`cah`** — the HCPC cluster variable's name, or `character()`.
+
+`ggmca_plot()` appends the per-axis contributions to the nested tooltip, then `tidyr::unite()`s it into the single `interactive_text` character column that every geom's `tooltip =` aesthetic reads.
+
+### The tooltip is the package
+
+`interactive_tooltips()` builds **one `tabxplor::tab()` per variable** (`output_list = TRUE`, `wt = "row.w"`, `na = "drop"`; `pct = "row"` with `color = "difference"` for the `active_tables` variables, `pct = "col"` for the rest), then `format_pct()` renders each cell as `<font color>` HTML, reading the colour through `tabxplor::fmt_get_color_code()` — never through tabxplor internals, as an earlier version did.
+
+- **WARNING** — the "Frequency" denominator is `pop_wcount`, the population. It is *not* the last row of the bound tables, which is whatever the last variable's last level happens to be and gave some levels a frequency above 100 %.
+- **WARNING** — the numbers are aligned with `str_pad()` under a monospace font, so the shim's exact stringr semantics (a *vector* `width`, a non-space fill) are load-bearing, not stylistic.
+- `unlv()` undoes tabxplor's `"_lv"` suffix on a level whose name collides with a column name, via `fct_relabel` so `lvs` stays a factor.
+
+### The FactoMineR contract
+
+The package computes no analysis of its own. `MCA2()` and `PCA2()` are the **ingress normalisers** — tidyselect for `active_vars`/`wt`, and a regex `excl` that promotes `NA` to a level and then excludes it, which is specific MCA — and everything downstream reads the fitted object directly: `$call$X` / `$quali` / `$Xtot` / `$excl` / `$marge.col` / `$row.w`, `$var$coord` / `$contrib` / `$cos2`, `$ind$coord`, `$eig`, `$svd$V` and `$vs`.
+
+`varsup()`, vendored from GDAtools 1.7.2, is the only extractor that dispatches on the object's class (`MCA` / `speMCA` / `csMCA` / `stMCA` / `multiMCA`) and it covers supplementary variables only. ggfacto adds one slot of its own, **`res$axes_names`**, read defensively and used by `theme_facto()` for the axis titles. ⚠ There is no shared extractor for the *active* side: `active_vars` is re-derived from `res.mca$call$X` and `$call$quali` independently in four places (`mca-data.R`, twice in `mca-teach.R`, and in a different shape in `tables.R`).
+
+### Weights ride one channel
+
+The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fitted object** (`res.mca$call$row.w`), never from `dat`, and re-attached as a `row.w` column → `tabxplor::tab(wt = "row.w")`. So a tooltip always describes the population the analysis was fitted on, even when the user passes a different `dat`. Consequently `count` (unweighted `n`) and `wcount` (`sum(row.w)`) travel as a pair everywhere: `wcount` is the point-size aesthetic and the sort key for `max_profiles` truncation, and a tooltip prints the weighted `n` only when it differs from the unweighted one.
+
+### The plot-object seam
+
+`theme_facto()` returns a **list** of ggplot objects, not a theme — axis titles carrying the eigenvalue percentages, scales, `coord_fixed()` — so it is `+`-ed as a whole; `ggmca_plot()` always calls it with `no_color_scale = TRUE` so the manual palette wins.
+
+`ggmca_plot()` and `ggca()` then smuggle render hints onto the returned object as extra list slots — `css_hover`, `css_tooltip`, `height_width_ratio` — and re-stamp `class` by hand, because `append()` strips it. `ggi()` and `ggsave2()` read those slots back; both must tolerate their absence, since a plain ggplot has none. Hover linking rests on a `data_id` convention: the ids are offset into disjoint bands — active variables from `1000`, HCPC clusters and answer profiles from `10000` — so that every point of one cluster shares an id and hovering any of them lights them all.
+
+### Tables are tabxplor's
+
+`pca_interpret()` and `HCPC_tab()` build `tabxplor::fmt()` columns — scale, `col_var`, `row_kind`, colour, `ref` — and let tabxplor render them; `benzecri_mrv(fmt = TRUE)` does the same for one vector. `mca_interpret(type = "html")` is the single site that does not, and closing it is Phase 1c. `mca_interpret()`'s statistics are Le Roux and Rouanet's: only levels contributing above the mean are kept, and the spread between a variable's positive and negative levels is stated in percent of that variable's own variance.
+
+### Cross-cutting invariants
+
+- **All string work goes through the `utils.R` shim**, never stringr and never bare `paste0`/`sub`: the shim keeps stringr's `NA` and padding semantics, which several call sites use as guards.
+- **`.` is a lambda pronoun, never a magrittr placeholder.** The package-level `. = NULL` binding turns a stranded placeholder into a wrong answer instead of an error.
+- **A tooltip denominator is the population**, computed once, before any binding.
+- **The plot object carries render hints.** Never rebuild it with a bare `append()` without re-stamping the class.
+- **Tables are tabxplor's job** — no kableExtra, DT or gt.
+- **`data.table` is used in exactly one function**, `complete_cah()`, where a grouped `.N` over many columns runs on the full individual-level data. The benchmark comment beside the adjacent `tidyr::nest()` records that data.table was *slower* there; do not generalise it.
+- **plotly and widgetframe are `Suggests`** and every entry point guards with `requireNamespace()`.
+
+---
 
 ### Documentation ecosystem
 
 The docs form one hierarchy, general to specific. **Each fact is stated at exactly one layer, referenced (never duplicated) across the others, and always written present-tense** — the current design is the reference point, never how it got there. The one place dev history is allowed is the roadmap "DONE" summaries. In R scripts, **the comments/code ratio should stay under 0.2**.
 
-- **`## ggfacto architecture`** (this file) — the cross-subsystem big picture: goals, data-flow, the declarative pattern, the type system, each subsystem's role and its meaningful "why". Rewritten only when the maintainer asks, by targeted cuts and replacements rather than accretion.
+- **`## ggfacto architecture`** (this file) — the cross-subsystem big picture: goals, each subsystem's role and its meaningful "why", etc.. Rewritten only when the maintainer asks, by targeted cuts and replacements rather than accretion.
 - **`## Repository Map`** (this file) — the file index: one role line per R file. *Cut, don’t accrete.*
 - **R file-header comments** — per-file subsystem design: current architecture, key constraints, a pointer up to this file.
 - **Inline `# DESIGN:` / `# WARNING:` tags** — the non-obvious "why" at the exact line, caveats to avoid, etc.
-- **Vignettes** (`vignette("ggfacto")`) — usage and teaching, for users.
-- **Roxygen man pages** (`?ggmca`, `?ggca`) — user-facing reference: *usage* and the main use cases, never build/internals/history. A `@param` states what the argument is, its values, and at most one sentence of when to change it; the rest is a link to the vignette that owns it. ⚠ The manual is LaTeX, so an Rd file is ASCII but for the few glyphs it can set (`— … × ÷`); copy `test-non-ascii.R` from `~/github/tabxplor` here to lock it.
-- **`dev/*.md`** (`.Rbuildignore`'d) — transversal or expert technical guides only. Each holds what an `R/` header is too short to derive — a foreign system, a cross-file policy, a statistical derivation — and the header that needs it points at it by section.
-- **Roadmap "DONE" summaries → `dev/ggfacto_roadmap_DONE_PHASES.md`** — the ONLY place dev history lives. *Only the maintainer* moves the DONE summaries there.
+- **Vignettes** — usage and teaching, for users. ⚠ **None exist yet**: there is no `vignettes/`, no `VignetteBuilder` and no `knitr` in `Suggests`. Until there is, a `@param` that needs more than a sentence carries it itself; do not link to a vignette that is not there.
+- **Roxygen man pages** (`?ggmca`, `?ggca`) — user-facing reference: *usage* and the main use cases, never build/internals/history. A `@param` states what the argument is, its values, and at most one sentence of when to change it; the rest is a link to the vignette that owns it. ⚠ The manual is LaTeX, so an Rd file is ASCII but for the few glyphs it can set (`— … × ÷`); `test-non-ascii.R` locks it.
+- **`dev/*.md`** (`.Rbuildignore`'d) — transversal or expert technical guides only; there is one, `dependency-audit.md` (what each dependency costs to install, and the ruling on each). Each holds what an `R/` header is too short to derive — a foreign system, a cross-file policy, a statistical derivation — and the header that needs it points at it by section.
+- **Roadmap "DONE" summaries are appended to the section below** (this file) — the **ONLY** place dev history lives. The maintainer then manualy moves them to `dev/ggfacto_roadmap_DONE_PHASES.md` for archiving.
 
 ---
 
@@ -47,42 +145,33 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 ## Testing
 
-`tests/testthat/` are to be implemented in the future (currently, only examples work as tests).
+`tests/testthat/` is the package's **contract**: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit. Two files exist so far — `test-str-shim.R` (the base-R string helpers' parity with stringr) and `test-non-ascii.R` (the ASCII rule for `R/` and `tests/`, and the LaTeX-safe glyph rule for `man/*.Rd`). Everything else is Phase 1b.
 
-It will be the package's **contract**: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit.
+The suite is **small and serial**: two files, 54 assertions, seconds to run, no `Config/testthat/parallel`, no `setup.R`, no i18n. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
 
 ```bash
 #In a temp .R file (outside tests/), then: OMP_NUM_THREADS=1 Rscript that_file.R
-#   Sys.setenv(TESTTHAT_CPUS = "6", NOT_CRAN = "true"); devtools::test("~/github/ggfacto")
-#   devtools::test("~/github/ggfactor", filter = "<name>")   # one/few files while iterating
+#   Sys.setenv(NOT_CRAN = "true"); devtools::test("~/github/ggfacto")
+#   devtools::test("~/github/ggfacto", filter = "<name>")   # one/few files while iterating
+#   devtools::check("~/github/ggfacto", document = FALSE)   # the release gate, ~1 min, must be 0/0/0
 ```
 
-### Threads and workers
+⚠ **`devtools::document()` needs `dangerouslyDisableSandbox`** — bwrap `--ro-bind`s `NAMESPACE` and `man/`.
 
-Copies from `~/github/tabxplor/CLAUDE.md`: to adapt to ggfacto when needed.
+⚠ **A plot must be forced to be tested.** `ggmca()`/`ggca()` return an object built with `append()`, so under ggplot2 4.x it is a plain list wearing `c("gg", "ggplot")` and the S7 generics (`ggplot_build()`, `grid.draw()`) do not dispatch on it. `print(p)` inside `pdf(tempfile())` is the path that works, and it is the path users take. See "The plot-object seam" above.
 
-✅ The suite **self-pins**: `tests/testthat/setup.R` pins data.table and BLAS/OpenMP per worker, and `tests/testthat.R` sets `OMP_NUM_THREADS=1` before they spawn. Keep the `OMP_NUM_THREADS=1` prefix anyway (grandchild processes, RhpcBLASctl-less setups).
+⚠ **`Rscript` writes `Rplots.pdf` into the working directory** when a plot prints without an open device; it turns `R CMD check` into a NOTE. Open a `pdf(tempfile())` in any harness that draws.
 
-⚠ **The trap this guards against**: `Config/testthat/parallel: true` runs each file in its own PROCESS, and each then multi-threads on its own — measured, 8 workers × (data.table ~6 + OpenBLAS ~10) = 165 threads on 12 logical cores, and a ~1 min suite ran >26 min.
+---
 
-⚠ **`detectCores()` counts SMT siblings.** This CPU reports 12 and has **6** real cores (`/sys/devices/system/cpu/cpu*/topology/thread_siblings_list` shows two siblings each); `parallelly::availableCores(logical = FALSE)` cannot tell either under WSL2. 8 workers beat 6 by ~6 % while oversubscribing a shared machine, so `tests/testthat.R` sizes the pool from the kernel topology. ⚠ **`devtools::test()` does not read `tests/testthat.R`** — set `TESTTHAT_CPUS` yourself there, which is what the recipe above does.
 
-⚠ **`setDTthreads()` must never be called in a per-file loop**: it tears down and rebuilds data.table's OpenMP pool, which inflated a per-file timing harness ~2×.
 
-**Never run anything else while the suite runs.** Before blaming the code for a slow run, check whether YOU are the cause: another R of yours running, then `ps -eLo pid,args | grep -c "[-]-no-readline --slave"` (thread count ≫ cores?), then orphans.
 
-### Locale, sandbox, orphans
 
-⚠ **A green local suite does NOT mean a green CI — this box is `fr_FR.UTF-8`.** GNU gettext ignores `LANGUAGE` when `LC_MESSAGES` is `C`/`POSIX`, which is the state under `R CMD check` on Linux and on the CRAN farm. So every French assertion passes here and fails there. French output is guarded by `skip_if_no_gettext()` (`tests/testthat/helper-i18n.R`), and each i18n feature is tested twice — an UNGUARDED English block plus a GUARDED French one. **Never simulate CI unless the maintainer asks**: `LC_ALL=C.UTF-8 LANGUAGE=en OMP_NUM_THREADS=1 Rscript <runner>.R` (use `C.UTF-8`, not `C`, which is harsher than any real runner).
 
-⚠ **Two steps need `dangerouslyDisableSandbox`** — bwrap runs `--unshare-net` and `--ro-bind`s `NAMESPACE`/`man/`: `dev/tests/testthat/test-tab-parallel.R` (mirai's dispatcher needs sockets) and `devtools::document()`.
 
-⛔ **NEVER kill a test run by killing its parent — you orphan the workers, and they do NOT stop.** Measured: two killed suites left 6 R processes alive for 52 minutes at ~860 % CPU, silently starving every later run.
 
-- **Diagnose AND kill unsandboxed** — bwrap runs `--unshare-pid`, so each Bash call gets its own PID namespace: `ps aux` cannot see the orphans, and a sandboxed `kill <host-pid>` would hit the wrong process. Identify yours by the parent's `--file=/tmp/claude-…/<session-id>/scratchpad/…`, never by name alone (Positron runs its own R).
-- **Never `pkill -f <pattern>`** — measured, `pkill -f testthat` killed the calling shell, and `pkill -f t9.R` is what orphaned the workers. Read `ps` first, then `kill` explicit PIDs.
-- **Never pipe a long run through `tail`/`head`** — they buffer until EOF, so the log looks empty and the run looks hung. Write to a file and read that.
-- ⚠ Killing PIDs needs the maintainer: surface the `ps` evidence and hand over the exact `kill -9 <pids>`.
+
 
 ## ggfacto v 0.4.0 roadmap and "DONE" summaries
 
@@ -112,13 +201,42 @@ Follow the locale, threads and orphan conventions in the Testing section above. 
 
 #### Phase 1c — drop kableExtra, render html tables with tabxplor
 
-`mca_interpret(type = "html")` (`R/geometrical_data_analysis.R:3431-3451`) is the package's only kableExtra consumer, and the last hard rule still broken: tables are tabxplor's job. Removing it takes the tree from 133 packages / 203.7 MB to **129 / 198.3 MB**.
+`mca_interpret(type = "html")` (`R/tables.R`, the `kableExtra::` block) is the package's only kableExtra consumer, and the last hard rule still broken: tables are tabxplor's job. Removing it takes the tree from 133 packages / 203.7 MB to **129 / 198.3 MB**.
 
 ⚠ **This is a rewrite of the html branch, not a rewiring.** `tabxplor::tab_html()` accepts a plain tibble but *silently degrades to an unstyled table*: `tab_render_vars()` requires `tabxplor_fmt` columns plus a factor row-variable, and there is no public `row_spec()`/`column_spec()` equivalent — borders, bold and block rules are all derived from tabxplor's own semantics. What `mca_interpret` currently hands over is a grouped tibble of eight pre-rendered character columns, which fails both tests and would render bare.
 
-`pca_interpret()` (`:5157`) is the in-file template: it already builds `tabxplor::fmt()` columns with `scale`, `col_var`, `row_kind`, `color` and `ref`. Do the same here — keep the contribution and spread columns as `fmt`, mark each axis's "All levels" row `row_kind = "total"`, use `col_var` to separate the positive and negative blocks so the side borders land, and make `Axe`/`Question` real factors so the row variable and the block boundaries are found. Then delete the manual `new_group` / `last_row` / `totrows` / `questions` index arithmetic at `:3393-3400` outright: tabxplor derives all four itself, and that arithmetic exists only to feed kableExtra.
+`pca_interpret()`, in the same file, is the template: it already builds `tabxplor::fmt()` columns with `scale`, `col_var`, `row_kind`, `color` and `ref`. Do the same here — keep the contribution and spread columns as `fmt`, mark each axis's "All levels" row `row_kind = "total"`, use `col_var` to separate the positive and negative blocks so the side borders land, and make `Axe`/`Question` real factors so the row variable and the block boundaries are found. Then delete the manual `new_group` / `last_row` / `totrows` / `questions` index arithmetic just above the `kableExtra::kable()` call outright: tabxplor derives all four itself, and that arithmetic exists only to feed kableExtra.
 
 Anything the class vocabulary cannot express — the two-line `Axe 1: 18.4%` / `of variance` label cell, the thin rule above each question — is a few user CSS rules appended after `tab_css()`, which is explicitly supported. The `type = "console"` path shares the computation and must not change. ⚠ Do not reach for `kable_tabxplor_style()`: it is defunct in tabxplor 2.0.0 and always errors.
+
+#### Phase 1d — one file per subsystem
+
+`R/geometrical_data_analysis.R` was 7057 lines holding every user-facing function, which made a "Repository Map" of two files document nothing. It is now **eleven files plus `utils.R`**, cut along the section markers the file already carried, each with a `# PURPOSE / # ROLE / # KEY CONSTRAINTS` header. Pure code motion: signatures, defaults and bodies are untouched.
+
+**Verification was a function-body digest, not a golden snapshot** — exhaustive where a snapshot samples. `HEAD` was extracted with `git archive`, both trees `sys.source`d into separate environments, and every object `deparse()`d and diffed. Result: **44 of 48 shared functions byte-identical**, and the four that differ differ only by the three intended edits. Upstream of that, the split itself was proved by partitioning the file into ranges that provably cover `1..7057` exactly once, then checking that every non-blank line reappears, in order, in the right destination — 5614 of 5614. A 31-call runtime sheet over `tea`/`mtcars`/`gss_cat` covered the argument paths a plain call cannot reach (`sup_vars`, `active_tables` both values, `tooltip_vars*`, `keep`/`discard_levels`, `cah`, the `xlim`/`ylim` no-repel branch, `ggmca_data()` → edit → `ggmca_plot()`), all green; `devtools::test()` 54/54; `R CMD check` 0/0/0.
+
+⚠ **The one trap the split sprang**: `@describeIn ggmca` names the merged help topic after whichever block roxygen reads first, and roxygen reads files in C-locale order — so `mca-plot.R` sorting before `mca.R` silently renamed the topic to `ggmca_plot` and reordered its usage section. The fix is the file name: `mca.R` became **`mca-data.R`**, which is also the truer name, and `mca-plot.R`'s header states the constraint.
+
+Carried in the same pass, all verified against the pre-existing `man/` byte-for-byte: two `\link[stringr]{}` cross-references that had shipped unresolvable since stringr left in 1a; `ggsave2()`'s `exists("plot$heigth_width_ratio")`, which tests for a variable of that literal name and is therefore always `FALSE`, so the aspect-ratio branch never fired — fixed, and the misspelt field renamed `height_width_ratio` at all six sites; `man/tabxplor-data.table.Rd`, copy-pasted from the sibling package, now `ggfacto-data.table`; and the two `"Title Scale color…"` roxygen titles left by the RStudio skeleton. `outlims()`, defined twice byte-identically inside `ggmca_plot()` and `ggca()`, is one internal in `render.R`.
+
+**About 850 lines of dead code and dev scratch went** (`R/` is 7704 lines down to 6981, and that is with 117 lines of new file headers added), each checked for call sites first: `PCA_princ_coord_in_base()` (its Le Roux notation key survives, duplicated verbatim, in `pca-3d.R`), `fct_clean()`, and `utils.R`'s whole colour block — `material_colors_lighter()`, which only comments referenced, `rgb2hsl()`/`hsl2rgb()`, which only it called, and 185 commented-out lines of vendored `plotwidgets`. `utils.R` went 647 → 247 lines. The commented-out scratch calls between functions (`ggmca_cah()`, `theme_ac()`, the `# axes = c(1,2)` debugging preambles, chains naming datasets that no longer exist) went with them. The README stopped teaching `%>%` while NEWS deprecates it, and lost the `marical` typo. The comments/code ratio fell from **0.36 to 0.27** — still over the 0.2 target the documentation ecosystem sets, and what remains is real commented-out alternatives inside `ggpca_3d()` and `ggmca_3d()`, which need reading rather than a sweep.
+
+**Left standing deliberately**, as design decisions rather than slips:
+
+- ⚠ **`ggsave2()` is broken under ggplot2 4.0** — and was already broken at `HEAD`, verified by running the same sheet against the pristine tree. `append()` turns the S7 ggplot into a plain list wearing `c("gg", "ggplot")`; `print()`, `+` and `ggi()` still work on that, `grid.draw()` does not. The real fix is to stop smuggling render hints through `append()`.
+- **`benzecri_mrv()` is exported with no internal caller.** Axis labels and `mca_interpret()` still print the raw eigenvalue percentages — which is the very thing a modified rate exists to correct.
+- **Four exports default an argument to itself** — `res.mca = res.mca` on `ggmca_initial_dims()`, `ggmca_with_base_ref()` and `mca_interpret()`, `res.ca = res.ca` on `ggca()`. Harmless when supplied, but omitting the argument gives "promise already under evaluation" instead of "argument is missing".
+- **`ggpca_3d()` is 1227 lines in one function**, and `pca-3d.R` is only that function. Splitting a function is not a file-organisation task.
+- **`vignettes/` still does not exist**, though the documentation ecosystem names it as a layer.
+
+
+
+
+
+
+
+
+---
 
 ## The last step of every implementation: update the documentation
 
