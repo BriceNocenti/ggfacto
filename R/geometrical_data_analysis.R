@@ -2534,7 +2534,8 @@ ggmca_3d <- function(res.mca, dat, cah, axes = 1:3, # color_groups,
 
   acm_cah <- acm$vars_data |>
     dplyr::filter(stringr::str_detect(.data$color_group, paste0("^", cah)))
-  acm_vars <- tabxplor::new_tab(acm$vars_data) |>
+  # a plain plotting tibble: no fmt column, so the tab class bought nothing
+  acm_vars <- acm$vars_data |>
     dplyr::filter(!.data$vars %in% cah) |>
     dplyr::mutate(face = dplyr::if_else(.data$color_group != "variables_actives", "italic", "bold") )
   acm_profiles <- acm$profiles_coord
@@ -3227,7 +3228,7 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
   eig <- eig/sum(eig)
 
   if (fmt) {
-    tabxplor::fmt(pct = eig, n = 0, type = "all")
+    tabxplor::fmt(pct = eig, n = 0, scale = "level_pct", pct_type = "all")
   } else {
     purrr::set_names(eig * 100, paste0("Dim ", 1:length(eig)) )
   }
@@ -5170,34 +5171,33 @@ pca_interpret <- function(res.pca, axes = 1:3) {
     dplyr::mutate(
       dplyr::across(where(is.numeric) & tidyselect::starts_with("Dim"),
                     #~ round(., 2)
+                    # A COORDINATE IS A DEVIATION, in standard deviations of the axis: `mean_diff`
+                    # is the scale that says so, and its ladder (0.1 / 0.2 / 0.4 / 0.8 SD) then makes
+                    # the colour's INTENSITY the size of the coordinate. `var = 1` because a PCA axis
+                    # is already standardized.
                     ~ tabxplor::fmt(n         = rep(n_acp, length(.)),
-                                    type      = "mean",
+                                    scale     = "mean_diff",
 
-                                    mean      = ., # dplyr::if_else(variable != "Total" , ., 0),
-                                    diff      = dplyr::case_when(
-                                      variable == "Total" ~ 1,
-                                      . > 0    ~ 3,
-                                      . < 0    ~ 1/9,
-                                      . == 0   ~ 1,
-                                    ),
-                                    in_totrow = variable == "Total",
+                                    mean      = .,
+                                    diff      = dplyr::if_else(variable == "Total", 0, .),
+                                    var       = 1,
+                                    row_kind  = dplyr::if_else(variable == "Total", "total", "data"),
                                     in_refrow = variable == "Total",
                                     digits  = 2L,
 
-                                    col_var   =  stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
-                                    color     = "diff",
+                                    col_var   =  stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"),
+                                    color     = "difference",
                                     ref = "tot",
-                                    #comp_all = FALSE
                     )
       ),
 
       dplyr::across(where(is.numeric) & tidyselect::starts_with("ctr"),
                     ~ tabxplor::fmt(n         = rep(n_acp, length(.)),
-                                    type      = "col",  # display = "pct",
+                                    scale     = "level_pct", pct_type = "col",
 
                                     pct       = dplyr::if_else(variable == "Total", 1, ./100),
                                     ctr       = ./100,
-                                    in_totrow = variable == "Total",
+                                    row_kind  = dplyr::if_else(variable == "Total", "total", "data"),
 
                                     col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
                                     color     = "contrib",
@@ -5206,17 +5206,16 @@ pca_interpret <- function(res.pca, axes = 1:3) {
 
       dplyr::across(where(is.numeric) & tidyselect::starts_with("cos2"),
                     ~ tabxplor::fmt(n    = rep(n_acp, length(.)),
-                                    type = "row", # display = "pct",
+                                    scale = "level_pct", pct_type = "row",
 
                                     pct  = .,
                                     diff = . - 0.5,
-                                    in_totrow = variable == "Total",
+                                    row_kind  = dplyr::if_else(variable == "Total", "total", "data"),
                                     in_refrow = variable == "Total",
 
                                     col_var   = stringr::str_extract(dplyr::cur_column(), "\\.[^\\.]+$"), # dplyr::cur_column(),
-                                    color     = "diff",
+                                    color     = "difference",
                                     ref = "tot",
-                                    #comp_all  = FALSE
                     )
       ),
 
@@ -5382,8 +5381,7 @@ mean_sd_tab <- function(data, vars, wt) {
 #'
 #' @examples # Make the correspondence analysis :
 #' \donttest{
-#' tabs <- table(forcats::gss_cat$race, forcats::gss_cat$marital)[-4,]
-#' # tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
+#' tabs <- as.matrix(tabxplor::tab(forcats::gss_cat, race, marital))
 #' res.ca <- FactoMineR::CA(tabs, graph = FALSE)
 #'
 #' # Interactive plot :
@@ -5871,22 +5869,28 @@ ggca <-
 
 #' Multiple Tables for Hierarchical Clusters
 #'
+#' @description
+#' One table describing every cluster: each variable's levels down the page, the clusters across it,
+#' and a colour saying at a glance which levels a cluster is made of. Numeric variables come in as
+#' mean rows, and the last two rows give each cluster's share of the population and its size.
+#'
 #' @param data A data frame.
-#' @param row_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The row variables
-#' of the table, to cross with the clusters. Typically, actives variables of the MCA.
-#' @param clust In columns, the variable with the clusters, typically made with hierarchical
+#' @param row_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The variables to describe the
+#' clusters with, typically the active variables of the MCA. Numeric ones become mean rows.
+#' @param clust The variable with the clusters, typically made with hierarchical
 #' clustering functions like \code{\link[FactoMineR]{HCPC}} (object
 #' `res$data.clust$clust`). Can be either a symbol or a character vector of
 #' length 1 (for vars in `data`), or an external variable (not in `data`)
 #' provided its length is equal to the number of rows of `data`.
 #' @param wt The name of the weight variable. Leave empty for unweighted results.
 #' @param excl The name of the levels to exclude, as a character vector.
-# @param recode_helper Set to `TRUE` to print a helper to recode levels.
-#' @param color The type of colors to print, see \code{\link[tabxplor]{tab}}.
-#' @param pct The type of percentages to print, see \code{\link[tabxplor]{tab}}.
-#' Default to column percentages
-#' @param row_tot The name of the total line (frequencies of each cluster)
-#' @param ... Additional arguments to pass to \code{\link[tabxplor]{tab_many}}.
+#' @param color The colour measure, see \code{\link[tabxplor]{tab}}. With `"difference"` (the
+#' default) the mean rows stay uncoloured: a difference of means and a difference of percentages
+#' have no ladder in common. Use `"ratio"` to colour every row, means included.
+#' @param pct `"col"` (default) reads each cluster as a distribution: of the people in this cluster,
+#' what percentage are in this level. `"row"` reads each level as a distribution across clusters.
+#' @param row_tot The name of the row giving each cluster's share of the population.
+#' @param ... Additional arguments to pass to \code{\link[tabxplor]{tab}}.
 #'
 #' @return A \code{tibble} of class \code{tab}, possibly with colored reading helpers.
 #' @export
@@ -5898,14 +5902,13 @@ ggca <-
 #' cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
 #' tea$clust <- cah$data.clust$clust
 #' HCPC_tab(tea, row_vars = all_of(names(tea)[1:18]), clust = "clust") #|>
-#' #tabxplor::tab_kable()
+#' #tabxplor::tab_export()
 #'
 HCPC_tab <- function(data, row_vars = character(), clust, wt,
-                     excl = character(), # recode_helper = FALSE,
-                     color = "diff", pct = "col",
+                     excl = character(),
+                     color = "difference", pct = "col",
                      row_tot = "% of population",
                      ...) {
-  #active <- names(CAH$data.clust)[names(CAH$data.clust) != "clust"]
 
   row_vars <- tidyselect::eval_select(rlang::enquo(row_vars), data)
   row_vars <- names(row_vars)
@@ -5930,7 +5933,6 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
   }
 
   if (clust_is_var) {
-    # clust <- safe_clust$result
     data <- data |>
       dplyr::select(tidyselect::all_of(row_vars), tidyselect::all_of(wt) ) |>
       levels_to_na(tidyselect::all_of(row_vars), excl = excl,
@@ -5945,84 +5947,90 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
                    levels_to = "Remove levels")
   }
 
-
   if (length(wt) == 0) {
     wt <- rlang::expr(NA)
   } else {
     wt <- rlang::sym(wt)
   }
 
-  first_lvs <- dplyr::select(data, tidyselect::all_of(row_vars)) |>
-    purrr::map_chr(~ dplyr::if_else(nlevels(.) == 2L, "first", "all"))
+  # A NUMBER cannot be a row of levels: it enters as a MEAN column and is transposed into a mean row.
+  # A FACTOR is built the way round the table is read -- levels down, clusters across -- so it needs
+  # no transposition at all: tabxplor stacks several row variables into one table by itself.
+  is_num   <- purrr::map_lgl(dplyr::select(data, tidyselect::all_of(row_vars)), is.numeric)
+  fct_vars <- row_vars[!is_num]
+  num_vars <- row_vars[is_num]
 
-  #if(recode_helper) tabxplor:::fct_recode_helper(data, "clust")
+  blocks <- list()
 
-  cah_actives_tab <- tabxplor::tab_many(data, "clust", tidyselect::all_of(row_vars),
-                                        pct = dplyr::if_else(pct == "row", "col", "row"),
-                                        wt = !!wt,
-                                        na = "drop", cleannames = TRUE, color = color,
-                                        levels = first_lvs, #, add_n = FALSE,
-                                        ...)
-  if (pct == "row") {
-    cah_actives_tab <- cah_actives_tab |> dplyr::select(-tidyselect::any_of(c("n")))
-  } else if (pct == "col") {
-    cah_actives_tab <- cah_actives_tab |> dplyr::filter(!clust == "n")
+  if (length(fct_vars) != 0) {
+    fct_tab <- tabxplor::tab(data,
+                             row_vars   = tidyselect::all_of(fct_vars),
+                             col_vars   = "clust",
+                             wt         = !!wt,
+                             pct        = pct,
+                             tot        = "col",
+                             na         = "drop",
+                             cleannames = TRUE,
+                             color      = color,
+                             ...) |>
+      dplyr::ungroup()
+
+    # A BINARY variable says everything in one row: the second level is the first one upside down.
+    binary  <- names(which(purrr::map_lgl(
+      dplyr::select(data, tidyselect::all_of(fct_vars)),
+      ~ nlevels(as.factor(.)) == 2L
+    )))
+    var_col <- as.character(fct_tab$row_var)
+    fct_tab <- fct_tab[!(var_col %in% binary) | !duplicated(var_col), , drop = FALSE]
+
+    blocks <- c(blocks, list(fct_tab))
   }
-  cah_actives_tab <- cah_actives_tab |>
-    dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "Total_", ), "Total", .)) |>
-    dplyr::relocate(.data$Total, .after = tidyselect::last_col()) |>
+
+  if (length(num_vars) != 0) {
+    num_tab <- tabxplor::tab(data,
+                             row_vars = "clust",
+                             col_vars = tidyselect::all_of(num_vars),
+                             wt       = !!wt,
+                             na       = "drop",
+                             color    = color) |>
+      tabxplor::tab_transpose(name = "levels") |>
+      dplyr::mutate(row_var = as.character(.data$levels), .before = 1)
+
+    blocks <- c(blocks, list(num_tab))
+  }
+
+  # The two summary rows are a fact about the CLUSTERS alone -- their share of the population and
+  # their size -- so they come from their own one-variable table, transposed once.
+  # They are DISPLAY rows, not data: `row_kind` says so, and they carry no comparison (a display row
+  # has nothing to be a deviation FROM), so the colour engine leaves them alone. They also carry the
+  # table's own scale and colour measure, because binding a column that claims something else would
+  # reconcile BOTH away -- the level rows would come out `mixed` and uncoloured.
+  pop_tab <- tabxplor::tab(data, row_vars = "clust", wt = !!wt, pct = "all") |>
+    tabxplor::tab_transpose(name = "levels")
+  pop_tab   <- dplyr::filter(pop_tab, as.character(.data$levels) %in% c("pct", "n"))
+  pop_kinds <- as.character(pop_tab$levels)          # "pct" / "n" -- already the row_kind vocabulary
+  pop_tab <- pop_tab |>
     dplyr::mutate(
-      Total = dplyr::mutate(.data$Total,
-                            wn = dplyr::if_else(is.na(.data$wn), as.double(.data$n), .data$wn)),
-      Total = vctrs::`field<-`(.data$Total, "pct",
-                               vctrs::field(.data$Total, "wn") /
-                                 dplyr::last(vctrs::field(.data$Total, "wn"))) |>
-        tabxplor::set_col_var("Total")
+      row_var = "Total",
+      .before = 1,
+      dplyr::across(
+        where(tabxplor::is_fmt),
+        ~ dplyr::mutate(., diff = NA_real_, ratio = NA_real_) |>
+          tabxplor::set_row_kind(pop_kinds) |>
+          tabxplor::set_scale("level_pct") |>
+          tabxplor::set_pct_type(pct) |>
+          tabxplor::set_color(color)
+      ),
+      levels = forcats::fct_recode(factor(pop_kinds),
+                                   !!!purrr::set_names(c("pct", "n"), c(row_tot, "n")))
     )
+  blocks <- c(blocks, list(pop_tab))
 
-  col_var <- tabxplor::get_col_var(cah_actives_tab)[tabxplor::get_col_var(cah_actives_tab) != ""]
-  col_var_total <- purrr::set_names(dplyr::last(names(col_var)), "Total" )
-  col_var <- col_var[-length(col_var)]
-  col_var <- c(purrr::set_names(names(col_var), col_var), col_var_total)
-
-  cah_actives_tab <- cah_actives_tab |>
-    tab_transpose() |>
-    dplyr::rename("lvs" = "variables") |>
-    dplyr::mutate(variables = forcats::fct_recode(.data$lvs, !!!col_var), .before = 1) |>
-    dplyr::rename("Ensemble" = "Total")
-
-  cah_actives_tab <- cah_actives_tab |>
-    dplyr::filter(!stringr::str_detect(.data$lvs, "Remove levels")) |>
-    dplyr::mutate(
-      lvs = forcats::fct_recode(.data$lvs, !!!purrr::set_names("Total", row_tot)),
-
-      ## not a good idea : unbreakable spaces should be used at the end, in tab_kable()
-      # lvs = forcats::fct_relabel(.data$lvs,
-      #                            ~ stringr::str_replace_all(., " ", unbrk))
-    )
-
-  n_rows <- dplyr::filter(cah_actives_tab, tabxplor::is_totrow(cah_actives_tab)) |>
-    dplyr::mutate(
-      variables = factor("Total"),
-      lvs = factor("n"),
-      dplyr::across(where(tabxplor::is_fmt),
-                    ~ dplyr::mutate(., display = "n", in_totrow = FALSE))
-    )
-  cah_actives_tab <- dplyr::bind_rows(cah_actives_tab, n_rows) |>
+  purrr::reduce(blocks, dplyr::bind_rows) |>
+    dplyr::filter(!stringr::str_detect(as.character(.data$levels), "Remove levels")) |>
+    dplyr::mutate(dplyr::across(c("row_var", "levels"), ~ forcats::as_factor(as.character(.)))) |>
+    dplyr::rename("variables" = "row_var", "lvs" = "levels", "Ensemble" = "Total") |>
     dplyr::group_by(.data$variables)
-
-
-  cah_actives_tab <- cah_actives_tab |>
-    dplyr::mutate(dplyr::across(
-      where(tabxplor::is_fmt), ~ dplyr::if_else(.$display == "mean",
-                               true  = dplyr::mutate(., diff = 0, digits = 2L) |>
-                                 tabxplor::as_totrow(),
-                               false = .)
-    ))
-
-
-
-  cah_actives_tab
 }
 
 
@@ -6419,281 +6427,6 @@ ggsave2 <- function(plot = ggplot2::last_plot(),
 
 
 
-#To add : - colomn with frequencies divided one by another to see if logit brings
-#something more than the cross-table
-
-#' Modified odd ratios plot from `finalfit`
-# Licence MIT : https://finalfit.org/LICENSE-text.html
-# Thanks to Ewen M Harrison.
-#'
-#' @param .data Data frame.
-#' @param dependent Character vector of length 1: name of dependent variable
-#' (must have 2 levels).
-#' @param explanatory Character vector of any length: name(s) of explanatory variables.
-#' @param random_effect Character vector of length 1, name of random effect variable.
-#' @param factorlist Option to provide output directly from \code{summary_factorlist()}.
-#' @param glmfit 	Option to provide output directly from \code{glmmulti()} and \code{glmmixed()}.
-#' @param confint_type One of \code{c("profile", "default")} for GLM models or
-#' \code{c("default", "Wald", "profile", "boot")} for \code{glmer models}.
-#' Note \code{"default" == "Wald"}.
-#' @param remove_ref 	Logical. Remove reference level for factors.
-#' @param break_scale Manually specify x-axis breaks in format \code{c(0.1, 1, 10)}.
-#' @param column_space 	Adjust table column spacing.
-#' @param dependent_label Main label for plot.
-#' @param prefix Plots are titled by default with the dependent variable. This adds
-#' text before that label.
-#' @param suffix Plots are titled with the dependent variable. This adds text after
-#' that label.
-#' @param table_text_size Alter font size of table text.
-#' @param title_text_size Alter font size of title text.
-#' @param plot_opts A list of arguments to be appended to the ggplot call by \code{"+"}.
-#' @param table_opts A list of arguments to be appended to the ggplot table call by
-#'  \code{"+"}.
-#' @param return_df To return the dataframe.
-#' @param ... Other parameters.
-
-#' @return The odd ratios plot as a \code{ggplot2} object.
-#' @export
-#'
-# @examples
-pers_or_plot <-
-  function (.data, dependent, explanatory, random_effect = NULL,
-            factorlist = NULL, glmfit = NULL, confint_type = NULL, remove_ref = FALSE,
-            break_scale = NULL, column_space = c(-0.5, 0, 0.2), dependent_label = NULL,
-            prefix = "", suffix = ": OR (95% CI, p-value)",
-            table_text_size = 5, title_text_size = 18, plot_opts = NULL,
-            table_opts = NULL, return_df = FALSE, ...) {
-    requireNamespace("finalfit", quietly = TRUE)
-
-    # sansF <- grDevices::windowsFonts("sans")
-    # grDevices::windowsFonts(sans = windowsFont("TT Arial"))
-    # grDevices::windowsFonts() %>% print()
-
-    if (!is.null(factorlist)) {
-      if (is.null(factorlist$Total))
-        stop("summary_factorlist function must include total_col=TRUE")
-      if (is.null(factorlist$fit_id))
-        stop("summary_factorlist function must include fit_id=TRUE")
-    }
-    if (is.null(factorlist)) {
-      factorlist = finalfit::summary_factorlist(.data, dependent, explanatory,
-                                                total_col = TRUE, fit_id = TRUE)
-    }
-    if (remove_ref) {
-      factorlist = factorlist %>%
-        dplyr::mutate(label = ifelse(.data$label == "", NA, .data$label)) %>%
-        tidyr::fill(.data$label) %>%
-        dplyr::group_by(.data$label) %>%
-        dplyr::filter(dplyr::row_number() != 1 | dplyr::n() > 2) %>%
-        finalfit::rm_duplicate_labels()
-    }
-    # if (is.null(breaks)) {
-    #   breaks = scales::pretty_breaks()
-    # }
-    if (is.null(confint_type) && is.null(random_effect)) {
-      confint_type = "profile"
-    }
-    else if (is.null(confint_type) && (!is.null(random_effect) |
-                                       inherits(glmfit, "glmerMod"))) {
-      confint_type = "default"
-    }
-    if (is.null(glmfit) && is.null(random_effect)) {
-      glmfit = finalfit::glmmulti(.data, dependent, explanatory)
-      glmfit_df_c = finalfit::fit2df(glmfit, condense = TRUE, estimate_suffix = " (multivariable)",
-                                     confint_type = confint_type, ...)
-    }
-    else if (is.null(glmfit) && !is.null(random_effect)) {
-      glmfit = finalfit::glmmixed(.data, dependent, explanatory, random_effect)
-      glmfit_df_c = finalfit::fit2df(glmfit, condense = TRUE, estimate_suffix = " (multilevel)",
-                                     confint_type = confint_type, ...)
-    }
-    if (!is.null(glmfit) && is.null(random_effect)) {
-      glmfit_df_c = finalfit::fit2df(glmfit, condense = TRUE, estimate_suffix = " (multivariable)",
-                                     confint_type = confint_type, estimate_name = "OR",
-                                     exp = TRUE, ...)
-    }
-    else if (!is.null(glmfit) && !is.null(random_effect)) {
-      glmfit_df_c = finalfit::fit2df(glmfit, condense = TRUE, estimate_suffix = " (multilevel)",
-                                     confint_type = confint_type, estimate_name = "OR",
-                                     exp = TRUE, ...)
-    }
-    glmfit_df = finalfit::fit2df(glmfit, condense = FALSE, confint_type = confint_type,
-                                 estimate_name = "OR", exp = TRUE, ...)
-    df.out = finalfit::finalfit_merge(factorlist, glmfit_df_c)
-    df.out = finalfit::finalfit_merge(df.out, glmfit_df, ref_symbol = "1.0")
-    df.out$Total = stringr::str_remove(df.out$Total, " \\(.*\\)") %>%
-      as.numeric()
-    df.out$Total[which(df.out$levels %in% c("Mean (SD)",
-                                            "Median (IQR)"))] = dim(.data)[1]
-    df.out$levels[which(df.out$levels %in% c("Mean (SD)",
-                                             "Median (IQR)"))] = "-"
-    if (any(is.na(df.out$label))) {
-      remove_rows = which(is.na(df.out$label))
-      df.out = df.out[-remove_rows, ]
-    }
-    else {
-      df.out
-    }
-
-
-    #Added :
-    if (return_df == FALSE) {
-      log_range <- max(as.numeric(df.out$OR)) + max(1/as.numeric(df.out$OR))
-      if (missing(break_scale)) {
-        break_scale <- dplyr::case_when(
-          log_range < 4/8  ~ 16,
-          log_range < 4/4  ~ 8,
-          log_range < 4/2  ~ 4,
-          log_range < 4    ~ 2,
-          log_range < 4*2  ~ 1,
-          log_range < 4*4  ~ 1/2,
-          log_range < 4*8  ~ 1/4,
-          log_range < 4*16 ~ 1/8,
-          TRUE             ~ 1/16)
-      }
-
-      inverse_breaks <-
-        sort((1:max(round(1/as.numeric(df.out$OR, 0))*2*break_scale)),
-             decreasing = T)/break_scale
-      legend_ticks_breaks <- c(1/inverse_breaks,
-                               1:(max(round(as.numeric(df.out$OR), 0)*2*break_scale))/break_scale, 1) %>%
-        unique() %>% sort()
-      legend_ticks_labels <- ifelse(legend_ticks_breaks < 1,
-                                    yes = stringr::str_c("1/", inverse_breaks),
-                                    no = stringr::str_remove_all(as.character(
-                                      legend_ticks_breaks), "0+$|\\.$"))
-
-      #unbrk <- stringi::stri_unescape_unicode("\\u202f")
-
-      df.out <- df.out %>%
-        dplyr::mutate(freq = (
-          (as.numeric(stringr::str_remove(df.out[, 5], " \\(.*\\)"))/.data$Total*100) %>%
-            round(0) %>% stringr::str_c("%") %>% stringr::str_pad(4)
-        )) %>%
-        dplyr::mutate(levels = stringr::str_c(.data$levels, " (", .data$freq, ")")) %>%
-        dplyr::mutate(`OR (multivariable)` = dplyr::case_when(
-          `OR (multivariable)` == "-" ~ "Reference",                               #There were unbreakable spaces.
-          OR >= 1 & p <  0.001 ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "***"),
-          OR >= 1 & p <  0.005 ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "**" , paste0(rep(unbrk, 2), collapse = "")),            #Unbreakable space
-          OR >= 1 & p <  0.01  ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2), "*"  , paste0(rep(unbrk, 4), collapse = "")),
-          OR >= 1 & p >= 0.01  ~ stringr::str_c(        format(round(  as.numeric(OR), digits = 2), nsmall = 2),        paste0(rep(unbrk, 6), collapse = "")),
-          OR <  1 & p <  0.001 ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "***"),
-          OR <  1 & p <  0.005 ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "**" , paste0(rep(unbrk, 2), collapse = "")),
-          OR <  1 & p <  0.01  ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2), "*"  , paste0(rep(unbrk, 4), collapse = "")),
-          OR <  1 & p >= 0.01  ~ stringr::str_c("1 / ", format(round(1/as.numeric(OR), digits = 2), nsmall = 2),        paste0(rep(unbrk, 6), collapse = ""))
-        )) %>%
-        dplyr::mutate(color = as.factor(dplyr::case_when(
-          `OR (multivariable)` == "Reference" ~ "Reference",
-          TRUE ~ "Autre"))) %>%
-        dplyr::mutate(index = .data$index + 1) %>%
-        tibble::add_row(fit_id = stringr::str_c("Title", 1:2), label = "",
-                        Total = 0, index = 0:1,
-                        .before = 1) #Two empty lines
-
-      #Two lines of the original function :
-      df.out$levels = as.character(df.out$levels)
-      df.out$fit_id = factor(df.out$fit_id, levels = df.out$fit_id[order(-df.out$index)])
-
-      first_row <- df.out[1,] %>%
-        tibble::add_row(fit_id = "Title1", label = "Variable", Total = 0, index = 0,
-                        levels = "Levels",
-                        `OR (multivariable)` = "Odds ratio", # stringi::stri_unescape_unicode("Odds ratio (IC \\u00e0 95%, \\u00e9chelle logarithmique)")
-                        .before = 1) %>%
-        tibble::add_row(fit_id = "Title2", label = "", Total = 0, index = 1,
-                        levels = stringr::str_c("(% ", colnames(df.out)[which( #stringr::str_to_lower(
-                          colnames(df.out) == "Total") - 1], ")"),
-                        .before = 2) %>%
-        dplyr::slice(1:2)
-
-      g1 = ggplot2::ggplot(df.out, ggplot2::aes(x = as.numeric(.data$OR),
-                                                xmin = as.numeric(.data$L95),
-                                                xmax = as.numeric(.data$U95),
-                                                y = .data$fit_id)) +
-        ggplot2::geom_point(ggplot2::aes(size = .data$Total, fill = .data$color),
-                            shape = 22, na.rm = TRUE) + #"darkblue"
-        ggplot2::geom_vline(xintercept = 1, linetype = "longdash",
-                            colour = "black") +
-        ggplot2::geom_point(data = dplyr::slice(dplyr::select(df.out, 1), 1),
-                            ggplot2::aes(x = 1, y = .data$fit_id),
-                            shape = 15, color = "white", size = 16,
-                            inherit.aes = FALSE, na.rm = TRUE) +
-        ggplot2::geom_point(ggplot2::aes(size = .data$Total, fill = .data$color),
-                            shape = 22, na.rm = TRUE) + #"darkblue"
-        ggplot2::geom_errorbarh(height = 0.2, na.rm = TRUE) +
-        #geom_point(ggplot2::aes(size = Total/2), color = "#222222", shape = 4) +
-        ggplot2::annotate("text", x = 0, y = first_row$fit_id[1],
-                          label = " (95% IC, log scale)", #" / rapport de chances",
-                          hjust = 0,
-                          size = table_text_size, fontface = "bold", na.rm = TRUE) +
-        # ggplot2::annotate("text", x = 0, y = first_row$fit_id[2],
-        #                   label = stringi::stri_unescape_unicode(" (IC \\u00e0 95%, \\u00e9chelle logarithmique)"),
-        #                   hjust = 0,
-        #                   size = table_text_size, fontface = "bold") +
-        ggplot2::scale_x_continuous(trans = "log10", breaks = legend_ticks_breaks,
-                                    labels = legend_ticks_labels) +
-        ggplot2::scale_fill_manual(values = c(Autre = "#333333", Reference = "#999999")) +
-        #xlab("Odds ratio (95% CI, log scale)") +
-        ggplot2::theme_classic(14) +
-        ggplot2::theme(axis.title.x = ggplot2::element_blank(), #element_text(),
-                       axis.title.y = ggplot2::element_blank(), axis.text.y = ggplot2::element_blank(),
-                       axis.line.y = ggplot2::element_blank(), axis.ticks.y = ggplot2::element_blank(),
-                       legend.position = "none", plot.margin = ggplot2::unit(c(0.25,0.25,0.25,-0.275), "cm"))
-      t1 = ggplot2::ggplot(df.out, ggplot2::aes(x = as.numeric(.data$OR),
-                                                y = .data$fit_id)) +
-        ggplot2::annotate("text", x = column_space[1], y = df.out$fit_id,
-                          label = df.out[, 2], hjust = 0, size = table_text_size, na.rm = TRUE) +
-        ggplot2::annotate("text", x = column_space[2], y = df.out$fit_id,
-                          label = df.out[, 3], hjust = 1, size = table_text_size, na.rm = TRUE) +
-        ggplot2::annotate("text", x = column_space[3], y = df.out$fit_id,
-                          label = df.out[, 8], hjust = 1, size = table_text_size, na.rm = TRUE) +
-        ggplot2::annotate("text", x = column_space[1], y = first_row$fit_id,
-                          label = first_row[, 2], hjust = 0, size = table_text_size,
-                          fontface = "bold", na.rm = TRUE) +
-        ggplot2::annotate("text", x = column_space[2], y = first_row$fit_id,
-                          label = first_row[, 3], hjust = 1, size = table_text_size,
-                          fontface = "bold", na.rm = TRUE) +
-        ggplot2::annotate("text", x = column_space[3], y = first_row$fit_id,
-                          label = first_row[, 8], hjust = 1, size = table_text_size,
-                          fontface = "bold.italic", na.rm = TRUE) +
-        ggplot2::theme_classic(14) +
-        ggplot2::theme(
-          #text = ggplot2::element_text(family = "sans"), #if ("arial" %in% names(grDevices::windowsFonts())) { "arial" } else { "sans" }),
-          axis.title.x = ggplot2::element_blank(), #element_text(colour = "white"),
-          axis.text.x = ggplot2::element_text(colour = "white"), axis.title.y = ggplot2::element_blank(),
-          axis.text.y = ggplot2::element_blank(), axis.ticks.y = ggplot2::element_blank(),
-          line = ggplot2::element_blank(), plot.margin = ggplot2::unit(c(0.25,-0.275, 0.25,0.25), "cm"))
-
-      g1 = g1 + plot_opts
-      t1 = t1 + table_opts
-      # title = plot_title(.data, dependent, dependent_label = dependent_label,
-      #                    prefix = prefix, suffix = suffix)
-
-
-      #plot.out <-
-      gridExtra::grid.arrange(t1, g1, ncol = 2, widths = c(3, 2)#,
-                              # top = grid::textGrob(title, x = 0.02, y = 0.2, gp = grid::gpar(fontsize = title_text_size),
-                              #                      just = "left")
-      )
-
-      # grDevices::windowsFonts(sans = windowsFont(sansF[[1]]))
-      #
-      # plot.out
-
-    } else {
-      df.out
-    }
-  }
-
-# OBJ_logit_plot <- glm.data %>%
-#   pers_or_plot("OBJVRAIacm", explanatory, table_text_size = 4)
-
-
-
-
-
-
-
-
 
 # Internal functions ---------------------------------------------------------------------
 
@@ -6888,68 +6621,82 @@ interactive_tooltips <- function(dat,
 
   tabs <- rep(list(NULL), length(vars))
 
+  # THE denominator of every "Frequency" line: the population, not `last(wcount)` -- the last row of
+  # the bound tables is whatever the last variable's last level happens to be, which gave a level a
+  # frequency above 100%.
+  pop_wcount <- sum(dat[["row.w"]], na.rm = TRUE)
 
+
+  # One table per variable: `output_list = TRUE` is tab_many()'s old shape, asked for by name (tab()
+  # merges several row variables into one table by default).
+  # Each branch hands on the SAME two plain numbers, `n` and `wcount`, taken from wherever that
+  # table keeps its base -- the Total column when there are crosstabs, the count columns when there
+  # are none. Reading them after the bind cannot work: the two shapes have no column in common.
   if (any(vars %in% active_tables)) {
     tabs_active_tables <-
-      withr::with_options(list(tabxplor.output_kable = FALSE,
-                               tabxplor.compact = FALSE,
-                               tabxplor.pvalue_lines = FALSE #,
-                               ), {
-        tabxplor::tab_many(dat,
-                           row_vars = tidyselect::all_of(vars[vars %in% active_tables]),
-                           col_vars = tidyselect::all_of(sup_list),
-                           na       = "drop",
-                           wt       = "row.w",
-                           pct      = "row",
-                           color    = "diff"#,
-                           #add_n    = FALSE # ,
-        ) |>
-          purrr::map(
-            ~ dplyr::select(., -tidyselect::any_of(c("n")))
-          )
+      withr::with_options(list(tabxplor.output_kable = FALSE), {
+        tabxplor::tab(dat,
+                      row_vars    = tidyselect::all_of(vars[vars %in% active_tables]),
+                      col_vars    = tidyselect::all_of(sup_list),
+                      wt          = "row.w",
+                      na          = "drop",
+                      pct         = "row",
+                      color       = "difference",
+                      output_list = TRUE)
       })
-
-
-    if (is.data.frame(tabs_active_tables)) tabs_active_tables <- list(tabs_active_tables)
-
 
     tabs[vars %in% active_tables] <- tabs_active_tables %>%
       purrr::map(
         ~ dplyr::rename_with(., ~ "lvs", 1) %>%
-          dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "^Total_"), "Total", .)) %>%
-          dplyr::select(-tidyselect::starts_with("Remove_levels"),
-                        -tidyselect::any_of(active_vars_2levels)) %>%
-          dplyr::filter(!.data$lvs == "Remove_levels")
+          dplyr::select(-tidyselect::any_of(active_vars_2levels)) %>%
+          dplyr::filter(!.data$lvs == "Remove_levels") %>%
+          dplyr::mutate(
+            n      = as.double(vctrs::field(.data$Total, "n")),
+            wcount = dplyr::coalesce(as.double(vctrs::field(.data$Total, "wn")), .data$n)
+          ) %>%
+          dplyr::select(-tidyselect::any_of("Total"))
       )
   }
 
   if (any(!vars %in% active_tables)) {
     tabs_no_active_tables <-
-      withr::with_options(list(tabxplor.output_kable = FALSE,
-                               tabxplor.compact = FALSE,
-                               tabxplor.pvalue_lines = FALSE #,
-                               ), {
-        tabxplor::tab_many(dat,
-                           row_vars = tidyselect::all_of(vars[!vars %in% active_tables]),
-                           na       = "drop",
-                           wt       = "row.w",
-                           pct      = "col"#,
-                           #add_n    = FALSE # ,
-        )
+      withr::with_options(list(tabxplor.output_kable = FALSE), {
+        tabxplor::tab(dat,
+                      row_vars    = tidyselect::all_of(vars[!vars %in% active_tables]),
+                      wt          = "row.w",
+                      na          = "drop",
+                      pct         = "col",
+                      output_list = TRUE)
       })
-
-    if (is.data.frame(tabs_no_active_tables)) tabs_no_active_tables <- list(tabs_no_active_tables)
 
     tabs[!vars %in% active_tables] <- tabs_no_active_tables %>%
       purrr::map(
         ~ dplyr::rename_with(., ~ "lvs", 1) %>%
-          dplyr::rename_with(~ dplyr::if_else(stringr::str_detect(., "^Total_"), "Total", .)) %>%
-          #dplyr::select(-tidyselect::any_of("n")) %>%
-          dplyr::filter(!.data$lvs == "Remove_levels")
+          dplyr::filter(!.data$lvs == "Remove_levels") %>%
+          dplyr::mutate(
+            wcount = dplyr::coalesce(as.double(vctrs::field(.data$n, "wn")),
+                                     as.double(vctrs::field(.data$n, "n"))),
+            n      = as.double(vctrs::field(.data$n, "n"))
+          ) %>%
+          dplyr::select(-tidyselect::any_of(c("wn", "pct")))
       )
   }
 
   tabs <- purrr::set_names(tabs, vars)
+
+  # tabxplor renames a level that collides with one of the data's own column names, appending "_lv"
+  # (a level named "breakfast" of a variable named "breakfast"). The plot's `lvs` never sees that
+  # rename, so the join below would drop every such level's tooltip: undo it on the exact levels it
+  # can have applied to.
+  unlv <- function(x) {
+    x <- as.character(x)
+    hit <- stringr::str_detect(x, "_lv$") & stringr::str_remove(x, "_lv$") %in% names(dat)
+    dplyr::if_else(hit, stringr::str_remove(x, "_lv$"), x)
+  }
+  # WARNING: through fct_relabel(), so `lvs` stays a FACTOR -- everything downstream picks the
+  #   tooltip pieces out by `is.character()`, and a character `lvs` would be nested away with them.
+  tabs <- purrr::map(tabs, ~ if (is.null(.)) . else
+                             dplyr::mutate(., lvs = forcats::fct_relabel(factor(.data$lvs), unlv)))
 
   # tabs <- purrr::map_if(
   #   vars, vars %in% active_tables,
@@ -7101,16 +6848,7 @@ interactive_tooltips <- function(dat,
                                         false = .data$lvs)
     )
 
-  if ("n" %in% names(interactive_text) & "wn" %in% names(interactive_text)) {
-    interactive_text <- interactive_text %>%
-      dplyr::mutate(wn = vctrs::field(.data$wn, "wn"))  |>
-      dplyr::rename("wcount" = "wn")
-  } else if ("Total" %in% names(interactive_text)) {
-    interactive_text <- interactive_text %>%
-      dplyr::mutate(n     = vctrs::field(.data$Total, "n"),
-                    Total = vctrs::field(.data$Total, "wn")) |>
-      dplyr::rename("wcount" = "Total")
-  }
+  # `n` / `wcount` are already plain numbers, normalised per table above.
 
   interactive_text <- interactive_text %>%
     dplyr::mutate(actives_text = dplyr::if_else(vars %in% active_tables,
@@ -7120,7 +6858,7 @@ interactive_tooltips <- function(dat,
       "<b>", .data$lvs,"</b>",
       dplyr::if_else(.data$lvs != "Central point", true = paste0("\n", .data$vars), false = ""),
       "\nFrequency (n=", .data$n, "): ",
-      paste0(format(round(.data$wcount / dplyr::last(.data$wcount) * 100, 0)), "%")
+      paste0(format(round(.data$wcount / pop_wcount * 100, 0)), "%")
     ) ) %>%
     dplyr::select(-.data$n) %>%
     dplyr::select(.data$vars, .data$lvs, .data$wcount, .data$begin_text,

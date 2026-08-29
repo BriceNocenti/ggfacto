@@ -10,7 +10,7 @@ HCPC_tab(
   clust,
   wt,
   excl = character(),
-  color = "diff",
+  color = "difference",
   pct = "col",
   row_tot = "\% of population",
   ...
@@ -19,10 +19,10 @@ HCPC_tab(
 \arguments{
 \item{data}{A data frame.}
 
-\item{row_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The row variables
-of the table, to cross with the clusters. Typically, actives variables of the MCA.}
+\item{row_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The variables to describe the
+clusters with, typically the active variables of the MCA. Numeric ones become mean rows.}
 
-\item{clust}{In columns, the variable with the clusters, typically made with hierarchical
+\item{clust}{The variable with the clusters, typically made with hierarchical
 clustering functions like \code{\link[FactoMineR]{HCPC}} (object
 `res$data.clust$clust`). Can be either a symbol or a character vector of
 length 1 (for vars in `data`), or an external variable (not in `data`)
@@ -32,20 +32,24 @@ provided its length is equal to the number of rows of `data`.}
 
 \item{excl}{The name of the levels to exclude, as a character vector.}
 
-\item{color}{The type of colors to print, see \code{\link[tabxplor]{tab}}.}
+\item{color}{The colour measure, see \code{\link[tabxplor]{tab}}. With `"difference"` (the
+default) the mean rows stay uncoloured: a difference of means and a difference of percentages
+have no ladder in common. Use `"ratio"` to colour every row, means included.}
 
-\item{pct}{The type of percentages to print, see \code{\link[tabxplor]{tab}}.
-Default to column percentages}
+\item{pct}{`"col"` (default) reads each cluster as a distribution: of the people in this cluster,
+what percentage are in this level. `"row"` reads each level as a distribution across clusters.}
 
-\item{row_tot}{The name of the total line (frequencies of each cluster)}
+\item{row_tot}{The name of the row giving each cluster's share of the population.}
 
-\item{...}{Additional arguments to pass to \code{\link[tabxplor]{tab_many}}.}
+\item{...}{Additional arguments to pass to \code{\link[tabxplor]{tab}}.}
 }
 \value{
 A \code{tibble} of class \code{tab}, possibly with colored reading helpers.
 }
 \description{
-Multiple Tables for Hierarchical Clusters
+One table describing every cluster: each variable's levels down the page, the clusters across it,
+and a colour saying at a glance which levels a cluster is made of. Numeric variables come in as
+mean rows, and the last two rows give each cluster's share of the population and its size.
 }
 \examples{
 
@@ -54,6 +58,6 @@ res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
 cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
 tea$clust <- cah$data.clust$clust
 HCPC_tab(tea, row_vars = all_of(names(tea)[1:18]), clust = "clust") #|>
-#tabxplor::tab_kable()
+#tabxplor::tab_export()
 
 }

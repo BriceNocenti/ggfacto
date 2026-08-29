@@ -87,35 +87,6 @@ fct_detect_replace <- function(factor, pattern, replacement, negate = FALSE){
 
 
 #' @keywords internal
-tab_transpose <- function(tabs, name = "variables") {
-  row_var <- tabxplor::tab_get_vars(tabs, "row_var")$row_var
-  totrow_names <- dplyr::filter(tabs, tabxplor::is_totrow(tabs)) |>
-    dplyr::pull(1) |> as.character()
-  if (length(totrow_names) >= 2) stop("not working for now with many total rows")
-  totcol_name <- tabxplor::is_totcol(tabs) ; totcol_name <- names(totcol_name[totcol_name])
-  if (length(totcol_name) >= 2) stop("not working for now with many total columns")
-
-  tabs |>
-    tidyr::pivot_longer(cols = -1, names_to = name, values_to = "value") |>
-    tidyr::pivot_wider(names_from = tidyselect::all_of(row_var),
-                       values_from = "value",
-                       names_sort = TRUE) |>
-    dplyr::mutate(dplyr::across(where(is.character), forcats::as_factor)) |>
-    dplyr::mutate(dplyr::across(where(tabxplor::is_fmt), ~ tabxplor::set_type(., "col"))) |>
-    dplyr::mutate(dplyr::across(where(tabxplor::is_fmt), ~ tabxplor::as_totcol(., FALSE))) |>
-    dplyr::mutate(dplyr::across(
-      tidyselect::any_of(totrow_names),
-      ~ tabxplor::as_totrow(tabxplor::as_totcol(.), FALSE)
-    )) |>
-    dplyr::mutate(dplyr::across(where(tabxplor::is_fmt), ~ dplyr::if_else(
-      !!rlang::sym(name) == totcol_name,
-      true  = tabxplor::as_totrow(.),
-      false = tabxplor::as_totrow(., FALSE)))) |>
-    tabxplor::new_tab()
-}
-
-
-#' @keywords internal
 levels_to_na <- function(data, vars, excl, levels_to = "NULL") {
   if (length(excl) == 0) return(data)
 

@@ -105,8 +105,7 @@ tooltips won't appear until you pass the result through \code{\link{ggi}}.
 \examples{
 # Make the correspondence analysis :
 \donttest{
-tabs <- table(forcats::gss_cat$race, forcats::gss_cat$marital)[-4,]
-# tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
+tabs <- as.matrix(tabxplor::tab(forcats::gss_cat, race, marital))
 res.ca <- FactoMineR::CA(tabs, graph = FALSE)
 
 # Interactive plot :

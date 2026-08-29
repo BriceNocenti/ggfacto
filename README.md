@@ -117,7 +117,7 @@ ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellips
 Make the correspondence analysis :
 
 ``` r
-tabs <- tabxplor::tab_plain(forcats::gss_cat, race, marital, df = TRUE)
+tabs <- as.matrix(tabxplor::tab(forcats::gss_cat, race, marital))
 res.ca <- FactoMineR::CA(tabs, graph = FALSE)
 ```
 
