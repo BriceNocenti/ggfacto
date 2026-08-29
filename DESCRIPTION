@@ -42,7 +42,6 @@ Imports:
 Suggests: 
     widgetframe (>= 0.3.0),
     htmlwidgets (>= 1.4.0),
-    kableExtra (>= 1.3.0),
     plotly (>= 4.1.0),
     testthat (>= 3.0.0)
 Depends:

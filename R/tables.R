@@ -3,10 +3,12 @@
 # ROLE: The reading aids: what an axis means, what a cluster is made of, what the variables look
 #   like before the analysis.
 # KEY CONSTRAINTS:
-#   - Tables are tabxplor's job. pca_interpret() and HCPC_tab() build tabxplor::fmt() columns and
-#     let tabxplor print them; mca_interpret(type = "html") is the one site that still does not.
+#   - Tables are tabxplor's job: every one here builds tabxplor::fmt() columns. mca_interpret() is
+#     the only one that also RENDERS -- its type = "html" contract is a finished table -- so it is
+#     the only caller of tab_html(), through the internal mca_interpret_tab().
 #   - mca_interpret() implements Le Roux and Rouanet's reading: only levels contributing above the
-#     mean are kept, and a spread is stated in percent of the question's own variance.
+#     mean are kept, and a spread is stated in percent of the question's own variance. That same
+#     mean contribution is what the html table's colour ladder is graded against.
 # See: CLAUDE.md section ggfacto architecture > Tables are tabxplor's.
 
 #' Benzecri's modified rate of variance
@@ -56,10 +58,13 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 #' of the variance of the question/variable.
 #' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
 #' @param axes The axes to interpret, as an integer vector. Default to the first five axes.
-#' @param type By default, a html table is printed. Set to \code{"console"} to print in
-#' console or axes the numbers as a data.frame.
+#' @param type By default (\code{"html"}), a table rendered by \pkg{tabxplor}: it opens in the
+#' Viewer when printed, and is an html table when knitted. Set to \code{"console"} for the plain
+#' numeric \code{tibble} that table is built from.
+#' @param spread Set to \code{TRUE} to add the spread column to the html table. The
+#' \code{"console"} tibble always carries it.
 #'
-#' @return An html table (or a \code{tibble}).
+#' @return An html table (or a \code{tibble} with \code{type = "console"}).
 #' @export
 #' @examples \donttest{
 #' data(tea, package = "FactoMineR")
@@ -68,8 +73,8 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 #' }
 mca_interpret <- function(res.mca,
                           axes = 1:min(res.mca$call$ncp, 5),
-                          type = c("html", "console")) {
-  if (type[1] == "html") requireNamespace("kableExtra", quietly = TRUE)
+                          type = c("html", "console"),
+                          spread = FALSE) {
 
   contrib1 <- res.mca$var$contrib[,axes] |>
     tibble::as_tibble(rownames = "levels") |>
@@ -143,6 +148,9 @@ mca_interpret <- function(res.mca,
     dplyr::ungroup() |>
     dplyr::mutate(spread = ifelse(is.na(.data$spread), NA, .data$spread) )
 
+  # The mean contribution the filter above tested against: the html table grades its colours on it.
+  mean_ctr <- contribsup$mean_ctr[1]
+
   #Contributions totales (positif/negatif sur l'axe), contrib de l'ecart total :
   total <- contribsup |>
     dplyr::group_by(.data$Axe) |>
@@ -178,72 +186,135 @@ mca_interpret <- function(res.mca,
                                        "Negative_levels" = "levels", "   " = "ctr_neg",
                                        "spread")))
 
-  if (type[1] == "html") {
-    final_tab <- final_tab |> dplyr::group_by(.data$Axe)
+  if (type[1] != "html") return(final_tab)
 
-    new_group <- dplyr::group_indices(final_tab)
-    new_group <- which(new_group != dplyr::lag(new_group, default = 0))
-
-    last_row <- nrow(final_tab)
-
-    totrows   <- final_tab |>
-      dplyr::mutate(row = dplyr::row_number(),
-                    row = row == max(row)) |>
-      dplyr::pull(row) |> which()
-
-    questions <- final_tab |> dplyr::group_by(.data$Axe, .data$Question) |>
-      dplyr::group_indices()
-    questions <- which(questions != dplyr::lag(questions, default = 0) &
-                         !is.na(dplyr::pull(final_tab, "Question")))
-    questions <- questions[!questions %in% new_group]
+  tabxplor::tab_html(
+    mca_interpret_tab(final_tab, mean_ctr = mean_ctr, mrv = benzecri_mrv(res.mca),
+                      n_ind = nrow(res.mca$call$X), spread = spread),
+    var_names = "rows",
+    # Every figure already has a cell of its own, so a hover box would only repeat it; and the
+    # generated legend describes a crosstab's over/under-representation, which an axis has no
+    # notion of -- mca_interpret_legend() says what the colour means here instead.
+    tooltips = FALSE, color_legend = FALSE
+  )
+}
 
 
-    final_tab <- final_tab |>
-      dplyr::mutate(dplyr::across(where(is.numeric),
-                                  ~ tidyr::replace_na(str_c(round(., 1), "%"), ""))) |>
-      dplyr::mutate(dplyr::across(where(is.character),
-                                  ~ tidyr::replace_na(., ""))) |>
-      dplyr::mutate(dplyr::across(
-        tidyselect::all_of(c("Question", "contrib", "spread")),
-        ~ dplyr::if_else(condition = .data$Question != dplyr::lag(.data$Question, default = ".novalue."),
-                         true      = .,
-                         false     = "")
-      )) |>
-      dplyr::mutate(Axe = dplyr::case_when(
-        condition = dplyr::row_number() == 1    ~ paste0("Axe ", .data$Axe, ": ", pct),
-        condition = dplyr::row_number() == 2    ~ "of variance",
-        TRUE                             ~ ""
-      )) |>
-      dplyr::rename(" " = "Axe") |>
-      dplyr::select(-tidyselect::all_of("pct"))
+# Why this exists: the html branch needs a tabxplor table, and a function is what the test suite can
+# address -- the rendered string is 7 kB of stylesheet plus markup, and nothing to snapshot.
+mca_interpret_tab <- function(final_tab, mean_ctr, mrv, n_ind, spread = FALSE) {
+  pos_col <- "  "   # the two contribution columns are named with two and three spaces, so that
+  neg_col <- "   "  # they print header-less beside the level they belong to
+
+  # --- one row per question and rank, the two sides of the axis side by side ----------------------
+  # A run id, not dplyr::group_by(): the table is already sorted by the question's contribution to
+  # the axis, and grouping would hand the blocks back in alphabetical order.
+  block <- cumsum(final_tab$Axe      != dplyr::lag(final_tab$Axe     , default = "") |
+                  final_tab$Question != dplyr::lag(final_tab$Question, default = ""))
+  pad   <- function(x, k) c(x, rep(x[NA_integer_][1], k))
+
+  packed <- purrr::map_dfr(split(final_tab, block), function(q) {
+    # WARNING: keyed on the CONTRIBUTIONS, never on the level names -- the "All levels" row carries
+    # both figures and no name at all, and would come back empty.
+    pos <- q[!is.na(q[[pos_col]]), ]
+    neg <- q[!is.na(q[[neg_col]]), ]
+    n   <- max(nrow(pos), nrow(neg), 1L)
+    tibble::tibble(
+      Axe     = q$Axe[1]    , pct    = q$pct[1]   , Question = q$Question[1],
+      contrib = q$contrib[1], spread = q$spread[1],
+      pos_lv  = pad(pos$Positive_levels, n - nrow(pos)),
+      pos_ctr = pad(pos[[pos_col]]     , n - nrow(pos)),
+      neg_lv  = pad(neg$Negative_levels, n - nrow(neg)),
+      neg_ctr = pad(neg[[neg_col]]     , n - nrow(neg))
+    )
+  })
+
+  # The axis heading states the raw eigenvalue percentage AND Benzecri's modified rate, which is
+  # the number that corrects it -- an MCA's raw percentages understate the first axes badly.
+  # An axis below the 1/Q cutoff has no modified rate, and simply does not get the clause.
+  packed <- packed |>
+    dplyr::mutate(mrv = mrv[as.integer(.data$Axe)]) |>
+    dplyr::group_by(.data$Axe) |>
+    dplyr::mutate(axis  = paste0("Axe ", .data$Axe, ": ",
+                                 .data$pct[!is.na(.data$pct)][1], "% of variance",
+                                 ifelse(is.na(.data$mrv[1]), "",
+                                        paste0(" (mod. ", round(.data$mrv[1]), "%)"))),
+                  first = .data$Question != dplyr::lag(.data$Question, default = ".")) |>
+    dplyr::ungroup()
+
+  is_tot   <- packed$Question == "All levels"
+  row_kind <- ifelse(is_tot, "total", "data")
+  blank    <- function(x) tidyr::replace_na(as.character(x), "")
+
+  # --- the cells ---------------------------------------------------------------------------------
+  # DESIGN: `pct` is what prints, `ctr` is what the colour is graded against -- so the sign of the
+  #   coordinate rides the colour without ever reaching the page. `color = "contrib"` reads
+  #   ctr / (the total row's ctr) and its ladder is declared over both halves, so a negative-side
+  #   level lands on the under-represented (red) half at the same x1 / x2 / x5 / x10 steps.
+  # WARNING: the total row's `ctr` is the MEAN contribution, not the sum it displays. It is the
+  #   reference every other cell is divided by, and it is Le Roux and Rouanet's own threshold.
+  ctr_fmt <- function(v, col_var, sign = 1) tabxplor::fmt(
+    n        = rep(n_ind, length(v)),
+    scale    = "level_pct", pct_type = "col",
+    pct      = v / 100,
+    ctr      = ifelse(is_tot, mean_ctr / 100, sign * v / 100),
+    row_kind = row_kind,
+    ref      = "tot",
+    col_var  = col_var,
+    color    = "contrib",
+    digits   = 1L
+  )
+
+  # A question's own figures are carried in every cell and DISPLAYED once: `display` is a per-cell
+  # field and "blank" one of its tokens, so a repeat is hidden without the value being dropped.
+  qst_fmt <- function(v, col_var) tabxplor::fmt(
+    n        = rep(n_ind, length(v)),
+    scale    = "level_pct", pct_type = "col",
+    pct      = v / 100,
+    row_kind = row_kind,
+    ref      = "tot",
+    col_var  = col_var,
+    color    = "no",
+    digits   = 1L,
+    display  = ifelse(packed$first, "pct", "blank")
+  )
+
+  # DESIGN: the AXIS is the row variable and the question is its level. Only a row variable is
+  #   turned vertically where the rotation saves width, and only the innermost label column draws
+  #   the thick rule -- as the single label column the axis gets both, so the axes are the blocks
+  #   the eye sees and the questions no longer cut the table into forty.
+  out <- tibble::tibble(
+    "Axe"      = tabxplor::new_lvl(forcats::as_factor(packed$axis), role = "var"),
+    "Question" = tabxplor::new_lvl(
+      forcats::as_factor(dplyr::if_else(packed$first, packed$Question, "")), role = "level"),
+    "contrib"  = qst_fmt(packed$contrib, "Question"),
+    # WARNING: "" and never NA -- a character NA renders as the literal string "NA".
+    "Positive_levels" = blank(packed$pos_lv),
+    "  "              = ctr_fmt(packed$pos_ctr, "Positive"),
+    "Negative_levels" = blank(packed$neg_lv),
+    "   "             = ctr_fmt(packed$neg_ctr, "Negative", sign = -1),
+    .name_repair = "minimal"
+  )
+  if (spread) out[["spread"]] <- qst_fmt(packed$spread, "Spread")
+
+  # DESIGN: `render_extras$n = "no"`, or tabxplor materialises a synthetic empty base-count column
+  #   at render time -- there is one population here, and nothing for a count to say about it.
+  tabxplor::new_tab(out, meta = list(render_extras = list(n = "no")),
+                    subtext = mca_interpret_legend())
+}
 
 
-    final_tab <- final_tab |>
-      kableExtra::kable(format = "html") |>
-      kableExtra::kable_classic(lightable_options = "hover",
-                                #bootstrap_options = c("hover", "condensed", "responsive", "bordered"), #"striped",
-                                full_width = FALSE,
-                                html_font = "DejaVu Sans Condensed", # row_label_position
-                                fixed_thead = TRUE)
-
-    final_tab <- final_tab |>
-      kableExtra::row_spec(
-        0, bold = TRUE,
-        extra_css = "border-top: 0px solid ; border-bottom: 1px solid ;"
-      ) |>
-      kableExtra::row_spec(totrows, bold = TRUE) |>
-      kableExtra::column_spec(c(1, 4, 6, 8), border_left = TRUE) |>
-      kableExtra::column_spec(8, border_right = TRUE) |>
-      kableExtra::row_spec(questions, extra_css = "border-top: 1px solid ;") |>
-      kableExtra::column_spec(1, bold = TRUE,
-                              extra_css = "border-top: 0px solid ; border-bottom: 0px solid ;") |>
-
-      kableExtra::row_spec(new_group, extra_css = "border-top: 2px solid ;") |>
-      kableExtra::row_spec(last_row, extra_css = "border-bottom: 2px solid ;")
-
-  }
-
-  final_tab
+# The colour legend, written here because tabxplor's own describes a crosstab: over- and
+# under-representation against independence, which an axis has no notion of. The swatch classes and
+# the breaks are tabxplor's, read at call time, so the words cannot drift from the palette.
+mca_interpret_legend <- function() {
+  breaks <- tabxplor::get_color_breaks()[["contrib"]]
+  swatch <- function(prefix) paste0("<span class=\"", prefix, seq_along(breaks), "\">\u00d7",
+                                    breaks, "</span>", collapse = " ")
+  paste0("Colour: the level's contribution to the variance of the axis, as a multiple of the mean ",
+         "contribution -- ", swatch("p"), " on the positive side of the axis, ", swatch("m"),
+         " on the negative side. Only levels contributing more than the mean are kept ",
+         "(Le Roux and Rouanet).")
 }
 
 

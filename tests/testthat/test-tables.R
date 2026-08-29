@@ -3,10 +3,10 @@
 #   modified rate of variance, the cluster description, the weighted means.
 # KEY CONSTRAINTS:
 #   - Tables are tabxplor's job: these build tabxplor::fmt() columns and let tabxplor render them.
-#     No kableExtra, DT or gt. mca_interpret(type = "html") is the one exception left and is
-#     Phase 1c's target, so it is NOT snapshotted here -- the snapshot would exist to be deleted.
-#   - Snapshots cover the console/tibble outputs, which are small and stable. Numbers are asserted
-#     as facts (a modified rate is below the raw rate) rather than as digits wherever possible.
+#     No kableExtra, DT or gt.
+#   - Snapshots cover the tibble outputs, which are small and stable -- never the rendered html,
+#     which is 7 kB of inlined stylesheet. Numbers are asserted as facts (a modified rate is below
+#     the raw rate) rather than as digits wherever possible.
 # See: CLAUDE.md section ggfacto architecture > Tables are tabxplor's.
 
 # --- benzecri_mrv --------------------------------------------------------------------------------
@@ -59,6 +59,105 @@ test_that("mca_interpret covers each requested axis", {
 
 test_that("the console interpretation table is stable", {
   expect_snapshot(print(mca_interpret(fx_mca(), axes = 1:2, type = "console"), n = Inf, width = Inf))
+})
+
+# --- mca_interpret, the tabxplor table -----------------------------------------------------------
+
+itab <- function(res, spread = FALSE, axes = 1:2) {
+  mca_interpret_tab(mca_interpret(res, axes = axes, type = "console"),
+                    mean_ctr = mean(res$var$contrib[, axes]),
+                    mrv      = benzecri_mrv(res),
+                    n_ind    = nrow(res$call$X),
+                    spread   = spread)
+}
+fx_itab <- function(spread = FALSE) itab(fx_mca(), spread)
+
+# tea[1:6] is a battery of binary items, so every question packs into exactly one row. The blanking
+# of a repeated question figure only has anything to hide once a question keeps several levels on
+# one side of the axis, which needs variables with more than two levels and a third axis.
+fx_mca_multi <- function() fx("mca_multi", function() {
+  MCA2(fx_tea(), tidyselect::all_of(c("Tea", "How", "how", "where", "price")), ncp = 5)
+})
+
+test_that("mca_interpret_tab builds fmt cells under declared tabxplor index columns", {
+  # Both halves are needed: tabxplor styles nothing without fmt columns, and cannot find the row
+  # variable without a declared tabxplor_lvl column.
+  tab <- fx_itab()
+  expect_true(any(vapply(tab, tabxplor::is_fmt, logical(1))))
+  expect_true(tabxplor::is_lvl(tab$Axe))
+  expect_true(tabxplor::is_lvl(tab$Question))
+})
+
+test_that("tabxplor accepts the table rather than degrading it to plain html", {
+  # The one predicate that decides whether the table styles at all; it also proves the character
+  # level-name columns sitting between fmt columns do not break the row model.
+  expect_false(tabxplor:::tab_render_vars(fx_itab())$degrade)
+})
+
+test_that("a question's two sides share one row, and an unmatched level takes its own", {
+  # The packing: a level is read against the level facing it, so a question with one positive and
+  # one negative level is one line, not two.
+  tab  <- fx_itab()
+  long <- mca_interpret(fx_mca(), axes = 1:2, type = "console")
+  expect_lt(nrow(tab), nrow(long))
+  both <- !is.na(tabxplor::get_num(tab[["  "]])) & !is.na(tabxplor::get_num(tab[["   "]]))
+  expect_true(any(both))
+})
+
+test_that("the total row displays the sum but is coloured against the mean contribution", {
+  # The pair that makes the colour say what it claims: `pct` prints, `ctr` grades. If ctr held the
+  # sum, every level would read as a fraction of the total instead of a multiple of the mean.
+  tab <- fx_itab()
+  tot <- which(tabxplor::get_row_kind(tab[["  "]]) == "total")
+  expect_gt(length(tot), 0L)
+  expect_equal(unique(round(tab[["  "]][tot]$ctr, 10)),
+               round(mean(fx_mca()$var$contrib[, 1:2]) / 100, 10))
+  expect_gt(tab[["  "]][tot[1]]$pct, tab[["  "]][tot[1]]$ctr)
+})
+
+test_that("a negative-side contribution is signed, so it colours on the under-represented half", {
+  # The sign rides `ctr` alone: it must never reach `pct`, which is what prints.
+  tab <- fx_itab()
+  neg <- tab[["   "]]
+  dat <- tabxplor::get_row_kind(neg) == "data" & !is.na(neg$pct)
+  expect_true(all(neg$ctr[dat] < 0))
+  expect_true(all(neg$pct[dat] > 0))
+})
+
+test_that("a question's own figures are carried in every cell and displayed once", {
+  # `display = "blank"` hides the repeat without dropping the value, which is what lets a reader
+  # sort or export the column. Needs a question that keeps two levels on one side -- see fx_mca_multi.
+  ctr <- itab(fx_mca_multi(), axes = 1:3)$contrib
+  expect_false(any(is.na(ctr$pct)))                    # the field is written everywhere ...
+  expect_true(any(is.na(tabxplor::get_num(ctr))))      # ... and get_num() follows the display
+  expect_true(any(ctr$display == "blank"))
+  expect_true(any(ctr$display != "blank"))
+})
+
+test_that("a battery of binary items packs to exactly one row per question", {
+  # The packing's best case, and the ordinary MCA input: two levels facing each other are one line.
+  tab <- fx_itab()
+  expect_equal(nrow(tab), sum(tab$Question != ""))
+})
+
+test_that("spread is opt-in on the html table and always present in the console tibble", {
+  expect_false("spread" %in% names(fx_itab()))
+  expect_true("spread" %in% names(fx_itab(spread = TRUE)))
+  expect_true("spread" %in% names(mca_interpret(fx_mca(), axes = 1:2, type = "console")))
+})
+
+test_that("mca_interpret(type = 'html') returns a rendered tabxplor table", {
+  html <- mca_interpret(fx_mca(), axes = 1:2)
+  expect_s3_class(html, "tabxplor_kable")
+  expect_match(paste(html, collapse = ""), '<table class="tabxplor-tab"', fixed = TRUE)
+  # a character NA would reach the page as the literal string "NA"
+  expect_false(grepl(">NA<", paste(html, collapse = ""), fixed = TRUE))
+})
+
+test_that("the interpretation table is stable", {
+  # n = Inf on purpose: pillar formats only the rows it shows, and a slice with no total row makes
+  # color = "contrib" warn that it has no mean contribution to read.
+  expect_snapshot(print(fx_itab(spread = TRUE), n = Inf, width = Inf))
 })
 
 # --- pca_interpret -------------------------------------------------------------------------------

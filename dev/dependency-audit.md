@@ -81,11 +81,13 @@ Replaced by a `ggplot2::geom_path()` over `t <- seq(0, 2 * pi, length.out = 200)
 
 ### kableExtra --- replace with tabxplor's own HTML renderer
 
-Ten sites, all inside `mca_interpret(type = "html")` at `:3421-3441`. **-4 packages / -5.4 MB.**
+Done in 0.4.0. Ten sites, all inside `mca_interpret(type = "html")`. **-4 packages / -5.4 MB** --- measured: `kableExtra`, `rstudioapi`, `svglite`, `textshaping`.
 
 The stronger argument is architectural rather than numeric: tables are tabxplor's job here, and tabxplor 2.0.0 already renders HTML itself: `tab_html()` (and its alias `tab_kable()`) emit raw HTML and return a `c("tabxplor_kable", "knitr_kable")` character object, and `tabxplor/R/tab-render-html.R:554` records that it deliberately uses none of kableExtra's themes. (`kable_tabxplor_style()` is **defunct** in 2.0.0 --- it calls `lifecycle::deprecate_stop()` and always errors.)
 
-⚠ Not a like-for-like swap, and the input format has to change too. `tab_html()` accepts a plain tibble but **silently degrades to an unstyled table**: it needs `tabxplor_fmt` columns plus a factor row-variable to style anything, and there is no public `row_spec()`/`column_spec()` equivalent --- borders and bold are derived from tabxplor's own semantics. `pca_interpret()` at `:5144` is the in-file template.
+**What `tab_html()` actually requires**, since an earlier reading of this got it wrong: `tab_render_vars()` (`tabxplor/R/tab.R:2212`) asks for one `tabxplor_fmt` column **and** one factor column, and degrades with a notice short of that. **Character columns sitting between `fmt` columns are carried through and styled normally** --- the level-name columns of `mca_interpret()`'s table are exactly that. What must be declared is the row index: `tabxplor::new_lvl()` stamps a column `"var"` / `"level"` / `"tab_var"`, and without a `"level"` column the row model is not found. Borders, bold and the block rules are then derived from tabxplor's own semantics (`col_var`, `row_kind`, `ref`) rather than from a `row_spec()`/`column_spec()` equivalent, which does not exist. `pca_interpret()` is the in-file template.
+
+⚠ Two traps found by rendering. A `tab_var` column whose **name contains a space** silently loses its `rowspan` and repeats down every row (an empty name errors outright in `tab_label_runs()`) --- a tabxplor bug, worked around here by naming the column `Axe`. And `render_extras = list(n = "no")` is needed on a hand-built table, or tabxplor materialises a synthetic empty base-count column at render time.
 
 ## Tier 3 --- base-R migrations
 
@@ -162,19 +164,19 @@ Recorded so the question is not reopened.
 
 ## Recommended end state
 
-Applied in 0.4.0, except the kableExtra work which is its own phase:
+Applied in 0.4.0:
 
 - `Imports` --- dropped `gridExtra`, `ggforce`, `stringr`; added `stats`, `grDevices`, `scales`;
   `ggplot2` raised to `>= 3.4.0` and `R` to `>= 4.1.0` (the package already used `|>`, which 4.0
   does not have).
-- `Suggests` --- dropped `finalfit`, `stringi`; added `testthat`. `kableExtra` stays until its
-  phase; `plotly`, `htmlwidgets` and `widgetframe` stay for good.
+- `Suggests` --- dropped `finalfit`, `stringi`, `kableExtra`; added `testthat`. `plotly`,
+  `htmlwidgets` and `widgetframe` stay for good.
 - `magrittr` stays one deprecation cycle: every internal use is now `|>`, but `%>%` is still
   re-exported for users. It costs 0 MB, so there is no hurry.
 
-Measured after the change: **164 packages / 243.7 MB to 133 / 203.7 MB** --- 31 fewer packages,
-40.0 MB less, about 16 %. Dropping kableExtra takes it to 129 / 198.3 MB (-35 packages, -45.4 MB),
-and retiring the `%>%` re-export removes the last declared dependency that no code uses.
+Measured after the change: **164 packages / 243.7 MB to 129 / 198.3 MB** --- 35 fewer packages,
+45.4 MB less, about 19 %. Retiring the `%>%` re-export would remove the last declared dependency
+that no code uses.
 
 The honest ceiling: with FactoMineR and ggiraph both untouchable, ~198 MB is ggfacto's floor, and
 ~47 MB of that is FactoMineR's unused statistical tail.

@@ -33,6 +33,35 @@
       11  100  
       12   88.6
 
+# the interpretation table is stable
+
+    Code
+      print(fx_itab(spread = TRUE), n = Inf, width = Inf)
+    Output
+      # A tabxplor tab: 8 x 8
+        Axe                                 Question   contrib Positive_levels   `  `
+                                                        <col%>                 <col%>
+      1 Axe 1: 23.4% of variance (mod. 83%) dinner       31.3% "dinner"         29.2%
+      2 Axe 1: 23.4% of variance (mod. 83%) tea.time     25.7% "Not.tea time"   14.5%
+      3 Axe 1: 23.4% of variance (mod. 83%) lunch        22.2% ""                    
+      4 Axe 1: 23.4% of variance (mod. 83%) All levels   73.8% ""               43.6%
+      5 Axe 2: 19.6% of variance (mod. 15%) always       32.2% "always"         21.1%
+      6 Axe 2: 19.6% of variance (mod. 15%) evening      31.6% "evening"        20.8%
+      7 Axe 2: 19.6% of variance (mod. 15%) breakfast    27.7% "Not.breakfast"  13.3%
+      8 Axe 2: 19.6% of variance (mod. 15%) All levels   91.5% ""               55.2%
+        Negative_levels  `   ` spread
+        <chr>           <col%> <col%>
+      1 ""                           
+      2 "tea time"       11.2%   100%
+      3 "lunch"          19.0%       
+      4 ""               30.2%  55.3%
+      5 "Not.always"     11.0%   100%
+      6 "Not.evening"    10.9%   100%
+      7 "breakfast"      14.4%   100%
+      8 ""               36.3%  88.6%
+      # contribution to Chi2 (vs the mean): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
+      # Colour: the level's contribution to the variance of the axis, as a multiple of the mean contribution -- <span class="p1">×1</span> <span class="p2">×2</span> <span class="p3">×5</span> <span class="p4">×10</span> on the positive side of the axis, <span class="m1">×1</span> <span class="m2">×2</span> <span class="m3">×5</span> <span class="m4">×10</span> on the negative side. Only levels contributing more than the mean are kept (Le Roux and Rouanet).
+
 # the PCA interpretation table is stable
 
     Code

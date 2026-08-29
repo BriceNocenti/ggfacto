@@ -7,7 +7,8 @@
 mca_interpret(
   res.mca,
   axes = 1:min(res.mca$call$ncp, 5),
-  type = c("html", "console")
+  type = c("html", "console"),
+  spread = FALSE
 )
 }
 \arguments{
@@ -15,11 +16,15 @@ mca_interpret(
 
 \item{axes}{The axes to interpret, as an integer vector. Default to the first five axes.}
 
-\item{type}{By default, a html table is printed. Set to \code{"console"} to print in
-console or axes the numbers as a data.frame.}
+\item{type}{By default (\code{"html"}), a table rendered by \pkg{tabxplor}: it opens in the
+Viewer when printed, and is an html table when knitted. Set to \code{"console"} for the plain
+numeric \code{tibble} that table is built from.}
+
+\item{spread}{Set to \code{TRUE} to add the spread column to the html table. The
+\code{"console"} tibble always carries it.}
 }
 \value{
-An html table (or a \code{tibble}).
+An html table (or a \code{tibble} with \code{type = "console"}).
 }
 \description{
 A table to help to interpret the meaning of axes in multiple
