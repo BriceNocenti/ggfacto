@@ -1,5 +1,37 @@
 # ggfacto 0.4.0 (development version)
 
+## Interactive graphs can be written to their own file
+
+A `bookdown` book merges every chapter into one markdown file and hands it to a single `pandoc`
+call. A widget embedded inline is a raw HTML block of several megabytes on one line, which is the
+case that reader handles worst: one course book measured 30 GB of resident memory before being
+killed. Setting
+
+``` r
+options(ggfacto.widget_dir = "auto")
+```
+
+makes every interactive graph write itself to `widget_<chunk label>.html` and put an `<iframe>` in
+the document instead. `"auto"` follows the chunk's `fig.path`, so the files travel with the
+document exactly like its figures do. See `?ggfacto_widget`.
+
+* The chunk needs a label, since the label names the file. Unset (the default), the option changes
+  nothing at all and the widget is embedded as before.
+* The frame's aspect ratio is the graph's own --- the ratio of the analysis' axes, computed in R,
+  not negotiated in JavaScript --- so an interactive plot keeps the scale it is interpreted with.
+  For the 3D graphs, which have no such ratio, the chunk's `fig.width` and `fig.height` decide.
+* `ggi()`, `ggpca_cor_circle()`, `ggmca_3d()` and `ggpca_3d()` all return widgets carrying the new
+  `ggfacto_widget` class. Printing them interactively is unchanged.
+
+## `ggi(savewidget = TRUE)` writes one standalone file
+
+* It used to write two --- `Plot.html` plus a `Plot_widget/index.html` that had to travel beside
+  it, framed by `widgetframe` and pym.js. It now writes a single self-contained page: a file that
+  can simply be sent to someone.
+* **Breaking:** `ggi(iframe = )` and `ggi(pixel_width = )` are removed, along with the
+  `widgetframe` dependency. They existed only to build that frame, and their own documentation
+  warned they produced a blank graph under `rmarkdown`. Use `ggfacto.widget_dir` for documents.
+
 ## Requires tabxplor 2.0.0
 
 Every table is now built with `tabxplor::tab()` and the 2.0.0 vocabulary.

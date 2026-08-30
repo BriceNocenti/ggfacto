@@ -14,8 +14,6 @@ ggi(
   name = "Plot",
   replace = FALSE,
   open = rlang::is_interactive(),
-  iframe = NULL,
-  pixel_width,
   ...
 )
 }
@@ -29,7 +27,8 @@ ggi(
 \item{keep_ratio}{By default, the height is forced based of the relative
 size of the MCA's axes. Set to \code{FALSE} to avoid this behavior.}
 
-\item{savewidget}{Should the html widget be saved on disk ?}
+\item{savewidget}{Should the html widget be saved on disk ? The file is standalone:
+one single \code{.html} carrying its own JavaScript, ready to be sent to someone.}
 
 \item{dir}{If saved as file, the directory in which to save the html widget.
 Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
@@ -41,19 +40,13 @@ with \code{link[base:options](options)} to change default directory.}
 
 \item{open}{Should the resulting file be opened at once ?}
 
-\item{iframe}{Create an html frame around the plot to ensure fixed
-dimensions. Useful when opening the plot in a web browser (but will produce a blank
-graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
-Require package \code{\link[widgetframe:widgetframe]{widgetframe}}.}
-
-\item{pixel_width}{The width in pixels for
-\code{\link[widgetframe:widgetframe]{widgetframe}}.}
-
 \item{...}{Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
 \code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.}
 }
 \value{
-An html plot.
+An html plot, of class \code{ggfacto_widget}. In a \pkg{knitr} document,
+setting option \code{"ggfacto.widget_dir"} writes it to its own file and embeds an
+\code{<iframe>} instead of the widget itself: see \link{ggfacto_widget}.
 }
 \description{
 Pass a MCA plot into a html interactive plot

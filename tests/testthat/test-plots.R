@@ -141,6 +141,16 @@ test_that("ggi returns a girafe widget for both graph families", {
   expect_s3_class(quietly(ggi(quietly(ggca(fx_ca())))), "girafe")
 })
 
+test_that("the ggfacto_widget tag sits where neither dispatch nor htmlwidgets is broken", {
+  # class(x)[1] is what htmlwidgets reads to find the JavaScript binding, and knit_print.htmlwidget
+  # is what wins if our tag lands after "htmlwidget". Both mistakes are silent: the first gives a
+  # blank graph, the second leaves the payload inline.
+  local_null_device()
+  w <- quietly(ggi(quietly(ggca(fx_ca()))))
+  expect_identical(class(w), c("girafe", "ggfacto_widget", "htmlwidget"))
+  expect_s3_class(w, "ggfacto_widget")
+})
+
 test_that("ggsave2 writes a non-empty file", {
   # Broken before the hints became attributes: grid.draw() could not dispatch on the flattened list.
   local_null_device()

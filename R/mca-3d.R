@@ -712,7 +712,9 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
   # final_plots$data$mean_projs         <- mean_projs
   # final_plots$data$planDf             <- planDf
 
-  final_plots
+  # No aspect ratio: a 3D scene has no 2D one to preserve, so a knitted iframe falls back on the
+  # chunk's fig.width/fig.height.
+  as_ggfacto_widget(final_plots)
 
   # plotly::layout(#title = "Title",
   #   scene = list(title = ,

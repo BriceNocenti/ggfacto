@@ -24,7 +24,7 @@ For anything related to crosstables, it relies heavily on `~/github/tabxplor/`.
 
 ## Repository Map
 
-Twelve files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / # KEY CONSTRAINTS` header with fuller design detail: read it before the code.
+Thirteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / # KEY CONSTRAINTS` header with fuller design detail: read it before the code.
 
 **The MCA pipeline** — the package's main path, and the only one that is staged.
 
@@ -45,6 +45,7 @@ Twelve files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / # 
 - `tables.R` — everything returning a table: `benzecri_mrv()`, `mca_interpret()`, `pca_interpret()`, `mean_sd_tab()`, `HCPC_tab()`.
 - `render.R` — `theme_facto()`, the material palettes, `ggi()`, `ggsave2()`, `plot_path()`, `outlims()`.
 - `utils.R` — factor helpers, the base-R string shim that replaced stringr, `weighted.var()`, vendored `where()`.
+- `knit.R` — the knitr seam: tags every widget the package returns, and writes it to its own file with an `<iframe>` in its place when `options(ggfacto.widget_dir)` asks.
 - `ggfacto-package.R` — imports, global bindings, `.onLoad()`, the deprecated `%>%` re-export.
 
 **Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md`).
@@ -98,7 +99,7 @@ The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fit
 
 `theme_facto()` returns a **list** of ggplot objects, not a theme — axis titles carrying the eigenvalue percentages, scales, `coord_fixed()` — so it is `+`-ed as a whole; `ggmca_plot()` always calls it with `no_color_scale = TRUE` so the manual palette wins.
 
-`ggmca_plot()` and `ggca()` then carry render hints on the returned object as **attributes** — `css_hover`, `css_tooltip`, `height_width_ratio` — which `ggi()` and `ggsave2()` read back; both must tolerate their absence, since a plain ggplot has none. Attributes rather than list slots because the object must stay a real ggplot: `append()` flattens the S7 object into a plain list wearing `c("gg", "ggplot")`, and then `ggplot_build()`, `grid.draw()` and so `ggsave2()` stop dispatching, while `print()` draws only as a side effect of `print.default()` recursing into the nested plot. The hints survive `+`, so a user can keep extending the graph. Hover linking rests on a `data_id` convention: the ids are offset into disjoint bands — active variables from `1000`, HCPC clusters and answer profiles from `10000` — so that every point of one cluster shares an id and hovering any of them lights them all.
+`ggmca_plot()` and `ggca()` then carry render hints on the returned object as **attributes** — `css_hover`, `css_tooltip`, `height_width_ratio` — which `ggi()` and `ggsave2()` read back; both must tolerate their absence, since a plain ggplot has none. `ggi()` passes the ratio on to the widget as `ggfacto_ratio`, which is the only geometry a knitted `<iframe>` has to go on (see `R/knit.R`). Attributes rather than list slots because the object must stay a real ggplot: `append()` flattens the S7 object into a plain list wearing `c("gg", "ggplot")`, and then `ggplot_build()`, `grid.draw()` and so `ggsave2()` stop dispatching, while `print()` draws only as a side effect of `print.default()` recursing into the nested plot. The hints survive `+`, so a user can keep extending the graph. Hover linking rests on a `data_id` convention: the ids are offset into disjoint bands — active variables from `1000`, HCPC clusters and answer profiles from `10000` — so that every point of one cluster shares an id and hovering any of them lights them all.
 
 ### Tables are tabxplor's
 
@@ -259,6 +260,20 @@ Carried in the same pass, all verified against the pre-existing `man/` byte-for-
 ⚠ **Two tabxplor findings, neither worked around badly.** A `tab_var` column whose **name contains a space** silently loses its `rowspan` and repeats down every row, and an empty name errors inside `tab_label_runs()` — the axis column is therefore named `Axe`, not `" "` as the kableExtra table had it. And a hand-built table needs `meta = list(render_extras = list(n = "no"))`, or tabxplor materialises a synthetic empty base-count column at render time. `<ctr>` as the column's unit tag was investigated and **deliberately not implemented**: the tag follows the displayed token, so it needs `display = "ctr"`, which prints the signed value (`-20%`); `pct_type = "none"` gives `<%>` but costs the total row its colour reference.
 
 **Verification.** The console path was proved unchanged by a six-cell digest (`tea[1:6]` and `tea[1:18]` × `axes` 1, 1:2, 1:3, 1:5) captured from a `git archive` of pristine `HEAD` and re-run after the edit. Bitwise comparison is the wrong instrument here, as Phase 1b already found: **pristine `HEAD` compared with itself across two processes is 0/6 bit-identical**, and 5/6 equal within 1e-10 — and `HEAD` vs the new tree has exactly the same profile, the one loose entry (`tea[1:18]`, axes 1:5) being unstable at `HEAD` too, at the same magnitude. The suite went from 213 to 241 assertions, the ten new ones covering the packing, the two `pct`/`ctr` invariants, the display blanking, the `spread` argument, and `tab_render_vars()` not degrading — the single predicate that decides whether the table styles at all. ⚠ The first blanking test was **vacuous**: `tea[1:6]` is a battery of binary items, so every question packs to exactly one row and nothing is ever a repeat. It needs multi-level variables and a third axis, which is what `fx_mca_multi()` is for; the binary case is now pinned as its own fact.
+
+#### Phase 1d — a knitted widget writes itself to its own file
+
+An interactive graph embedded inline is a raw HTML block of several megabytes **on one line**, which is what pandoc's markdown reader handles worst: a bookdown book merges every chapter into one file, and `formations_stat`'s M2 book reached 30 GB of resident memory and killed the machine. Setting `options(ggfacto.widget_dir = "auto")` now makes every widget the package returns write itself to `widget_<chunk label>.html` under the chunk's `fig.path` and put an `<iframe>` in the document instead. That book's merged markdown fell from megabyte-long lines to under 4 000 characters, and its peak memory to **4.2 GB**.
+
+**One new file, `R/knit.R`**, holding the seam: `as_ggfacto_widget()` tags what `ggi()`, `ggmca_3d()` and `ggpca_3d()` return, and `knit_print.ggfacto_widget()` (registered in `.onLoad()`, so knitr stays a `Suggests`) writes the page. Unset, the option changes nothing and the widget is embedded as before. Interactive display is untouched.
+
+**The geometry is resolved in R, once.** The frame gets `width:100%` and an `aspect-ratio` taken from the plot's own `height_width_ratio` — the attribute of the plot-object seam, which is what keeps an analysis' axes isotropic. Without one (the 3D plots) the chunk's `fig.width`/`fig.height` decide; `out.width` counts only as a percentage. No JavaScript negotiates anything.
+
+⚠ **Three silent traps, all pinned by `test-knit.R`.** The tag goes **after** the widget's name class and **before** `htmlwidget`: prepending breaks `htmlwidgets`, which reads `class(x)[1]` to find the JavaScript binding, and the page comes out blank; appending lets `knit_print.htmlwidget` win the dispatch. `resolveSizing()` reads the **top level** of `sizingPolicy` for a standalone page and the `browser` scope only for the resizing script, so both must be set or the page keeps a 960×500 box. And every dependency is **renamed with a `ggfacto-` prefix**, because htmltools resolves a name clash by keeping the highest version: plotly asks for jQuery 3.5.1 while a gitbook template ships 3.6.0, and the page pointed at a directory that never existed.
+
+**The page is assembled from htmltools primitives, not `saveWidget()`.** `saveWidget()` insists on copying the libraries into a directory *below* the page — 23 MB beside each graph, or 8.3 MB per graph self-contained, pandoc base64-encoding the fonts. Rewriting each dependency's `src` as an `href` renders the same tags with no copying; shipping the files is the document's job, done by handing them to knitr as chunk metadata. Where they land is `options(ggfacto.widget_lib_dir)`, relative to the document, default `"libs"` (bookdown). Get it wrong and the page **says so** instead of showing an empty frame.
+
+**Removed:** `ggi(iframe = )`, `ggi(pixel_width = )` and the `widgetframe` dependency — a pym.js frame whose height was negotiated in JavaScript, on an unmaintained package, and whose own documentation warned it produced a blank graph under rmarkdown. `ggi(savewidget = TRUE)` now writes **one** standalone file instead of an inseparable pair.
 
 ---
 

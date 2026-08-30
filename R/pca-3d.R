@@ -1272,7 +1272,9 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
   final_plots$data$mean_projs         <- mean_projs
   final_plots$data$planDf             <- planDf
 
-  final_plots
+  # No aspect ratio: a 3D scene has no 2D one to preserve, so a knitted iframe falls back on the
+  # chunk's fig.width/fig.height.
+  as_ggfacto_widget(final_plots)
 
   # plotly::layout(#title = "Title",
   #   scene = list(title = ,

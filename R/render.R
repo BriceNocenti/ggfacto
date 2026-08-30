@@ -8,6 +8,9 @@
 #     hover colour, and a point already painted with it could not be seen to highlight.
 #   - ggi()/ggsave2() read css_hover, css_tooltip and height_width_ratio from the plot object's
 #     ATTRIBUTES. They are absent on a plain ggplot, so every read must tolerate NULL.
+#   - ggi() hands the girafe to as_ggfacto_widget() (R/knit.R), which records the aspect ratio it
+#     just resolved. That attribute is the ONLY geometry a knitted <iframe> has to go on, so it
+#     must keep being written here, where width and height are both known.
 # See: CLAUDE.md section ggfacto architecture > The plot-object seam.
 
 #' A ggplot2 Theme for Geometrical Data Analysis
@@ -154,34 +157,28 @@ material_colors_dark <- function() {
 #' @param height The height in centimeters. Default to printing device's size.
 #' @param keep_ratio By default, the height is forced based of the relative
 #' size of the MCA's axes. Set to \code{FALSE} to avoid this behavior.
-#' @param savewidget Should the html widget be saved on disk ?
+#' @param savewidget Should the html widget be saved on disk ? The file is standalone:
+#' one single \code{.html} carrying its own JavaScript, ready to be sent to someone.
 #' @param dir If saved as file, the directory in which to save the html widget.
 #' Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
 #' with \code{link[base:options](options)} to change default directory.
 #' @param open Should the resulting file be opened at once ?
 #' @param name The name of the file to save.
 #' @param replace Replace file ? By default, number added to find a new name.
-#' @param iframe Create an html frame around the plot to ensure fixed
-#' dimensions. Useful when opening the plot in a web browser (but will produce a blank
-#' graph with \pkg{rmarkdown}). This is default behavior with \code{savewidget = TRUE}.
-#' Require package \code{\link[widgetframe:widgetframe]{widgetframe}}.
-#' @param pixel_width The width in pixels for
-#'  \code{\link[widgetframe:widgetframe]{widgetframe}}.
 #' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
 #' \code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.
 #'
-#' @return An html plot.
+#' @return An html plot, of class \code{ggfacto_widget}. In a \pkg{knitr} document,
+#' setting option \code{"ggfacto.widget_dir"} writes it to its own file and embeds an
+#' \code{<iframe>} instead of the widget itself: see \link{ggfacto_widget}.
 #' @export
 #'
 # @examples
 ggi <- function(plot = ggplot2::last_plot(),
                 width = NULL, height = NULL, keep_ratio = TRUE,
                 savewidget = FALSE, dir = NULL, name = "Plot", replace = FALSE,
-                open = rlang::is_interactive(),
-                iframe = NULL, pixel_width, ...
+                open = rlang::is_interactive(), ...
 ) {
-
-  if (is.null(iframe)) iframe <- savewidget
 
   # Render hints are attributes set by ggmca_plot()/ggca(); a plain ggplot carries none, so every
   # read below must tolerate NULL.
@@ -250,18 +247,7 @@ ggi <- function(plot = ggplot2::last_plot(),
     )
 
 
-  if (iframe == TRUE) {
-    requireNamespace("widgetframe", quietly = TRUE)
-    if (missing(pixel_width)) pixel_width <- grDevices::dev.size("px")[1]
-
-    widget <-
-      widgetframe::frameWidget(widget, width = pixel_width,
-                               options = widgetframe::frameOptions(
-                                 title = name,
-                                 name = name
-                               ))
-    #Title and name options : options = widgetframe::frameOptions(name = "Graphique")
-  }
+  widget <- as_ggfacto_widget(widget, ratio = height / width)
 
   if (savewidget == FALSE) {
     return(widget)
@@ -269,14 +255,10 @@ ggi <- function(plot = ggplot2::last_plot(),
   } else {
     path <- plot_path(dir = dir, name = name, extension = "html", replace = replace)
 
-    if (iframe == FALSE) {
-      requireNamespace("htmlwidgets", quietly = TRUE)
-      htmlwidgets::saveWidget(widget, path, title = name)
-
-    } else {
-      requireNamespace("widgetframe", quietly = TRUE)
-      widgetframe::saveWidgetframe(widget, path, selfcontained = TRUE)
+    if (!requireNamespace("htmlwidgets", quietly = TRUE)) {
+      stop("`savewidget = TRUE` requires the htmlwidgets package.", call. = FALSE)
     }
+    htmlwidgets::saveWidget(widget, path, selfcontained = TRUE, title = name)
 
     if (open == TRUE) file.show(path)
 

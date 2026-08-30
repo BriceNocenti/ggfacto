@@ -49,8 +49,16 @@ globalVariables(c(":="))
 #' @keywords internal
 .onLoad <- function(libname, pkgname) {
   options("ggfacto.export_dir" = NULL)
+  options("ggfacto.widget_dir" = NULL)
 
   #options("ggfacto.html_font" = )
+
+  # knitr is a soft dependency: register the method by hand rather than declare it in NAMESPACE,
+  # so loading ggfacto without knitr installed still works.
+  if (requireNamespace("knitr", quietly = TRUE)) {
+    registerS3method("knit_print", "ggfacto_widget", knit_print.ggfacto_widget,
+                     envir = asNamespace("knitr"))
+  }
 
   invisible()
 }
