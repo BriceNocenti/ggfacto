@@ -15,11 +15,17 @@ numeric variables to compute means and sds with.}
 \item{wt}{The name of the weight variable, if needed.}
 }
 \value{
-A data.frame.
+A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
 }
 \description{
-Simple Mean and SD Summary
+One row per numeric variable: its base, its mean, its standard deviation, and its coefficient of
+variation --- the standard deviation as a percentage of the mean, which is what lets two variables
+measured in different units be compared for how dispersed they are. What to look at before a
+principal component analysis.
 }
 \examples{
 mean_sd_tab(mtcars, 1:7)
+}
+\seealso{
+[ggfacto_summary], [pca_interpret()].
 }

@@ -48,15 +48,17 @@ globalVariables(c(":="))
 
 #' @keywords internal
 .onLoad <- function(libname, pkgname) {
-  options("ggfacto.export_dir" = NULL)
-  options("ggfacto.widget_dir" = NULL)
+  # DESIGN: NOTHING is seeded. `options(x = NULL)` REMOVES an option rather than setting one, and
+  #   every reader here states its own default -- getOption("ggfacto.print", "html"),
+  #   getOption("ggfacto.widget_lib_dir", "libs") -- so "unset" stays distinguishable from "set to
+  #   the default", which is what lets ggfacto.print be html without depending on tabxplor.print.
 
-  #options("ggfacto.html_font" = )
-
-  # knitr is a soft dependency: register the method by hand rather than declare it in NAMESPACE,
+  # knitr is a soft dependency: register the methods by hand rather than declare them in NAMESPACE,
   # so loading ggfacto without knitr installed still works.
   if (requireNamespace("knitr", quietly = TRUE)) {
     registerS3method("knit_print", "ggfacto_widget", knit_print.ggfacto_widget,
+                     envir = asNamespace("knitr"))
+    registerS3method("knit_print", "ggfacto_summary", knit_print.ggfacto_summary,
                      envir = asNamespace("knitr"))
   }
 

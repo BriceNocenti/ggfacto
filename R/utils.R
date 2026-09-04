@@ -256,6 +256,18 @@ deprecated_args_warned <- new.env(parent = emptyenv())
 # Route a renamed argument to its new name. Callers pass the OLD argument's value and get it back,
 # having warned once; the caller does the missing() test, since missing() only works in its own frame.
 #' @keywords internal
+# The FUNCTION twin of renamed_arg(): one warning per session, naming what to use instead.
+#' @keywords internal
+#' @noRd
+deprecated_fn <- function(old, new) {
+  key <- str_c("fn::", old)
+  if (!isTRUE(deprecated_args_warned[[key]])) {
+    assign(key, TRUE, envir = deprecated_args_warned)
+    warning(old, "() is deprecated; use ", new, "() instead.", call. = FALSE)
+  }
+  invisible(NULL)
+}
+
 renamed_arg <- function(value, old, new, fn) {
   key <- str_c(fn, "::", old)
   if (!isTRUE(deprecated_args_warned[[key]])) {

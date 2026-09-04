@@ -44,7 +44,7 @@ what percentage are in this level. `"row"` reads each level as a distribution ac
 \item{...}{Additional arguments to pass to \code{\link[tabxplor]{tab}}.}
 }
 \value{
-A \code{tibble} of class \code{tab}, possibly with colored reading helpers.
+A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
 }
 \description{
 One table describing every cluster: each variable's levels down the page, the clusters across it,
@@ -60,4 +60,7 @@ tea$clust <- cah$data.clust$clust
 HCPC_tab(tea, row_vars = all_of(names(tea)[1:18]), clust = "clust") #|>
 #tabxplor::tab_export()
 
+}
+\seealso{
+[ggfacto_summary], [mca_interpret()].
 }
