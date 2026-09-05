@@ -109,7 +109,10 @@ test_that("no axes_names still yields axis titles carrying the eigenvalue percen
   expect_true(any(grepl("%", unlist(labs), fixed = TRUE)))
 })
 
-test_that("ncp is honoured", {
+test_that("ncp is honoured, and the default keeps every axis", {
+  # The default is Inf: `res$eig` is how one chooses how many axes to interpret, and FactoMineR
+  # truncates it to `ncp`. One lowers `ncp` only to feed HCPC(), which clusters on the axes kept.
   expect_equal(ncol(MCA2(fx_tea(), 1:6, ncp = 2)$ind$coord), 2L)
-  expect_equal(ncol(fx_mca()$ind$coord), 5L)
+  expect_equal(ncol(fx_mca()$ind$coord), nrow(fx_mca()$eig))
+  expect_equal(sum(fx_mca()$eig[, 2]), 100, tolerance = 1e-6)
 })

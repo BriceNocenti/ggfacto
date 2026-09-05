@@ -5,7 +5,7 @@
 #   many axes to interpret.
 # KEY CONSTRAINTS:
 #   - ONE table, never a list: the eigenvalues ride meta$footer_tabs, and the format is a print-time
-#     decision (options(ggfacto.print)). Both are asserted, in the three media.
+#     decision -- tabxplor's own, options(tabxplor.print). Both are asserted.
 #   - Snapshots cover the console tibble, which is small and stable -- never the rendered html, which
 #     is 7 kB of inlined stylesheet. Numbers are asserted as facts wherever possible.
 #   - tea[1:6] is a battery of binary items, so every question packs to one row. Anything about
@@ -17,7 +17,7 @@ withr::local_options(lifecycle_verbosity = "quiet", .local_envir = testthat::tea
 # tea[1:6] is all binary, so mca_interpret()'s row packing collapses every question to one line and
 # its display blanking has nothing to hide -- that needs multi-level variables and a third axis.
 fx_mca_multi <- function() fx("mca_multi", function() {
-  MCA2(fx_tea(), tidyselect::all_of(c("Tea", "How", "how", "where", "price")), ncp = 5)
+  MCA2(fx_tea(), tidyselect::all_of(c("Tea", "How", "how", "where", "price")))
 })
 
 # --- benzecri_mrv --------------------------------------------------------------------------------
@@ -89,25 +89,25 @@ test_that("eig = FALSE leaves the eigenvalues out", {
 
 })
 
-test_that("options(ggfacto.print) decides the medium, and html is the default", {
+test_that("options(tabxplor.print) decides the medium, for a summary as for a crosstab", {
+  # There is no ggfacto option: one option governs both, so a script sets it once. A summary that
+  # obeyed its own would print differently from the `tab()` two lines above it.
   x <- mca_interpret(fx_mca(), axes = 1)
 
-  withr::with_options(list(ggfacto.print = NULL), {
-    out <- suppressWarnings(print(x))
-    expect_s3_class(out, "tabxplor_kable")          # unset means html, whatever tabxplor asks
-  })
-  withr::with_options(list(ggfacto.print = "html", tabxplor.print = "console"),
+  withr::with_options(list(tabxplor.print = "html"),
+                      expect_s3_class(suppressWarnings(print(x)), "tabxplor_kable"))
+  withr::with_options(list(tabxplor.print = "kable"),   # the pre-2.0.0 synonym still works
                       expect_s3_class(suppressWarnings(print(x)), "tabxplor_kable"))
 
-  md <- utils::capture.output(withr::with_options(list(ggfacto.print = "md"), print(x)))
-  expect_true(any(grepl("^\\|", md)))               # a markdown pipe table
-  expect_true(any(grepl("Positive_levels", md)))
-  expect_true(any(grepl("eigenvalue", md)))         # the subordinate table renders under it
-  expect_false(any(grepl("<style>", md, fixed = TRUE)))   # css = FALSE, always
+  txt <- utils::capture.output(withr::with_options(list(tabxplor.print = "console"), print(x)))
+  expect_true(any(grepl("A tabxplor tab", txt)))
+  expect_true(any(grepl("eigenvalue", txt)))        # the subordinate table renders under it
 
-  txt <- utils::capture.output(
-    withr::with_options(list(ggfacto.print = "console", tabxplor.print = "html"), print(x)))
-  expect_true(any(grepl("A tabxplor tab", txt)))    # console means console, whatever tabxplor asks
+  # markdown is an explicit pipe, not an option: `tabxplor.print` has no "md".
+  md <- tabxplor::tab_md(mca_interpret(fx_mca(), axes = 1), css = FALSE, print = FALSE)
+  expect_true(any(grepl("^\\|", strsplit(md, "\n")[[1]])))
+  expect_true(grepl("Positive_levels", md))
+  expect_false(grepl("<style>", md, fixed = TRUE))
 })
 
 test_that("the colour legend is tabxplor's, saying ggfacto's nouns", {
@@ -152,13 +152,15 @@ test_that("the glossary names each statistic the colours do NOT grade, and only 
   expect_false(any(grepl("[<{]", gloss(complete = TRUE))))
 })
 
-test_that("a PCA gets one legend line per scale, and no line about the empty Total row", {
-  # ONE measure (`difference`) on TWO scales: `coord` in axis SD, `cos2` in percentage points.
+test_that("a PCA legend names the ONE column it grades, and no empty Total row", {
+  # The coordinate is the only graded quantity: under `scale.unit` it IS a correlation, so the
+  # 0.1/0.2/0.4/0.8 ladder reads it end to end. The cos2 prints beside it and goes to the glossary.
   foot <- tabxplor::tab_footer_text(pca_interpret(fx_pca(), axes = 1:2))
   expect_match(foot[[1]], "[Cc]oordinate on the axis")
-  expect_match(foot[[2]], "[Qq]uality of representation")
-  # the prose form names no reference: the Total row of these two columns is empty
-  expect_false(any(grepl("Total", foot[1:2])))
+  expect_false(grepl("[Qq]uality of representation", foot[[1]]))
+  expect_true(any(startsWith(foot, "cos2:")))      # named, not graded
+  # the prose form names no reference: the Total row of that column is empty
+  expect_false(grepl("Total", foot[[1]]))
 
   # `set_legend_words()` is keyed on the measure's full name; an acronym is refused
   expect_error(tabxplor::set_legend_words(pca_interpret(fx_pca()), diff = "x"),
@@ -252,10 +254,13 @@ test_that("complete = TRUE adds the coordinate, the cos2 and the spread, and not
   for (nm in c("coord", "cos2", "coord ", "cos2 "))
     expect_true(unique(tabxplor::get_color(complete[[nm]])) %in% c("no", ""))
   expect_identical(unique(tabxplor::get_color(complete$ctr)), "contrib")
-  # ... whereas a PCA colours both, because there the two quantities DO have a ladder that fits
+
+  # A PCA colours the COORDINATE, which there is a correlation and has a ladder that fits. The cos2
+  # is never graded on any of the three: its 50 % rule is about a whole cloud, not about a cell.
   pca <- pca_interpret(fx_pca(), axes = 1)
   expect_identical(unique(tabxplor::get_color(pca[["coord_Axe 1"]])), "difference")
-  expect_identical(unique(tabxplor::get_color(pca[["cos2_Axe 1"]])), "difference")
+  expect_true(unique(tabxplor::get_color(pca[["cos2_Axe 1"]])) %in% c("no", ""))
+  expect_true(unique(tabxplor::get_color(pca[["contrib_Axe 1"]])) %in% c("no", ""))
 })
 
 test_that("the spread is NA for a question with only one side", {
@@ -272,26 +277,62 @@ test_that("the retired arguments warn and route", {
   expect_warning(mca_interpret(fx_mca(), axes = 1, type = "console"), "deprecated")
 })
 
+test_that("several levels of one question on one side are all kept, on continuation rows", {
+  # The block is as tall as its longer side (`k <- max(nrow(p), nrow(n), 1L)`) and the shorter one is
+  # padded, so nothing is dropped when a question keeps two levels at the same pole. The question's
+  # name and its `contrib` are blanked on a continuation row; the LEVEL itself never is.
+  tab <- mca_interpret(fx_mca_multi(), axes = 1:3)
+  q   <- as.character(tab$Question)
+  pos <- as.character(tab$Positive_levels)
+  neg <- as.character(tab$Negative_levels)
+
+  cont <- which(q == "")
+  expect_gt(length(cont), 0L)                             # there ARE continuation rows
+  expect_true(all(nzchar(pos[cont]) | nzchar(neg[cont]))) # each carries a level, never both empty
+
+  # and nothing is lost: on each axis, one side's displayed contributions sum to its summary row.
+  # ⚠ on `pct`, the DISPLAYED share -- `ctr` is the multiple of the mean contribution, and every
+  # summary row holds exactly 1 by construction, so summing it would compare nothing.
+  ctr  <- tab[[which(names(tab) == "Positive_levels") + 1L]]
+  kind <- tabxplor::get_row_kind(ctr)
+  for (a in unique(as.character(tab$Axe))) {
+    rows <- as.character(tab$Axe) == a
+    expect_equal(sum(ctr$pct[rows & kind == "data"], na.rm = TRUE),
+                 sum(ctr$pct[rows & kind != "data"], na.rm = TRUE), tolerance = 1e-6)
+  }
+})
+
 test_that("the MCA interpretation table is stable", {
   # n = Inf on purpose: pillar formats only the rows it shows, and a slice with no total row makes
   # color = "contrib" warn that it has no mean contribution to read.
-  withr::local_options(ggfacto.print = "console")
+  withr::local_options(tabxplor.print = "console")
   expect_snapshot(print(mca_interpret(fx_mca(), axes = 1:2), n = Inf, width = Inf))
   expect_snapshot(print(mca_interpret(fx_mca(), axes = 1:2, complete = TRUE), n = Inf, width = Inf))
 })
 
 # --- ca_interpret --------------------------------------------------------------------------------
 
-test_that("ca_interpret reads both margins, each against its own threshold", {
+test_that("ca_interpret reads both margins, each against its own threshold and under its own name", {
   # A CA's rows and its columns each sum to 100 % of the axis over a DIFFERENT number of points, so
-  # one pooled mean contribution would keep too many of one and too few of the other.
-  tab <- ca_interpret(fx_ca())
+  # one pooled mean contribution would keep too many of one and too few of the other. And each
+  # summary row NAMES its margin: an axis carries two of them, and the bare label said which of the
+  # two contributions it totals -- twice the same word.
+  tab  <- ca_interpret(fx_ca())
   vars <- as.character(tab$Variable)
-  expect_length(setdiff(unique(vars), c("", "Above mean ctr")), 2L)
-  # one summary row per (axis, margin), under the block it sums
-  tot <- tabxplor::get_row_kind(tab[["  "]]) == "total"
+  tot  <- tabxplor::get_row_kind(tab[["  "]]) == "total"
   expect_equal(sum(tot), 2L * nrow(fx_ca()$eig))
-  expect_true(all(vars[tot] == "Above mean ctr"))
+
+  marges <- setdiff(unique(vars[!tot]), "")
+  expect_length(marges, 2L)
+  expect_setequal(unique(vars[tot]), paste0(marges, ": above mean ctr"))
+
+  # the threshold still drives the wording, margin name and all
+  z <- as.character(ca_interpret(fx_ca(), min_contrib = 0)$Variable)
+  zt <- tabxplor::get_row_kind(ca_interpret(fx_ca(), min_contrib = 0)[["  "]]) == "total"
+  expect_setequal(unique(z[zt]), paste0(marges, ": all levels"))
+
+  # an MCA has ONE set, so it keeps the bare label the courses and the skill quote
+  expect_true("Above mean ctr" %in% as.character(mca_interpret(fx_mca(), axes = 1)$Question))
 })
 
 test_that("ca_interpret has no contribution column, because it would always be 100 %", {
@@ -313,7 +354,7 @@ test_that("ca_interpret names the margins from the matrix, or says Rows and Colu
 })
 
 test_that("the CA interpretation table is stable", {
-  withr::local_options(ggfacto.print = "console")
+  withr::local_options(tabxplor.print = "console")
   expect_snapshot(print(ca_interpret(fx_ca(), complete = TRUE), n = Inf, width = Inf))
 })
 
@@ -337,39 +378,80 @@ test_that("pca_interpret gives one block of three columns per axis, named as the
 })
 
 test_that("the PCA interpretation table is stable", {
-  withr::local_options(ggfacto.print = "console")
+  withr::local_options(tabxplor.print = "console")
   expect_snapshot(print(pca_interpret(fx_pca(), axes = 1:2), n = Inf, width = Inf))
 })
 
 # --- the eigenvalue block ------------------------------------------------------------------------
 
 
-test_that("the eigenvalue table shows n_axes rows, then an ellipsis and the last one", {
-  # A reader must know how many axes there are, whether the analysis has nine or forty -- so the LAST
-  # row is shown whatever `n_axes` says, and an ellipsis row states that something was skipped.
+test_that("the eigenvalue table ends on an ellipsis STATING how many axes the cloud has", {
+  # A reader must know how many axes there are, whether the analysis has nine or forty. The count is
+  # what answers that, so the ellipsis carries it -- and the last axis is not shown, its numbers
+  # having nothing above them to be read against.
   eig <- function(...) tabxplor::get_footer_tabs(mca_interpret(fx_mca(), axes = 1, ...))[[1]]
-  full <- eig(n_axes = 8L)                       # tea[1:6] has 5 axes: nothing to skip
-  expect_identical(as.character(full$Axe), c(paste("Axe", 1:5), "Total"))
-  expect_false(any(as.character(full$Axe) == "..."))
+
+  full <- eig(n_axes = 8L)                       # tea[1:6] has 6 axes: nothing is missing
+  expect_identical(as.character(full$Axe), c(paste("Axe", 1:6), "Total"))
+  expect_false(any(grepl("\\.\\.\\.", as.character(full$Axe))))   # no ellipsis over nothing
 
   cut <- eig(n_axes = 2L)
-  expect_identical(as.character(cut$Axe), c("Axe 1", "Axe 2", "...", "Axe 5", "Total"))
+  expect_identical(as.character(cut$Axe), c("Axe 1", "Axe 2", "... of 6", "Total"))
   # the ellipsis row is a display device, and says so
   expect_identical(tabxplor::get_row_kind(cut[["% variance"]])[3], "blank")
   expect_true(is.na(cut[["% variance"]]$pct[3]))
 })
 
+test_that("the ellipsis counts the CLOUD's axes, not the ones the fit kept", {
+  # `ncp` truncates `res$eig`, so the count cannot be read off it: an MCA has (levels - questions)
+  # axes, whatever the fit kept. Without this, a table showing 5 of 27 axes claimed to show them all.
+  cut <- MCA2(fx_tea(), 1:6, ncp = 2)
+  eig <- tabxplor::get_footer_tabs(mca_interpret(cut, axes = 1))[[1]]
+  expect_identical(as.character(eig$Axe), c("Axe 1", "Axe 2", "... of 6", "Total"))
 
-test_that("the eigenvalue table totals what the axes add up to, and carries a data bar", {
+  # and the Total then says the share those two axes actually hold
+  tot <- which(tabxplor::get_row_kind(eig[["% variance"]]) == "total")
+  expect_equal(unname(eig[["% variance"]]$pct[tot]), sum(cut$eig[, 2]) / 100)
+})
+
+
+test_that("the eigenvalue table totals the share it actually holds, truncation included", {
+  # The Total is READ off `eig`, never assumed to be 1: a fit that kept a fraction of the axes must
+  # say so. Writing 1 claimed the whole cloud under any `ncp`, which is what this table must not do.
   eig <- tabxplor::get_footer_tabs(mca_interpret(fx_mca(), axes = 1))[[1]]
   tot <- which(tabxplor::get_row_kind(eig[["% variance"]]) == "total")
   expect_length(tot, 1L)
-  expect_equal(unname(eig[["% variance"]]$pct[tot]), 1)
+  expect_equal(unname(eig[["% variance"]]$pct[tot]), 1)          # MCA2() keeps every axis
   expect_equal(unname(eig$eigenvalue$var[tot]), sum(fx_mca()$eig[, 1]))
-  # `% variance` IS the screeplot: a bar chart inside the table (tabxplor::set_bars())
-  expect_identical(tabxplor::get_bars(eig), "% variance")
-  expect_null(tabxplor::get_bars(
-    tabxplor::get_footer_tabs(mca_interpret(fx_mca(), axes = 1, color = FALSE))[[1]]))
+
+  cut  <- MCA2(fx_tea(), 1:6, ncp = 3)
+  eig2 <- tabxplor::get_footer_tabs(mca_interpret(cut, axes = 1))[[1]]
+  tot2 <- which(tabxplor::get_row_kind(eig2[["% variance"]]) == "total")
+  expect_equal(unname(eig2[["% variance"]]$pct[tot2]), sum(cut$eig[, 2]) / 100)
+  expect_lt(unname(eig2[["% variance"]]$pct[tot2]), 1)
+
+  # No data bar: tabxplor scales one on its column's LARGEST value, so an MCA's first axis at a tenth
+  # of the inertia drew a full-width bar. It comes back when the scale can be fixed at 100 %.
+  expect_null(tabxplor::get_bars(eig))
+})
+
+test_that("MCA2() keeps every axis, so the modified rate is the cloud's", {
+  # `ncp` truncates `res$eig`, and benzecri_mrv() renormalises over the axes it finds: a truncated
+  # fit gives the SAME axis a different modified rate. The default must therefore keep them all.
+  expect_identical(formals(MCA2)$ncp, Inf)
+  expect_identical(formals(PCA2)$ncp, Inf)
+
+  full <- MCA2(fx_tea(), 1:6)
+  cut  <- MCA2(fx_tea(), 1:6, ncp = 2)
+  expect_gt(nrow(full$eig), nrow(cut$eig))
+  expect_equal(sum(full$eig[, 2]), 100, tolerance = 1e-6)
+  # tea[1:6] has THREE axes above 1/Q, so cutting at two renormalises the rate over two of them:
+  # the same axis then reports a different modified rate, which is the defect the default closes.
+  expect_false(isTRUE(all.equal(benzecri_mrv(full)[[1]], benzecri_mrv(cut)[[1]])))
+
+  # and an axis the fit did not keep is dropped, not indexed past the end
+  expect_identical(as.character(mca_interpret(cut, axes = 1:8, eig = FALSE)$Axe),
+                   as.character(mca_interpret(cut, axes = 1:2, eig = FALSE)$Axe))
 })
 
 
@@ -393,10 +475,10 @@ test_that("color = FALSE builds the table without a colour measure at all", {
     expect_true(all(vapply(fmts, function(c) all(tabxplor::get_color(c) %in% c("no", "")),
                            logical(1))))
   }
-  # a PCA keeps its coordinate and its cos2 coloured, and never its contribution
+  # a PCA keeps its COORDINATE coloured, and neither its cos2 nor its contribution
   pca <- pca_interpret(fx_pca(), axes = 1)
   expect_identical(unique(tabxplor::get_color(pca[["coord_Axe 1"]])), "difference")
-  expect_identical(unique(tabxplor::get_color(pca[["cos2_Axe 1"]])),  "difference")
+  expect_true(unique(tabxplor::get_color(pca[["cos2_Axe 1"]]))    %in% c("no", ""))
   expect_true(unique(tabxplor::get_color(pca[["contrib_Axe 1"]])) %in% c("no", ""))
 })
 

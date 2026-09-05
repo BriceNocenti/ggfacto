@@ -31,7 +31,10 @@
 #' @param wt <\link[tidyr:tidyr_tidy_select]{tidy-select}>
 #' @param graph By default no graph is made, since the result can be ploted with
 #'  \code{\link{ggmca}}.
-#' @param ncp The number of axes to keep. Default to 5.
+#' @param ncp The number of axes to keep. All of them by default: the eigenvalue table is how one
+#'   chooses how many axes to interpret, and a truncated one cannot show the drop --- it also
+#'   renormalises Benzecri's modified rate over the axes it kept, so the same axis gets a different
+#'   rate. Lower it only to feed \code{FactoMineR::HCPC()}, which clusters on the axes kept.
 #' @param excl A character vector of regular expressions to exclude "junk" categories.
 #' Any level of an active variable with any of the detected patterns is not taken into
 #' account in the calculation of axes (which is called specific multiple correspondence analysis).
@@ -47,7 +50,7 @@
 #'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) %>%
 #'   ggi() #to make the graph interactive
 MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
-                 wt, excl, ncp = 5, graph = FALSE, ...) {
+                 wt, excl, ncp = Inf, graph = FALSE, ...) {
   active_vars <- tidyselect::eval_select(rlang::enquo(active_vars), data)
   #sup_vars    <- tidyselect::eval_select(rlang::enquo(sup_vars)   , data)
   #sup_quanti  <- tidyselect::eval_select(rlang::enquo(sup_quanti) , data)

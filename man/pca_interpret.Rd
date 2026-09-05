@@ -42,6 +42,10 @@ The eigenvalues of the axes travel under the table.
 data(mtcars, package = "datasets")
 mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
 res.pca <- FactoMineR::PCA(mtcars, graph = FALSE)
+
+# ONE option decides how every tabxplor table prints, an interpretation table included.
+# In a script it goes once, at the top, beside the library() calls.
+options(tabxplor.print = "html")
 pca_interpret(res.pca)
 
 }

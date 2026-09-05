@@ -37,7 +37,7 @@ shows them, or that prints the summary several times to comment it column by col
 
 \item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
 
-\item{type}{Deprecated. The output format is now \code{options(ggfacto.print)}, or an explicit
+\item{type}{Deprecated. The output format is now \code{options(tabxplor.print)}, or an explicit
 \code{\link[tabxplor]{tab_md}} / \code{\link[tabxplor]{tab_html}} call --- see
 [ggfacto_summary].}
 
@@ -62,6 +62,10 @@ The eigenvalues of the axes travel under the table, Benzecri's modified rate bes
 \donttest{
 data(tea, package = "FactoMineR")
 res.mca <- MCA2(tea, active_vars = 1:18)
+
+# ONE option decides how every tabxplor table prints, an interpretation table included.
+# In a script it goes once, at the top, beside the library() calls.
+options(tabxplor.print = "html")
 mca_interpret(res.mca)
 mca_interpret(res.mca, axes = 1:2, complete = TRUE)
 }

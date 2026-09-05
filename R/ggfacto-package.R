@@ -49,9 +49,9 @@ globalVariables(c(":="))
 #' @keywords internal
 .onLoad <- function(libname, pkgname) {
   # DESIGN: NOTHING is seeded. `options(x = NULL)` REMOVES an option rather than setting one, and
-  #   every reader here states its own default -- getOption("ggfacto.print", "html"),
-  #   getOption("ggfacto.widget_lib_dir", "libs") -- so "unset" stays distinguishable from "set to
-  #   the default", which is what lets ggfacto.print be html without depending on tabxplor.print.
+  #   every reader here states its own default -- getOption("ggfacto.widget_lib_dir", "libs") -- so
+  #   "unset" stays distinguishable from "set to the default". The print format is not among them:
+  #   a summary obeys `options(tabxplor.print)`, which tabxplor seeds itself.
 
   # Bind the R-ggfacto gettext catalog to the package's compiled .mo (harmless if absent -> English).
   po <- system.file("po", package = pkgname)

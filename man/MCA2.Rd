@@ -4,7 +4,7 @@
 \alias{MCA2}
 \title{Multiple Correspondence Analysis}
 \usage{
-MCA2(data, active_vars, wt, excl, ncp = 5, graph = FALSE, ...)
+MCA2(data, active_vars, wt, excl, ncp = Inf, graph = FALSE, ...)
 }
 \arguments{
 \item{data}{The data frame.}
@@ -17,7 +17,10 @@ MCA2(data, active_vars, wt, excl, ncp = 5, graph = FALSE, ...)
 Any level of an active variable with any of the detected patterns is not taken into
 account in the calculation of axes (which is called specific multiple correspondence analysis).}
 
-\item{ncp}{The number of axes to keep. Default to 5.}
+\item{ncp}{The number of axes to keep. All of them by default: the eigenvalue table is how one
+chooses how many axes to interpret, and a truncated one cannot show the drop --- it also
+renormalises Benzecri's modified rate over the axes it kept, so the same axis gets a different
+rate. Lower it only to feed \code{FactoMineR::HCPC()}, which clusters on the axes kept.}
 
 \item{graph}{By default no graph is made, since the result can be ploted with
 \code{\link{ggmca}}.}

@@ -128,6 +128,10 @@ mean_sd_tab <- function(data, vars, wt) {
 #' res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
 #' cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
 #' tea$clust <- cah$data.clust$clust
+#'
+#' # ONE option decides how every tabxplor table prints, an interpretation table included.
+#' # In a script it goes once, at the top, beside the library() calls.
+#' options(tabxplor.print = "html")
 #' HCPC_tab(tea, row_vars = all_of(names(tea)[1:18]), clust = "clust") #|>
 #' #tabxplor::tab_export()
 #'

@@ -12,7 +12,7 @@ PCA2(
   ind_name,
   scale.unit = TRUE,
   ind.sup = NULL,
-  ncp = 5,
+  ncp = Inf,
   graph = FALSE,
   ...
 )
@@ -35,7 +35,9 @@ scaled to unit variance.}
 
 \item{ind.sup}{A vector indicating the indexes of the supplementary individuals.}
 
-\item{ncp}{Number of dimensions kept in the results (by default 5).}
+\item{ncp}{Number of dimensions kept in the results. All of them by default: the eigenvalue
+table is how one chooses how many axes to interpret, and a truncated one cannot show the drop.
+Lower it only to feed \code{FactoMineR::HCPC()}, which clusters on the axes kept.}
 
 \item{graph}{A boolean, set to `TRUE` to display the base graph.}
 

@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: ggfacto 0.3.2.9001\n"
-"POT-Creation-Date: 2026-09-05 07:29+0200\n"
+"POT-Creation-Date: 2026-09-05 10:11+0200\n"
 "PO-Revision-Date: 2026-09-04 18:32+0200\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -11,68 +11,80 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: interpret.R:362
+#: interpret.R:259
+#, c-format
+msgid "... of %s"
+msgstr "... sur %s"
+
+#: interpret.R:381
 msgid "Above mean ctr"
 msgstr "Contrib. > moyenne"
 
-#: interpret.R:363
+#: interpret.R:382
 msgid "All levels"
 msgstr "Toutes modalités"
 
-#: interpret.R:364
+#: interpret.R:383
 #, c-format
 msgid "Above %s%%"
 msgstr "Contrib. > %s %%"
 
-#: interpret.R:483
+#: interpret.R:385
+#, c-format
+msgid "%s: above mean ctr"
+msgstr "%s : contrib. > moyenne"
+
+#: interpret.R:386
+#, c-format
+msgid "%s: all levels"
+msgstr "%s : toutes modalités"
+
+#: interpret.R:387
+#, c-format
+msgid "%s: above %s%%"
+msgstr "%s : contrib. > %s %%"
+
+#: interpret.R:509
 msgid "contribution to the variance of the axis"
 msgstr "contribution à la variance de l'axe"
 
-#: interpret.R:484
+#: interpret.R:510
 msgid "a level"
 msgstr "une modalité"
 
-#: interpret.R:485
+#: interpret.R:511
 msgid "%1$s on the positive side, contributing"
 msgstr "%1$s du côté positif, contribuant"
 
-#: interpret.R:486
+#: interpret.R:512
 msgid "%1$s on the negative side, contributing"
 msgstr "%1$s du côté négatif, contribuant"
 
-#: interpret.R:487 interpret.R:488
+#: interpret.R:513 interpret.R:514
 msgid "the mean contribution"
 msgstr "la contribution moyenne"
 
-#: interpret.R:501
+#: interpret.R:526
 msgid "coordinate on the axis"
 msgstr "coordonnée sur l'axe"
 
-#: interpret.R:502
+#: interpret.R:527
 msgid "coordinate on the axis, i.e. its correlation with it"
 msgstr "coordonnée sur l'axe, c'est-à-dire sa corrélation avec lui"
 
-#: interpret.R:503
-msgid "quality of representation"
-msgstr "qualité de représentation"
-
-#: interpret.R:506
-msgid "quality of representation, against the rule of 50 %"
-msgstr "qualité de représentation, par rapport au seuil de 50 %"
-
-#: interpret.R:507
+#: interpret.R:528
 msgid "a variable"
 msgstr "une variable"
 
-#: interpret.R:508
+#: interpret.R:529
 msgid "%1$s above, by"
 msgstr "%1$s au-dessus, de"
 
-#: interpret.R:509
+#: interpret.R:530
 msgid "%1$s below, by"
 msgstr "%1$s en-dessous, de"
 
-#: interpret.R:516
+#: interpret.R:537
 msgid ""
 "sd/mean: coefficient of variation -- the standard deviation as a percentage "
 "of the mean, comparable between variables measured in different units"
@@ -80,23 +92,23 @@ msgstr ""
 "sd/mean : coefficient de variation -- l'écart-type en pourcentage de la "
 "moyenne, comparable entre variables mesurées dans des unités différentes"
 
-#: interpret.R:528
+#: interpret.R:549
 msgid "ctr: the level's contribution to the variance of the axis"
 msgstr "ctr : la contribution de la modalité à la variance de l'axe"
 
-#: interpret.R:529
+#: interpret.R:550
 msgid "contrib: the whole question's contribution to the axis"
 msgstr "contrib : la contribution de la question entière à l'axe"
 
-#: interpret.R:531
+#: interpret.R:552
 msgid "coord: coordinate on the axis"
 msgstr "coord : coordonnée sur l'axe"
 
-#: interpret.R:532
+#: interpret.R:553 interpret.R:878
 msgid "cos2: quality of representation"
 msgstr "cos2 : qualité de représentation"
 
-#: interpret.R:533
+#: interpret.R:554
 msgid ""
 "spread: share of the group's contribution the gap between its two sides "
 "accounts for"
@@ -104,32 +116,38 @@ msgstr ""
 "spread : part de la contribution de la question qu'explique l'écart entre "
 "ses deux côtés"
 
-#: interpret.R:629 interpret.R:716
+#: interpret.R:659 interpret.R:752
 #, c-format
 msgid "Axe %s: %s%% of variance"
 msgstr "Axe %s : %s %% de variance"
 
-#: interpret.R:630
+#: interpret.R:660
 #, c-format
 msgid "Axe %s: %s%% of variance (mod. %s%%)"
 msgstr "Axe %s : %s %% de variance (mod. %s %%)"
 
-#: interpret.R:708
+#: interpret.R:742
 msgid "Rows"
 msgstr "Lignes"
 
-#: interpret.R:708
+#: interpret.R:742
 msgid "Columns"
 msgstr "Colonnes"
 
-#: interpret.R:767
+#: interpret.R:807
 msgid "Total"
 msgstr "Total"
 
-#: interpret.R:832
+#: interpret.R:877
 msgid ""
 "contrib: its contribution to the variance of the axis; an axis sums to 100 %"
 msgstr "contrib : sa contribution à la variance de l'axe ; un axe fait 100 %"
+
+#~ msgid "quality of representation"
+#~ msgstr "qualité de représentation"
+
+#~ msgid "quality of representation, against the rule of 50 %"
+#~ msgstr "qualité de représentation, par rapport au seuil de 50 %"
 
 #, c-format
 #~ msgid ""

@@ -12,7 +12,8 @@
       | Axe 3   |     0.177  |     17.7%  | 60.7%  | |                    2.0%  |       100%  |
       | Axe 4   |     0.146  |     14.6%  | 75.4%  | |                          |             |
       | Axe 5   |     0.131  |     13.1%  | 88.4%  | |                          |             |
-      |**Total**|   **0.884**|    **100%**|        | |                  **100%**|             |
+      | Axe 6   |     0.116  |     11.6%  |  100%  | |                          |             |
+      |**Total**|   **1.000**|    **100%**|        | |                  **100%**|             |
       
       # A tabxplor tab: 8 x 7
         Axe                                 Question       contrib Positive_levels
@@ -52,7 +53,8 @@
       | Axe 3   |     0.177  |     17.7%  | 60.7%  | |                    2.0%  |       100%  |
       | Axe 4   |     0.146  |     14.6%  | 75.4%  | |                          |             |
       | Axe 5   |     0.131  |     13.1%  | 88.4%  | |                          |             |
-      |**Total**|   **0.884**|    **100%**|        | |                  **100%**|             |
+      | Axe 6   |     0.116  |     11.6%  |  100%  | |                          |             |
+      |**Total**|   **1.000**|    **100%**|        | |                  **100%**|             |
       
       # A tabxplor tab: 8 x 12
         Axe                                 Question       contrib Positive_levels
@@ -95,28 +97,28 @@
       |**Total**|   **0.046**|    **100%**|        |
       
       # A tabxplor tab: 9 x 11
-        Axe                      Variable         Positive_levels    ctr  coord   cos2
-                                                                  <col%> <mean> <row%>
-      1 Axe 1: 88.8% of variance "Rows"           "Black"          72.6%   0.45    98%
-      2 Axe 1: 88.8% of variance "Above mean ctr" ""               72.6%              
-      3 Axe 1: 88.8% of variance "Columns"        "Never married"  54.2%   0.30   100%
-      4 Axe 1: 88.8% of variance "Above mean ctr" ""               54.2%              
-      5 Axe 2: 11.2% of variance "Rows"           ""                                  
-      6 Axe 2: 11.2% of variance "Above mean ctr" ""                                  
-      7 Axe 2: 11.2% of variance "Columns"        "Widowed"        46.2%   0.17    84%
-      8 Axe 2: 11.2% of variance ""               "Divorced"       26.0%   0.09    86%
-      9 Axe 2: 11.2% of variance "Above mean ctr" ""               72.3%              
-        Negative_levels `ctr ` `coord ` `cos2 ` spread
-        <chr>           <col%>   <mean>  <row%> <col%>
-      1 ""                                            
-      2 ""                                            
-      3 "Married"        30.5%    -0.16     92%  84.7%
-      4 ""               30.5%                   84.7%
-      5 "Other"          84.5%    -0.22     63%       
-      6 ""               84.5%                        
-      7 "Married"        21.1%    -0.05      8%  86.2%
-      8 ""                                            
-      9 ""               21.1%                   86.2%
+        Axe                      Variable                  Positive_levels    ctr
+                                                                           <col%>
+      1 Axe 1: 88.8% of variance "Rows"                    "Black"          72.6%
+      2 Axe 1: 88.8% of variance "Rows: above mean ctr"    ""               72.6%
+      3 Axe 1: 88.8% of variance "Columns"                 "Never married"  54.2%
+      4 Axe 1: 88.8% of variance "Columns: above mean ctr" ""               54.2%
+      5 Axe 2: 11.2% of variance "Rows"                    ""                    
+      6 Axe 2: 11.2% of variance "Rows: above mean ctr"    ""                    
+      7 Axe 2: 11.2% of variance "Columns"                 "Widowed"        46.2%
+      8 Axe 2: 11.2% of variance ""                        "Divorced"       26.0%
+      9 Axe 2: 11.2% of variance "Columns: above mean ctr" ""               72.3%
+         coord   cos2 Negative_levels `ctr ` `coord ` `cos2 ` spread
+        <mean> <row%> <chr>           <col%>   <mean>  <row%> <col%>
+      1   0.45    98% ""                                            
+      2               ""                                            
+      3   0.30   100% "Married"        30.5%    -0.16     92%  84.7%
+      4               ""               30.5%                   84.7%
+      5               "Other"          84.5%    -0.22     63%       
+      6               ""               84.5%                        
+      7   0.17    84% "Married"        21.1%    -0.05      8%  86.2%
+      8   0.09    86% ""                                            
+      9               ""               21.1%                   86.2%
       # contribution to the variance of the axis (vs the mean contribution): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
       # coord: coordinate on the axis
       # cos2: quality of representation
@@ -127,16 +129,17 @@
     Code
       print(pca_interpret(fx_pca(), axes = 1:2), n = Inf, width = Inf)
     Output
-      | Axe     |eigenvalue  |% variance  |cumul.  |
-      |:--------|-----------:|-----------:|-------:|
-      |         | *Variance* |            |        |
-      |         |   *<var>*  |  *<col%>*  |        |
-      | Axe 1   |     5.086  |     72.7%  | 72.7%  |
-      | Axe 2   |     1.157  |     16.5%  | 89.2%  |
-      | Axe 3   |     0.345  |      4.9%  | 94.1%  |
-      | Axe 4   |     0.158  |      2.3%  | 96.4%  |
-      | Axe 5   |     0.129  |      1.8%  | 98.2%  |
-      |**Total**|   **6.875**|    **100%**|        |
+      | Axe      |eigenvalue  |% variance  |cumul.  |
+      |:---------|-----------:|-----------:|-------:|
+      |          | *Variance* |            |        |
+      |          |   *<var>*  |  *<col%>*  |        |
+      | Axe 1    |     5.086  |     72.7%  | 72.7%  |
+      | Axe 2    |     1.157  |     16.5%  | 89.2%  |
+      | Axe 3    |     0.345  |      4.9%  | 94.1%  |
+      | Axe 4    |     0.158  |      2.3%  | 96.4%  |
+      | Axe 5    |     0.129  |      1.8%  | 98.2%  |
+      | ... of 7 |            |            |        |
+      |**Total** |   **6.875**|   **98.2%**|        |
       
       # A tabxplor tab: 8 x 10
         variable mean_Variables sd_Variables `sd/mean_Variables` `coord_Axe 1`
@@ -159,8 +162,8 @@
       6             15%          78%          0.35             10%          12%
       7              6%          29%          0.81             56%          65%
       8            100%                                       100%             
-      # coord: coordinate on the axis (Total): -0.8 -0.4 -0.2 -0.1 +0.1 +0.2 +0.4 +0.8
-      # cos2: quality of representation (Total): -30 -20 -10 -5 +5 +10 +20 +30
+      # coordinate on the axis (Total): -0.8 -0.4 -0.2 -0.1 +0.1 +0.2 +0.4 +0.8
       # contrib: its contribution to the variance of the axis; an axis sums to 100 %
+      # cos2: quality of representation
       # sd/mean: coefficient of variation -- the standard deviation as a percentage of the mean, comparable between variables measured in different units
 

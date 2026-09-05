@@ -44,8 +44,8 @@ fx_tea_wt <- function() fx("tea_wt", function() {
 
 # --- the analyses ------------------------------------------------------------------------------
 
-fx_mca    <- function() fx("mca",    function() MCA2(fx_tea(), 1:6, ncp = 5))
-fx_mca_wt <- function() fx("mca_wt", function() MCA2(fx_tea_wt(), 1:6, wt = "w", ncp = 5))
+fx_mca    <- function() fx("mca",    function() MCA2(fx_tea(), 1:6))
+fx_mca_wt <- function() fx("mca_wt", function() MCA2(fx_tea_wt(), 1:6, wt = "w"))
 
 fx_pca <- function() fx("pca", function() {
   d <- mtcars[1:7]; names(d)[names(d) == "wt"] <- "weight"

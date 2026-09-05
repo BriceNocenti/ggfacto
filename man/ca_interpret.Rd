@@ -58,6 +58,10 @@ The eigenvalues of the axes travel under the table.
 \donttest{
 crosstab <- tabxplor::tab(forcats::gss_cat, race, marital)
 res.ca   <- FactoMineR::CA(as.matrix(crosstab), graph = FALSE)
+
+# ONE option decides how every tabxplor table prints, an interpretation table included.
+# In a script it goes once, at the top, beside the library() calls.
+options(tabxplor.print = "html")
 ca_interpret(res.ca, vars = c("race", "marital"))
 
 # a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of

@@ -10,8 +10,7 @@
 \arguments{
 \item{x}{A table returned by one of the functions of [ggfacto_summary].}
 
-\item{...}{Passed to the renderer (\code{\link[tabxplor]{tab_html}} /
-\code{\link[tabxplor]{tab_md}}) or to the console print method.}
+\item{...}{Passed to \code{\link[tabxplor]{tab_html}}, or to the console print method.}
 }
 \value{
 \code{x} invisibly (or the rendered object, for html).
@@ -22,15 +21,15 @@
 \code{tabxplor} table, so it can be piped, filtered and exported like any other. What differs is
 only how it is \emph{shown}:
 
-\code{options(ggfacto.print = "html")} --- the default --- draws it with
-\code{\link[tabxplor]{tab_html}}: the Viewer pane in RStudio/Positron, a real html table when
-knitted. \code{"md"} prints a markdown pipe table (\code{\link[tabxplor]{tab_md}}), which is what
-to set when the reader is a text file or a language model. \code{"console"} prints the plain
-\code{tabxplor} grid. The option is ggfacto's own and is read at print time, so it can be set
-after the table is built; \code{options(tabxplor.print)} governs ordinary crosstabs and is left
-alone. An html summary of \emph{axes} carries no hover tooltip --- every figure one would reveal
-already has a column of its own --- while \code{\link{HCPC_tab}}, being a crosstab of
-percentages, keeps them: the count behind each one is worth hovering for.
+\code{options(tabxplor.print = "html")} draws it with \code{\link[tabxplor]{tab_html}}: the
+Viewer pane in RStudio/Positron, a real html table when knitted. The default, \code{"console"},
+prints the plain \code{tabxplor} grid. It is the same option that governs an ordinary crosstab
+--- one to set, once, at the top of a script --- and it is read at print time, so it can be set
+after the table is built. For a text file or a language model, pipe the table into
+\code{\link[tabxplor]{tab_md}} explicitly. An html summary of \emph{axes} carries no hover
+tooltip --- every figure one would reveal already has a column of its own --- while
+\code{\link{HCPC_tab}}, being a crosstab of percentages, keeps them: the count behind each one
+is worth hovering for.
 
 An analysis-of-axes summary carries the \strong{eigenvalues} as a subordinate table
 (\code{\link[tabxplor]{set_footer_tabs}}), which every medium renders under it: the percentage of
@@ -38,14 +37,17 @@ variance of each axis, its cumulated percentage, and for an MCA Benzecri's modif
 numbers the rule for choosing how many axes to interpret is read on.
 
 \code{eig = FALSE} leaves them out, for a document that shows them already or prints the summary
-several times to comment it column by column; \code{n_axes} says how many of them to print --- past
-that, the LAST axis is still shown, under an ellipsis row, so the reader always knows how many the
-analysis has.
+several times to comment it column by column; \code{n_axes} says how many of them to print. When
+some axes are left out --- by \code{n_axes}, or because \code{ncp} truncated the analysis --- a
+final row states how many the cloud has (\code{... of 27}), and the \code{Total} row states the
+share of the variance the table can account for. A table showing every axis carries no such row.
 
 \code{min_contrib} moves the threshold: \code{NULL} (the default) keeps the points contributing
 more than the mean --- Le Roux and Rouanet's rule --- \code{0} keeps them all, and a number keeps
 what contributes at least that many percent. The summary row's label follows it, so it can never
-name a set it does not total. \code{color = FALSE} builds the table with no colour measure at all.
+name a set it does not total --- and in a correspondence analysis, where each axis carries two
+such rows, it leads with the margin's own name (\code{Rows: above mean ctr}, or the name
+\code{vars} gave it). \code{color = FALSE} builds the table with no colour measure at all.
 
 \code{lang} is \code{NULL} (the session's language), \code{"en"} or \code{"fr"}: it
 translates what a reader reads as prose --- the axis heading, the summary row's label, the words
@@ -77,7 +79,8 @@ Under it, one plain line names each statistic the colours do \emph{not} grade.
 
 The subclass is not carried by dplyr (only a table's \code{tabxplor} attributes are), so a summary
 that has been through \code{mutate()} prints as an ordinary \code{tabxplor} table --- the
-eigenvalues still render under it, the format choice falls back to \code{options(tabxplor.print)}.
+eigenvalues still render under it, and the format is the same \code{options(tabxplor.print)}
+either way. What is lost is only the hover policy and the margin names.
 }
 
 \seealso{

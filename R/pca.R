@@ -26,7 +26,9 @@
 #' @param scale.unit A boolean, if `TRUE` (value set by default) then data are
 #' scaled to unit variance.
 #' @param ind.sup A vector indicating the indexes of the supplementary individuals.
-#' @param ncp Number of dimensions kept in the results (by default 5).
+#' @param ncp Number of dimensions kept in the results. All of them by default: the eigenvalue
+#'   table is how one chooses how many axes to interpret, and a truncated one cannot show the drop.
+#'   Lower it only to feed \code{FactoMineR::HCPC()}, which clusters on the axes kept.
 #' @param graph A boolean, set to `TRUE` to display the base graph.
 #' @param ... Additional arguments to pass to \code{\link[FactoMineR]{PCA}}.
 #'
@@ -38,7 +40,7 @@
 #' res.pca <- PCA2(mtcars, tidyselect::all_of(active_vars) )
 #'
 PCA2 <- function(data, active_vars, wt, col.w = NULL, ind_name, scale.unit = TRUE,
-                 ind.sup = NULL, ncp = 5, graph = FALSE, ...) {
+                 ind.sup = NULL, ncp = Inf, graph = FALSE, ...) {
   active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
 
   wt <- if (missing(wt)) {character()} else {as.character(rlang::ensym(wt))}

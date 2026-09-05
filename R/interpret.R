@@ -6,8 +6,9 @@
 #   - Every summary is ONE tabxplor table, never a list: gda_summary() tags it `ggfacto_summary`
 #     (the subclass hook of tabxplor::new_tab()) and hangs the eigenvalues off it as a subordinate
 #     table (tabxplor::set_footer_tabs()), which every exporter then renders under it.
-#   - The FORMAT is a print-time decision, `options(ggfacto.print)`: print/knit_print pick the
-#     renderer, so the object stays a table one can pipe, filter and export.
+#   - The FORMAT is a print-time decision, and it is TABXPLOR'S: `options(tabxplor.print)` governs a
+#     summary exactly as it governs a crosstab, so there is ONE option to teach and to set. The
+#     object stays a table one can pipe, filter and export.
 #   - Le Roux and Rouanet's rule, everywhere: only a point contributing MORE than the mean
 #     contribution of its own set is kept. In an MCA there is one set (the active levels); in a CA
 #     there are two (the rows, the columns), whose means differ.
@@ -15,13 +16,15 @@
 #     contribution and every summary row holds exactly 1, so a table carrying several summary rows
 #     (one per axis, or one per set) cannot colour against the wrong one.
 #   - ONLY WHAT HAS A LADDER IS COLOURED. The contribution has Le Roux and Rouanet's threshold on
-#     every family; a coordinate and a cos2 have one only in a PCA, where the coordinate IS a
-#     correlation and the cloud has few axes. In an MCA or a CA they print and do not colour --
-#     measured: the PCA's 50 % cos2 rule turns an MCA table entirely red. ⚠ In a PCA the CONTRIBUTION
+#     every family; a COORDINATE has one only in a PCA, where it IS a correlation and the cloud has
+#     few axes. In an MCA or a CA it prints and does not colour -- measured: the PCA's 50 % cos2 rule
+#     turns an MCA table entirely red. ⚠ In a PCA the CONTRIBUTION
 #     is the one left uncoloured: the coordinate beside it already says which variables build the
-#     axis, and grading one fact twice is two saturated channels for one reading.
+#     axis, and grading one fact twice is two saturated channels for one reading. And a cos2 is
+#     never graded, on any of the three: its 50 % rule is about a whole cloud, not about a cell.
 #   - THE THRESHOLD IS AN ARGUMENT, AND ITS LABEL FOLLOWS IT. `min_contrib` moves the filter; the
-#     summary row is "Above mean ctr", "All levels" or "Above 5%" accordingly. A label naming a set
+#     summary row is "Above mean ctr", "All levels" or "Above 5%" accordingly, and in a CA -- which
+#     has two sets -- the margin's name leads it ("Rows: above mean ctr"). A label naming a set
 #     it does not total is the one thing this table must never do.
 #   - THE COLOUR LEGEND IS TABXPLOR'S, SAYING GGFACTO'S NOUNS. `set_legend_words()` re-states what
 #     the ladder grades -- a factorial axis has no chi-squared -- and changes nothing else, so the
@@ -46,15 +49,15 @@
 #' \code{tabxplor} table, so it can be piped, filtered and exported like any other. What differs is
 #' only how it is \emph{shown}:
 #'
-#' \code{options(ggfacto.print = "html")} --- the default --- draws it with
-#' \code{\link[tabxplor]{tab_html}}: the Viewer pane in RStudio/Positron, a real html table when
-#' knitted. \code{"md"} prints a markdown pipe table (\code{\link[tabxplor]{tab_md}}), which is what
-#' to set when the reader is a text file or a language model. \code{"console"} prints the plain
-#' \code{tabxplor} grid. The option is ggfacto's own and is read at print time, so it can be set
-#' after the table is built; \code{options(tabxplor.print)} governs ordinary crosstabs and is left
-#' alone. An html summary of \emph{axes} carries no hover tooltip --- every figure one would reveal
-#' already has a column of its own --- while \code{\link{HCPC_tab}}, being a crosstab of
-#' percentages, keeps them: the count behind each one is worth hovering for.
+#' \code{options(tabxplor.print = "html")} draws it with \code{\link[tabxplor]{tab_html}}: the
+#' Viewer pane in RStudio/Positron, a real html table when knitted. The default, \code{"console"},
+#' prints the plain \code{tabxplor} grid. It is the same option that governs an ordinary crosstab
+#' --- one to set, once, at the top of a script --- and it is read at print time, so it can be set
+#' after the table is built. For a text file or a language model, pipe the table into
+#' \code{\link[tabxplor]{tab_md}} explicitly. An html summary of \emph{axes} carries no hover
+#' tooltip --- every figure one would reveal already has a column of its own --- while
+#' \code{\link{HCPC_tab}}, being a crosstab of percentages, keeps them: the count behind each one
+#' is worth hovering for.
 #'
 #' An analysis-of-axes summary carries the \strong{eigenvalues} as a subordinate table
 #' (\code{\link[tabxplor]{set_footer_tabs}}), which every medium renders under it: the percentage of
@@ -62,14 +65,17 @@
 #' numbers the rule for choosing how many axes to interpret is read on.
 #'
 #' \code{eig = FALSE} leaves them out, for a document that shows them already or prints the summary
-#' several times to comment it column by column; \code{n_axes} says how many of them to print --- past
-#' that, the LAST axis is still shown, under an ellipsis row, so the reader always knows how many the
-#' analysis has.
+#' several times to comment it column by column; \code{n_axes} says how many of them to print. When
+#' some axes are left out --- by \code{n_axes}, or because \code{ncp} truncated the analysis --- a
+#' final row states how many the cloud has (\code{... of 27}), and the \code{Total} row states the
+#' share of the variance the table can account for. A table showing every axis carries no such row.
 #'
 #' \code{min_contrib} moves the threshold: \code{NULL} (the default) keeps the points contributing
 #' more than the mean --- Le Roux and Rouanet's rule --- \code{0} keeps them all, and a number keeps
 #' what contributes at least that many percent. The summary row's label follows it, so it can never
-#' name a set it does not total. \code{color = FALSE} builds the table with no colour measure at all.
+#' name a set it does not total --- and in a correspondence analysis, where each axis carries two
+#' such rows, it leads with the margin's own name (\code{Rows: above mean ctr}, or the name
+#' \code{vars} gave it). \code{color = FALSE} builds the table with no colour measure at all.
 #'
 #' \code{lang} is \code{NULL} (the session's language), \code{"en"} or \code{"fr"}: it
 #' translates what a reader reads as prose --- the axis heading, the summary row's label, the words
@@ -98,21 +104,13 @@
 #' @section After a dplyr verb:
 #' The subclass is not carried by dplyr (only a table's \code{tabxplor} attributes are), so a summary
 #' that has been through \code{mutate()} prints as an ordinary \code{tabxplor} table --- the
-#' eigenvalues still render under it, the format choice falls back to \code{options(tabxplor.print)}.
+#' eigenvalues still render under it, and the format is the same \code{options(tabxplor.print)}
+#' either way. What is lost is only the hover policy and the margin names.
 #'
 #' @name ggfacto_summary
 #' @seealso [mca_interpret()], [ca_interpret()], [pca_interpret()], [HCPC_tab()], [mean_sd_tab()].
 NULL
 
-
-# "html" | "md" | "console". NOT seeded at load, so "unset" is distinguishable and ggfacto's own
-# default (html) does not depend on what tabxplor's option happens to be.
-#' @keywords internal
-#' @noRd
-gda_print_format <- function() {
-  v <- getOption("ggfacto.print", "html")
-  if (length(v) != 1L || !v %in% c("html", "md", "console")) "html" else v
-}
 
 # Tag a finished table as a ggfacto summary: the legend's words, the glossary lines, the
 # eigenvalues under it, the exporter options only ggfacto knows, and the subclass its print methods
@@ -141,44 +139,46 @@ gda_plain <- function(x) {
   x
 }
 
-# One renderer call, so html and md cannot drift on the options only ggfacto knows. Nothing to
-# suppress in the footer -- the colour legend is tabxplor's, saying ggfacto's words.
+# THE one predicate for "does options(tabxplor.print) ask for html?", mirroring tabxplor's own
+# tx_print_html(): "kable" is its pre-2.0.0 synonym, kept working. There is no ggfacto option -- a
+# summary and a crosstab obey the same one, so a script sets it once.
+# WARNING: `isTRUE()`, not a bare `%in%`. tabxplor seeds the option in its .onLoad(), but ggfacto
+#   reaches it through `tabxplor::` alone, so `library(ggfacto)` leaves the namespace unloaded and
+#   the option UNSET -- on which a bare `%in%` yields logical(0) and `if` stops. Measured.
+#' @keywords internal
+#' @noRd
+gda_print_html <- function() {
+  isTRUE(getOption("tabxplor.print") %in% c("html", "kable"))
+}
+
+# The ONE html render, so print and knit_print cannot drift on the options only ggfacto knows.
+# Nothing to suppress in the footer -- the colour legend is tabxplor's, saying ggfacto's words.
 # DESIGN: an AXIS SUMMARY carries no tooltip -- every figure it hides already has a column of its
 #   own, so the hover would repeat the row. A CLUSTER description is an ordinary crosstab of
 #   percentages, and the count behind each one is worth hovering for: HCPC_tab() asks for them.
 #' @keywords internal
 #' @noRd
-gda_render <- function(x, format, ...) {
+gda_render <- function(x, ...) {
   o <- attr(x, "ggfacto_render") %||% list()
-  x <- gda_plain(x)
   args <- utils::modifyList(list(var_names = o$var_names, tooltips = isTRUE(o$tooltips)),
                             rlang::list2(...))
-  # `tab_md()` has no tooltip: a markdown table has nowhere to hover.
-  if (identical(format, "md"))
-    do.call(tabxplor::tab_md, c(list(x, css = FALSE), args[names(args) != "tooltips"]))
-  else
-    do.call(tabxplor::tab_html, c(list(x), args))
+  do.call(tabxplor::tab_html, c(list(gda_plain(x)), args))
 }
 
 #' @method print ggfacto_summary
 #' @param x A table returned by one of the functions of [ggfacto_summary].
-#' @param ... Passed to the renderer (\code{\link[tabxplor]{tab_html}} /
-#'   \code{\link[tabxplor]{tab_md}}) or to the console print method.
+#' @param ... Passed to \code{\link[tabxplor]{tab_html}}, or to the console print method.
 #' @return \code{x} invisibly (or the rendered object, for html).
 #' @rdname ggfacto_summary
 #' @export
 print.ggfacto_summary <- function(x, ...) {
-  fmt <- gda_print_format()
-  if (identical(fmt, "html")) {
-    out <- gda_render(x, "html", ...)
+  if (gda_print_html()) {
+    out <- gda_render(x, ...)
     print(out)
     return(invisible(out))
   }
-  if (identical(fmt, "md")) {
-    gda_render(x, "md", ...)
-    return(invisible(x))
-  }
-  # "console": tabxplor's own grid, whatever options(tabxplor.print) says -- the reader asked for it.
+  # The medium is STATED for the delegated call, never left to be re-read: tabxplor's own print
+  # stops on an unset option, and `library(ggfacto)` alone leaves it unset (see gda_print_html()).
   withr::with_options(list(tabxplor.print = "console"), print(gda_plain(x), ...))
   invisible(x)
 }
@@ -187,10 +187,7 @@ print.ggfacto_summary <- function(x, ...) {
 #' @keywords internal
 #' @noRd
 knit_print.ggfacto_summary <- function(x, ...) {
-  fmt <- gda_print_format()
-  if (identical(fmt, "html")) return(knitr::knit_print(gda_render(x, "html")))
-  if (identical(fmt, "md"))
-    return(knitr::asis_output(paste0(gda_render(x, "md", print = FALSE), "\n\n")))
+  if (gda_print_html()) return(knitr::knit_print(gda_render(x)))
   withr::with_options(list(tabxplor.print = "console"),
                       knitr::knit_print(gda_plain(x), ...))
 }
@@ -225,26 +222,36 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 }
 
 
-# The eigenvalue table, the subordinate table every axes summary carries. `n_axes` rows at most, and
-# when there are more the LAST one is shown anyway, under an ellipsis row -- so the reader always
-# knows how many axes the analysis has, whether it has nine or forty.
-# DESIGN: no barplot. The numbers ARE the rule -- a cumulated percentage cannot be read off a bar --
-#   and `% variance` carries a data bar (tabxplor::set_bars()), which is the barplot, inside the table.
+# The eigenvalue table, the subordinate table every axes summary carries: `n_axes` rows at most, and
+# an ellipsis row STATING HOW MANY AXES THE CLOUD HAS whenever some are missing from the display.
+# DESIGN: no barplot. The numbers ARE the rule -- a cumulated percentage cannot be read off a bar.
+# DESIGN: `n_total` is the cloud's axis count, and it is passed in rather than read off `eig`, which
+#   `ncp` truncates. It is what makes the ellipsis honest in the two cases that differ: `n_axes` cut
+#   the display, or `ncp` cut the analysis. The ellipsis appears iff `n_total > k`, so a table that
+#   shows every axis carries none -- an ellipsis over nothing is a lie about the tail.
+# WARNING: the last axis is NOT shown after the ellipsis. It gave a row whose numbers cannot be read
+#   against the ones above (nothing bridges the gap), where the count alone answers the only question
+#   the reader has: how many axes are there. So the label carries the count instead.
+# WARNING: no data bar. tabxplor scales a bar on its column's LARGEST value, so an MCA's first axis
+#   at 9.9 % of the inertia drew a full-width bar -- "this axis is everything". It comes back when
+#   `set_bars()` can be told to scale on 100 %; see tabxplor's roadmap.
 # WARNING: every column takes a `col_var`, and the two Benzecri ones share theirs: a column with none
 #   opens no block, so no vertical rule would say that the modified rate and its cumulation belong
 #   together.
 #' @keywords internal
 #' @noRd
-gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, color = TRUE) {
+gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL) {
   n    <- nrow(eig)
+  # never fewer axes than `eig` holds: a caller's count is a hint, `eig` is a fact.
+  n_total <- max(as.integer(n_total %||% n), n)
   k    <- max(1L, min(n, as.integer(n_axes)))
   rows <- seq_len(k)
-  gap  <- k < n                                   # is the last axis beyond what we show?
-  # the ellipsis row, then the last axis. `row_kind = "blank"` is the vocabulary tabxplor already has
-  # for a row that is a display device rather than data.
-  idx  <- if (gap) c(rows, NA_integer_, n) else rows
+  gap  <- n_total > k                             # are there axes the table does not show?
+  # the ellipsis row. `row_kind = "blank"` is the vocabulary tabxplor already has for a row that is a
+  # display device rather than data.
+  idx  <- if (gap) c(rows, NA_integer_) else rows
   kind <- ifelse(is.na(idx), "blank", "data")
-  pick <- function(v) if (gap) c(v[rows], NA_real_, v[[n]]) else v[rows]
+  pick <- function(v) if (gap) c(v[rows], NA_real_) else v[rows]
 
   pctf <- function(v, col_var) tabxplor::fmt(
     n = rep(n_ind, length(v)), scale = "level_pct", pct_type = "col", pct = v / 100,
@@ -252,7 +259,8 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, color = TRUE) {
 
   out <- tibble::tibble(
     "Axe" = tabxplor::new_lvl(
-      forcats::as_factor(ifelse(is.na(idx), "...", paste("Axe", idx))), role = "level"),
+      forcats::as_factor(ifelse(is.na(idx), gettextf("... of %s", n_total),
+                                paste("Axe", idx))), role = "level"),
     # a variance, and it says so: `display = "var"` (tabxplor phase 6 stopped calling it "mean-var").
     "eigenvalue" = tabxplor::fmt(
       n = rep(n_ind, length(idx)), scale = "level_mean", var = pick(eig[, 1]), display = "var",
@@ -269,19 +277,23 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, color = TRUE) {
     out[["cumul. mod."]]              <- pctf(pick(cm), "Benzecri")
   }
 
-  # The Total row states what the axes add up to. ⚠ `res$eig` stops at `ncp`, so the sum is the
-  # variance the ANALYSIS kept, not the cloud's -- the label says so rather than claiming the whole.
+  # The Total row states what the axes add up to, and it is READ, never assumed: `res$eig` stops at
+  # `ncp`, so a fit that kept five axes of a 27-axis cloud totals 34.1 %, not 100 %. Writing 1 here
+  # claimed the whole cloud under any truncation -- the one thing this table must not do.
+  share <- sum(eig[, 2], na.rm = TRUE) / 100
   tot <- tibble::tibble(
-    "Axe" = tabxplor::new_lvl(forcats::as_factor(if (n < 1L) "Total" else "Total"), role = "level"),
+    "Axe" = tabxplor::new_lvl(forcats::as_factor("Total"), role = "level"),
     "eigenvalue" = tabxplor::fmt(n = n_ind, scale = "level_mean", var = sum(eig[, 1]),
                                  display = "var", row_kind = "total", col_var = "Variance",
                                  color = "no", digits = 3L),
-    "% variance" = tabxplor::fmt(n = n_ind, scale = "level_pct", pct_type = "col", pct = 1,
+    "% variance" = tabxplor::fmt(n = n_ind, scale = "level_pct", pct_type = "col", pct = share,
                                  row_kind = "total", col_var = "Variance", color = "no", digits = 1L),
     "cumul."     = tabxplor::fmt(n = n_ind, scale = "level_pct", pct_type = "col", pct = NA_real_,
                                  row_kind = "total", col_var = "Variance", color = "no", digits = 1L)
   )
   if (!is.null(mrv)) {
+    # 1 and not `share`: a modified rate is normalised over the axes above 1/Q that `eig` HOLDS, so
+    # its column sums to 1 whatever the truncation. What truncation moves is each RATE, not the total.
     tot[["Benzecri's modified rate"]] <- tabxplor::fmt(
       n = n_ind, scale = "level_pct", pct_type = "col", pct = 1, row_kind = "total",
       col_var = "Benzecri", color = "no", digits = 1L)
@@ -291,9 +303,7 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, color = TRUE) {
   }
 
   out <- dplyr::bind_rows(out, tot)
-  out <- tabxplor::new_tab(out, meta = list(render_extras = list(n = "no")))
-  if (color) out <- tabxplor::set_bars(out, "% variance")
-  out
+  tabxplor::new_tab(out, meta = list(render_extras = list(n = "no")))
 }
 
 
@@ -367,9 +377,19 @@ gda_poles <- function(long, min_contrib = NULL) {
 
   # THE LABEL FOLLOWS THE THRESHOLD, or it lies: this row totals what was KEPT, which is "all levels"
   # only when nothing was filtered out.
-  tot_label <- if (is.null(min_contrib)) gettext("Above mean ctr")
-               else if (min_contrib <= 0) gettext("All levels")
-               else gettextf("Above %s%%", format(min_contrib))
+  # DESIGN: a CA has TWO sets, so its label NAMES the margin it totals. Without it an axis carries the
+  #   same word twice -- one row for the rows' contributions, one for the columns' -- and nothing says
+  #   which is which. `vars =` is what makes that name a variable's rather than "Rows" / "Columns". An
+  #   MCA has one set and keeps the bare label, which the courses and the exploration skill quote.
+  bare <- if (is.null(min_contrib))  gettext("Above mean ctr")
+          else if (min_contrib <= 0) gettext("All levels")
+          else                       gettextf("Above %s%%", format(min_contrib))
+  named <- function(s) {
+    if (is.null(min_contrib))  gettextf("%s: above mean ctr", s)
+    else if (min_contrib <= 0) gettextf("%s: all levels", s)
+    else                       gettextf("%s: above %s%%", s, format(min_contrib))
+  }
+  tot_label <- if (nlevels(kept$set) > 1L) named else function(s) rep(bare, length(s))
 
   # One total row per (axis, set): the two sides' summed contributions -- the pair that says whether
   # an axis opposes two poles or a specific group to the average -- and the spread of the whole axis.
@@ -381,7 +401,8 @@ gda_poles <- function(long, min_contrib = NULL) {
       pos_ctr = sum0(.data$ctr[.data$pos]), neg_ctr = sum0(.data$ctr[!.data$pos]),
       spread  = gap(.data$coord, .data$fk, .data$pos, dplyr::first(.data$eig), 1),
       .groups = "drop") |>
-    dplyr::mutate(group = tot_label, is_tot = TRUE, block = .Machine$integer.max,
+    dplyr::mutate(group = tot_label(as.character(.data$set)),
+                  is_tot = TRUE, block = .Machine$integer.max,
                   contrib = rowSums(cbind(.data$pos_ctr, .data$neg_ctr), na.rm = TRUE),
                   pos_lv = NA_character_, pos_cd = NA_real_, pos_cos2 = NA_real_,
                   neg_lv = NA_character_, neg_cd = NA_real_, neg_cos2 = NA_real_)
@@ -495,23 +516,18 @@ gda_contrib_words <- function() list(contrib = list(
   unit_word  = gettext("the mean contribution"),
   ref        = gettext("the mean contribution")))
 
-# A PCA colours two quantities with ONE measure, `difference`, on two scales: `coord` in axis
-# standard deviations, `cos2` in percentage points around the 50 % rule. tabxplor writes one line
-# per scale, so `word_std` names the first and `word` the second.
-# WARNING: `lead_over` / `lead_under` are SHARED by the two lines -- one measure, one pair -- so they
-#   must be true of both, hence neutral. And `ref` is REFUSED on `difference`: its baseline is a row
-#   of the table, not a concept. The compact form therefore still brackets "(Total)" while the Total
-#   row of these two columns is empty; the prose form, which is what every export prints, does not
-#   name it at all. Accepted, not worked around: only tabxplor can widen that.
+# A PCA colours ONE quantity, the coordinate, with the measure `difference` on the standardized
+# scale: under `scale.unit` it IS the variable's correlation with the axis, so the 0.1/0.2/0.4/0.8
+# ladder reads it end to end. The cos2 beside it is printed and named in the glossary, never graded.
+# WARNING: `ref` is REFUSED on `difference`: its baseline is a row of the table, not a concept. The
+#   compact form therefore still brackets "(Total)" while the Total row of the column is empty; the
+#   prose form, which is what every export prints, does not name it at all. Accepted, not worked
+#   around: only tabxplor can widen that.
 #' @keywords internal
 #' @noRd
 gda_pca_words <- function() list(difference = list(
   word_std      = gettext("coordinate on the axis"),
   word_long_std = gettext("coordinate on the axis, i.e. its correlation with it"),
-  word          = gettext("quality of representation"),
-  # WARNING: a literal "% " mid-msgid is read as a format specification by tools::checkPoFile().
-  #   The percent sign therefore closes the sentence, here and in every translation.
-  word_long     = gettext("quality of representation, against the rule of 50 %"),
   subject       = gettext("a variable"),
   lead_over     = gettext("%1$s above, by"),
   lead_under    = gettext("%1$s below, by")))
@@ -594,7 +610,7 @@ mca_interpret_data <- function(res.mca, axes) {
 #' shows them, or that prints the summary several times to comment it column by column.
 #' @param n_axes How many axes the eigenvalue table prints; the last one is always shown besides.
 #' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
-#' @param type Deprecated. The output format is now \code{options(ggfacto.print)}, or an explicit
+#' @param type Deprecated. The output format is now \code{options(tabxplor.print)}, or an explicit
 #' \code{\link[tabxplor]{tab_md}} / \code{\link[tabxplor]{tab_html}} call --- see
 #' [ggfacto_summary].
 #' @param spread Deprecated. Folded into \code{complete}.
@@ -605,6 +621,10 @@ mca_interpret_data <- function(res.mca, axes) {
 #' @examples \donttest{
 #' data(tea, package = "FactoMineR")
 #' res.mca <- MCA2(tea, active_vars = 1:18)
+#'
+#' # ONE option decides how every tabxplor table prints, an interpretation table included.
+#' # In a script it goes once, at the top, beside the library() calls.
+#' options(tabxplor.print = "html")
 #' mca_interpret(res.mca)
 #' mca_interpret(res.mca, axes = 1:2, complete = TRUE)
 #' }
@@ -619,15 +639,20 @@ mca_interpret <- function(res.mca,
                           type = NULL,
                           spread = NULL) {
   if (!is.null(spread)) complete <- renamed_arg(spread, "spread", "complete", "mca_interpret")
-  if (!is.null(type))   renamed_arg(type, "type", "options(ggfacto.print)", "mca_interpret")
+  # the guard `ca_interpret()` and `pca_interpret()` already had: an axis the fit did not keep
+  # indexes past the end of `$var$coord` and returns garbage rather than stopping.
+  axes <- axes[axes <= nrow(res.mca$eig)]
+  if (!is.null(type))   renamed_arg(type, "type", "options(tabxplor.print)", "mca_interpret")
   with_gda_lang(lang, function(lg) {
 
   long   <- mca_interpret_data(res.mca, axes)
   packed <- gda_poles(long, min_contrib)
 
   mrv     <- benzecri_mrv(res.mca)
-  eig_tab <- gda_eig_tab(res.mca$eig, n_ind = nrow(res.mca$call$X), mrv = mrv,
-                         n_axes = n_axes, color = color)
+  # The cloud's axis count, which `ncp` does not touch: an MCA has (active levels - questions) axes.
+  # Read off `$var$coord`, whose ROWS are the levels (only its columns are truncated by `ncp`).
+  eig_tab <- gda_eig_tab(res.mca$eig, n_ind = nrow(res.mca$call$X), mrv = mrv, n_axes = n_axes,
+                         n_total = nrow(res.mca$var$coord) - length(res.mca$call$quali))
 
   # The axis heading states the raw eigenvalue percentage AND Benzecri's modified rate, which is the
   # number that corrects it -- an MCA's raw percentages understate the first axes badly. An axis
@@ -700,6 +725,10 @@ ca_interpret_data <- function(res.ca, axes, var_names) {
 #' @examples \donttest{
 #' crosstab <- tabxplor::tab(forcats::gss_cat, race, marital)
 #' res.ca   <- FactoMineR::CA(as.matrix(crosstab), graph = FALSE)
+#'
+#' # ONE option decides how every tabxplor table prints, an interpretation table included.
+#' # In a script it goes once, at the top, beside the library() calls.
+#' options(tabxplor.print = "html")
 #' ca_interpret(res.ca, vars = c("race", "marital"))
 #'
 #' # a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of
@@ -720,7 +749,9 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
   packed <- gda_poles(long, min_contrib)
 
   n_ind   <- round(sum(res.ca$call$Xtot))
-  eig_tab <- gda_eig_tab(res.ca$eig, n_ind = n_ind, n_axes = n_axes, color = color)
+  # a correspondence analysis has min(rows, columns) - 1 axes
+  eig_tab <- gda_eig_tab(res.ca$eig, n_ind = n_ind, n_axes = n_axes,
+                         n_total = min(dim(res.ca$call$X)) - 1L)
   label   <- gettextf("Axe %s: %s%% of variance", packed$axis, gda_num(packed$pct, lg))
 
   gda_poles_tab(packed, axis_label = label, group_name = "Variable", n_ind = n_ind,
@@ -757,6 +788,10 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
 #' data(mtcars, package = "datasets")
 #' mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
 #' res.pca <- FactoMineR::PCA(mtcars, graph = FALSE)
+#'
+#' # ONE option decides how every tabxplor table prints, an interpretation table included.
+#' # In a script it goes once, at the top, beside the library() calls.
+#' options(tabxplor.print = "html")
 #' pca_interpret(res.pca)
 #'
 pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes = 8L,
@@ -825,19 +860,25 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
       pct = ifelse(is_tot, 1, ctr / 100),
       row_kind = kind, ref = "tot", col_var = cv, color = "no")
 
+    # WARNING: NOT coloured either, and the rule is now uniform across the three functions -- a cos2
+    #   is never graded. The 50 % rule the course teaches is a rule of thumb about a WHOLE cloud, not
+    #   a per-cell threshold: it makes a plausible-looking colour out of a quantity whose only honest
+    #   reading is the comparison between the variables displayed. `coord` alone carries the colour.
     out[[paste0("cos2_", cv)]] <- tabxplor::fmt(
       n = nn, scale = "level_pct", pct_type = "row",
-      pct = pad(res.pca$var$cos2[, a]), diff = pad(res.pca$var$cos2[, a]) - 0.5,
+      pct = pad(res.pca$var$cos2[, a]),
       row_kind = kind, in_refrow = is_tot, ref = "tot",
-      col_var = cv, color = if (color) "difference" else "no")
+      col_var = cv, color = "no")
   }
 
-  eig_tab <- gda_eig_tab(res.pca$eig, n_ind = n_acp, n_axes = n_axes, color = color)
+  # a PCA has min(active variables, individuals - 1) axes
+  eig_tab <- gda_eig_tab(res.pca$eig, n_ind = n_acp, n_axes = n_axes,
+                         n_total = min(n_var, n_acp - 1L))
 
-  # `coord` and `cos2` are named by the generated legend, which grades them; the glossary keeps the
-  # two columns it does not touch.
+  # The generated legend names `coord`, the only column it grades; the glossary names the rest.
   glossary <- c(
     gettext("contrib: its contribution to the variance of the axis; an axis sums to 100 %"),
+    gettext("cos2: quality of representation"),
     gda_cv_line())
 
   gda_summary(tabxplor::new_tab(out, meta = list(render_extras = list(n = "no"))),

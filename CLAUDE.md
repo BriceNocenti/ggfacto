@@ -107,19 +107,21 @@ The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fit
 
 Every table here is built out of `tabxplor::fmt()` columns — scale, `col_var`, `row_kind`, colour, `ref` — and rendered by tabxplor; `benzecri_mrv(fmt = TRUE)` does the same for one vector.
 
-**Five functions, one output contract** (`?ggfacto_summary`, `R/interpret.R`). Each returns **one** `tabxplor` table, tagged with the subclass `new_tab(class =)` provides, so it can be piped, filtered and exported like any other; the format is a print-time decision, `options(ggfacto.print = "html" | "md" | "console")`, read by `print.` and `knit_print.` — html by default, and the option is deliberately NOT seeded, so ggfacto's default does not depend on what `tabxplor.print` happens to be. `gda_render()` is the one call to the renderers, so html and md cannot drift on the option only ggfacto knows: the tooltip. An **axis summary** carries none — every figure it would reveal already has a column of its own — while `HCPC_tab()` asks for them, being an ordinary crosstab of percentages whose counts are worth hovering for. There is nothing to suppress in the footer, so a `tab_md()` written by hand needs no argument of its own. ⚠ dplyr carries a table's tabxplor attributes but not its class, so a summary that has been through `mutate()` prints as an ordinary table — which is why the render options ride a plain attribute rather than `meta`: they die with the methods that read them.
+**Five functions, one output contract** (`?ggfacto_summary`, `R/interpret.R`). Each returns **one** `tabxplor` table, tagged with the subclass `new_tab(class =)` provides, so it can be piped, filtered and exported like any other; the format is a print-time decision, and it is **tabxplor's own**, `options(tabxplor.print)`, read by `print.` and `knit_print.`. There is no ggfacto option: a summary and the `tab()` two lines above it obey the same one, so a script sets it once. Markdown is not among its values — it is an explicit `|> tab_md()`. `gda_render()` is the one html render, so print and knit_print cannot drift on the option only ggfacto knows: the tooltip. ⚠ `gda_print_html()` reads it through `isTRUE()`: ggfacto reaches tabxplor by `tabxplor::` alone, so `library(ggfacto)` never loads its namespace and leaves the option **unset**, on which a bare `%in%` yields `logical(0)`. For the same reason the console branch **states** its medium for the delegated call — tabxplor's own print stops on an unset option (its roadmap, phase 9). An **axis summary** carries none — every figure it would reveal already has a column of its own — while `HCPC_tab()` asks for them, being an ordinary crosstab of percentages whose counts are worth hovering for. There is nothing to suppress in the footer, so a `tab_md()` written by hand needs no argument of its own. ⚠ dplyr carries a table's tabxplor attributes but not its class, so a summary that has been through `mutate()` prints as an ordinary table — which is why the render options ride a plain attribute rather than `meta`: they die with the methods that read them.
 
-**The eigenvalues travel under the table**, as a subordinate table (`tabxplor::set_footer_tabs()`), so every medium renders them below it and the rule for choosing how many axes to interpret is never a second call to remember — a pipe table in console, a `<table>` in html, a sheet in Excel. It is a table and not a barplot: a cumulated percentage — Benzecri's modified rate for an MCA, 80 % for a CA, an eigenvalue above 1 for a PCA — cannot be read off a bar. `% variance` and `cumul.` sit under a `Variance` `col_var`, the modified rate and its cumul under `Benzecri`, so each group is framed as a block, and a `Total` row states what the axes add up to. `n_axes` bounds what is printed **independently of `axes =`**, and beyond it the LAST axis is still shown under an ellipsis row: the reader always knows how many axes the cloud has. A data bar behind `% variance` (`tabxplor::set_bars()`) makes the drop legible without reading a number.
+**The eigenvalues travel under the table**, as a subordinate table (`tabxplor::set_footer_tabs()`), so every medium renders them below it and the rule for choosing how many axes to interpret is never a second call to remember — a pipe table in console, a `<table>` in html, a sheet in Excel. It is a table and not a barplot: a cumulated percentage — Benzecri's modified rate for an MCA, 80 % for a CA, an eigenvalue above 1 for a PCA — cannot be read off a bar. `% variance` and `cumul.` sit under a `Variance` `col_var`, the modified rate and its cumul under `Benzecri`, so each group is framed as a block, and a `Total` row states what the axes add up to. `n_axes` bounds what is printed **independently of `axes =`**, and when axes are left out an ellipsis row **states how many the cloud has** (`... of 27`) — the count being the only question a reader has, where the last axis alone gave a row with nothing above it to be read against. ⚠ The count is **passed in**, not read off `eig`, which `ncp` truncates: an MCA has `levels - questions` axes, a CA `min(dim) - 1`, a PCA `min(vars, n - 1)`. So the row appears in the two cases that differ — `n_axes` cut the display, or `ncp` cut the analysis — and **not at all** when every axis is shown, an ellipsis over nothing being a lie about the tail. The `Total` row is likewise **read off `eig`**: a truncated fit says the share it actually holds, not 100 %. ⚠ No data bar — tabxplor scales one on its column's largest value, so an MCA's first axis at a tenth of the inertia drew a full-width bar; it returns when the scale can be fixed (tabxplor's roadmap, phase 9).
 
 ⚠ **A correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of their size**, so the crosstab is asked for beside it — `tab(..., pct = "row", color = "contrib")`, percentages coloured by contribution, never `display = "ctr"`. `ca_interpret()` does not carry it: a reader who wants both asks for both, and `vars =` is what names the two margins, because `FactoMineR::CA()` destroys `names(dimnames())` of `call$X` and `call$Xtot` even when the input was a named `as.table()`.
 
+**`MCA2()` and `PCA2()` keep every axis** (`ncp = Inf`). `res$eig` is how one chooses how many axes to interpret, and FactoMineR truncates it to `ncp`; worse, `benzecri_mrv()` renormalises over the axes it finds, so a truncated fit gives the SAME axis a different modified rate — 57.4 % against 55.4 % on `tea`, measured. One lowers `ncp` only to feed `FactoMineR::HCPC()`, which clusters on the axes kept. Measured cost of the default on a 9 234 × 15 MCA: +0.03 s and +5 MB.
+
 `mca_interpret()` and `ca_interpret()` share one builder, `gda_poles()`. Its statistics are Le Roux and Rouanet's: only a point contributing more than the mean contribution **of its own set** is kept, and the spread between a group's positive and negative points is stated in percent of that group's own contribution. ⚠ The set matters: an MCA has one (the active levels, summing to 100 % over K points), a CA has two (its rows and its columns, summing to 100 % over different numbers of points), so one pooled mean would keep too many of one and too few of the other. The table is **the axes as blocks**: the axis is the row *variable* (so tabxplor writes its heading once per block, wrapped, with one thick rule per axis) and the group is its level; a group's positive and negative points face each other on one row, its own figure is carried in every cell and `display`ed once, and one summary row per (axis, set) gives the two sides' summed contributions — the pair that says whether an axis opposes two poles or one specific group to the average.
 
-**The threshold is an argument, and its label follows it.** `min_contrib = NULL` keeps Le Roux and Rouanet's mean, `0` keeps every level, a number keeps what contributes at least that much **on the displayed scale, in percent**. The summary row is then `Above mean ctr`, `All levels` or `Above 5%` — computed where the filter is applied, never written beside it, because a label naming a set it does not total is the one thing this table must not do.
+**The threshold is an argument, and its label follows it.** `min_contrib = NULL` keeps Le Roux and Rouanet's mean, `0` keeps every level, a number keeps what contributes at least that much **on the displayed scale, in percent**. The summary row is then `Above mean ctr`, `All levels` or `Above 5%` — computed where the filter is applied, never written beside it, because a label naming a set it does not total is the one thing this table must not do. ⚠ **In a CA the margin's name leads it** (`Rows: above mean ctr`, or the name `vars` gave): an axis there carries two summary rows, and the bare label was the same word twice with nothing saying which contributions each totalled.
 
 **A number is normalised before tabxplor grades it.** `pct` prints and `ctr` colours, which is what lets the sign of the coordinate ride the colour without reaching the page — but `ctr` holds the **multiple of the mean contribution**, negated on the negative side, and every summary row holds exactly 1. So a table carrying several summary rows (one per axis, or one per set) cannot grade against the wrong one, and `color = "contrib"`'s ×1/×2/×5/×10 ladder IS Le Roux and Rouanet's threshold.
 
-**Only what has a ladder is coloured**, and the two families differ because the quantities do. The contribution has that threshold everywhere. A coordinate and a cos2 have one only in a **PCA**, where under `scale.unit` the coordinate IS a correlation — so the 0.1/0.2/0.4/0.8 steps read it end to end — and where the few axes make the course's 50 % / 75 % cos2 rule meaningful. In an MCA or a CA, `complete = TRUE` prints both and colours neither: a coordinate in axis standard deviations has no conventional cut-off, and an MCA cloud has dozens of axes, so every cos2 is structurally small — measured on nine binary questions, every retained level fell between 10 % and 48 %, i.e. entirely below the PCA threshold and entirely red. A ladder that does not fit the quantity is a signal that is plausible and false.
+**Only what has a ladder is coloured**, and the families differ because the quantities do. The contribution has that threshold everywhere. A **coordinate** has one only in a **PCA**, where under `scale.unit` it IS a correlation, so the 0.1/0.2/0.4/0.8 steps read it end to end; in an MCA or a CA, `complete = TRUE` prints it and does not colour it, a coordinate in axis standard deviations having no conventional cut-off. ⚠ **A cos2 is never coloured, on any of the three.** Its 50 % rule judges a whole axis, not a cell: an MCA cloud has dozens of axes, so every cos2 is structurally small — measured on nine binary questions, every retained level fell between 10 % and 48 %, i.e. entirely below the threshold and entirely red. A ladder that does not fit the quantity is a signal that is plausible and false.
 
 **The colour legend is tabxplor's, saying ggfacto's nouns.** `set_legend_words()` re-states what the ladder grades — *contribution to the variance of the axis*, not to a chi² an axis has none of — and changes nothing else, so the swatches, the ladder, both registers, the publication palettes and the five media keep working, the console included, which no exporter argument can reach. It is built at **render**, hence coloured, and in the palette and language of the call that prints it. Two vocabularies, in `R/interpret.R`: `gda_contrib_words()` for the MCA/CA poles — whose leads say the thing the old plain-text line could not, that the sign of the ladder is the POLE of the axis — and `gda_pca_words()`, one measure (`difference`) on two scales, `word_std` naming `coord` and `word` naming `cos2`. ⚠ `ref` is **refused** on `difference` (its baseline is a row of the table, not a concept), so the leads carry the meaning instead and the compact form still brackets an empty `(Total)`; the prose form, which every export prints, does not. See `~/github/tabxplor/dev/legend_and_side_tables.md`.
 
@@ -179,7 +181,7 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 The suite is **small and serial**: 377 assertions, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
 
-**Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(ggfacto.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
+**Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(tabxplor.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
 
 ```bash
 #In a temp .R file (outside tests/), then: OMP_NUM_THREADS=1 Rscript that_file.R
@@ -565,6 +567,93 @@ imprimée est l'objet qu'on peut piper »), et les instantanés dataient d'avant
 **Ce que la phase n'a pas fait.** Aucun graphique, aucun calcul, aucune valeur : le balisage du pied
 seul bouge. `mca_interpret()`, `ca_interpret()`, `pca_interpret()`, `HCPC_tab()` et `mean_sd_tab()`
 gardent leurs arguments. La phase 1g reste ouverte.
+
+#### Phase 1i — un éboulis honnête, une seule option d'impression
+
+**Cinq retours d'usage, dont un qui était une crainte infondée et deux qui étaient des défauts de
+correction.** Suite verte : **412** (397 avant), `R CMD check` **0/0/0**.
+
+**`MCA2()` et `PCA2()` calculent tous les axes (`ncp = Inf`).** `ncp` tronque `res$eig`, et
+`benzecri_mrv()` renormalise sur les axes qu'il y trouve : le **même axe** recevait donc un taux de
+Benzécri différent selon `ncp` — **57,4 % contre 55,4 %** sur `tea[1:18]`, six axes au-dessus de 1/Q
+manquant à l'appel. Accessoirement `n_axes = 8` était **inerte par défaut** (`gap <- k < n` est faux
+quand `nrow(eig)` vaut 5), donc l'ellipse et le dernier axe que la documentation promet n'ont jamais
+été rendus sur un appel ordinaire. Coût mesuré du nouveau défaut sur une ACM de 9 234 × 15 :
+**+0,03 s et +5 Mo**. On abaisse `ncp` uniquement pour nourrir `HCPC()`, qui classe sur les axes
+retenus, et `FactoMineR` normalise `Inf` en un entier réel, donc le `1:call$ncp` de `varsup()` reste
+sûr. `mca_interpret()` reçoit au passage le garde que ses deux sœurs avaient déjà : un `axes =`
+au-delà du dernier axe indexait hors des bornes en silence.
+
+**La ligne `Total` de l'éboulis est lue, plus supposée.** Elle écrivait `pct = 1` en dur : sur un
+ajustement gardant cinq axes d'un nuage qui en porte 27, elle annonçait **100 %** là où les cinq
+axes font **34,1 %**. Elle dit maintenant la part réellement présente. ⚠ Sur le taux de Benzécri
+elle garde 1, et c'est exact : un taux modifié est normalisé sur les axes au-dessus de 1/Q que `eig`
+**contient**, donc sa colonne somme à 1 quelle que soit la troncature — ce que la troncature déplace,
+c'est chaque taux, pas leur total. Un ternaire mort (`if (n < 1L) "Total" else "Total"`) part avec.
+
+**La barre de données quitte l'éboulis.** `tabxplor` cale une barre sur le **plus grand de la
+colonne**, donc l'axe 1 d'une ACM à 9,9 % de l'inertie recevait `--tx-bar:100%` — mesuré, avec l'axe
+2 à 82 %. Une barre pleine sous 9,9 % se lit « cet axe, c'est tout ». Elle revient quand `set_bars()`
+saura fixer son échelle : le cas d'usage et deux pistes de cadre souple sont écrits dans la feuille
+de route de `tabxplor` (phase 9).
+
+**Le cos² n'est plus coloré nulle part.** L'ACP était la dernière exception : la règle des 50 % juge
+**un axe entier**, pas une case, et la graduer était le même signal plausible et faux que la phase 1f
+avait retiré de l'ACM et de l'AC. Seule la **coordonnée** reste graduée en ACP, où elle EST une
+corrélation. `gda_pca_words()` perd donc sa seconde échelle et le glossaire gagne `cos2`, avec le
+msgid que la famille employait déjà — une seule formulation, une seule traduction.
+
+**`options(ggfacto.print)` disparaît : une AGD obéit à `options(tabxplor.print)`.** Un résumé et le
+`tab()` deux lignes au-dessus s'affichaient d'après deux options différentes, alors qu'un script n'a
+aucune raison d'en poser deux. La valeur `"md"` part avec — `tabxplor.print` n'en a pas, et la
+recette d'un carnet est un `|> tab_md()` explicite, qui ne passait déjà pas par `print()`.
+
+⚠ **Ce que la suppression a fait apparaître, et qui est un défaut de `tabxplor`.** `tx_print_html()`
+écrit `getOption("tabxplor.print") %in% c(...)` : sur une option **non posée** cela vaut
+`logical(0)`, et `if` s'arrête. Le cas n'est pas théorique — `.onLoad()` sème l'option, mais
+`ggfacto` n'atteint `tabxplor` que par `tabxplor::`, donc **`library(ggfacto)` ne charge pas son
+*namespace* et laisse l'option absente** (mesuré : `loadNamespace("tabxplor")` la sème,
+`library(ggfacto)` non). `gda_print_html()` lit donc par `isTRUE()`, et la branche console **énonce**
+son médium pour l'appel délégué. Sans cela un `mca_interpret()` imprimé dans une session fraîche
+s'arrêtait. Signalé dans la feuille de route de `tabxplor` (phase 9), où `isTRUE()` suffit.
+
+**L'ellipse dit désormais combien d'axes le nuage porte, et n'apparaît que s'il en manque.** Trois
+défauts en un. (1) `n_axes = 4` sur un ajustement à cinq axes insérait une ellipse **entre l'axe 4 et
+l'axe 5**, alors qu'aucun ne manquait entre les deux. (2) Le dernier axe montré sous l'ellipse donnait
+une ligne dont les nombres n'avaient rien au-dessus d'eux à quoi se comparer ; le **compte** répond à
+la seule question que le lecteur se pose, et il remplace cette ligne : `... of 27`, `... sur 27` en
+français. (3) Cinq axes sur 27 s'affichaient **sans aucune ellipse**, donc sans rien dire qu'il en
+manquait 22. ⚠ Le compte est **passé par l'appelant**, jamais lu sur `eig` que `ncp` tronque : une ACM
+a `modalités - questions` axes (les **lignes** de `$var$coord`, dont seules les colonnes sont
+tronquées), une AC `min(dim) - 1`, une ACP `min(variables, individus - 1)`. Vérifié aussi sous
+`excl =`, où le compte reste juste.
+
+**Chaque ligne de résumé d'une AC nomme sa marge.** Un axe en porte deux — une pour les lignes, une
+pour les colonnes — et toutes deux affichaient `Above mean ctr` : le même mot deux fois, sans rien
+dire lequel des deux jeux de contributions chacune totalisait. Elles disent maintenant
+`race: above mean ctr` / `marital: above mean ctr`, et `Rows` / `Columns` faute de `vars =`. Le seuil
+continue de commander la formulation (`: all levels`, `: above 5%`). ⚠ L'ACM **garde le libellé nu** :
+elle n'a qu'un jeu, et c'est ce libellé que les cours et le skill `exploration-donnees` citent. Trois
+msgid neufs, traduits avec l'**espace fine insécable** (U+202F) devant `:` et `%` que le catalogue
+emploie déjà — une espace ordinaire ne s'y voit pas et ne se cherche pas.
+
+**La crainte du *maintainer* sur les modalités multiples est infondée, et c'est mesuré.** Rien ne
+déduplique ni ne tronque : `k <- max(nrow(p), nrow(n), 1L)` rend le bloc aussi haut que son côté le
+plus long et `pad()` comble l'autre. Vérifié sur `tea` (la question `How` garde `lemon` face à `milk`
+**et** `other`) et sur l'ACM du M2 (`JV`, deux modalités négatives sur l'axe 2). Un test le verrouille
+désormais, et il compare les contributions **affichées** (`pct`) à la ligne de résumé — pas `ctr`,
+qui porte le multiple de la contribution moyenne et vaut exactement 1 sur toute ligne de résumé.
+
+**Les fixtures exercent le défaut livré.** `fx_mca()` et `fx_mca_multi()` passaient `ncp = 5` : le
+`tea[1:6]` de référence porte six axes, la suite en testait cinq. ⚠ `tea[1:6]` a exactement **trois**
+axes au-dessus de 1/Q, donc `ncp = 3` n'y renormalise rien — le test de divergence coupe à 2.
+
+**Ce que la phase n'a pas fait.** Aucun fichier de `tabxplor` touché : les barres et le `isTRUE()`
+sont écrits dans sa feuille de route et attendent leur session. Les exemples roxygen posent
+`options(tabxplor.print = "html")` comme un script le fait, sans le restaurer — ⚠ `options(op)`
+**retire** une option qui n'était pas posée, ce qui rallumait précisément le défaut ci-dessus au
+milieu de `R CMD check`.
+
 
 ---
 
