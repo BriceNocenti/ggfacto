@@ -430,9 +430,30 @@ test_that("the eigenvalue table totals the share it actually holds, truncation i
   expect_equal(unname(eig2[["% variance"]]$pct[tot2]), sum(cut$eig[, 2]) / 100)
   expect_lt(unname(eig2[["% variance"]]$pct[tot2]), 1)
 
-  # No data bar: tabxplor scales one on its column's LARGEST value, so an MCA's first axis at a tenth
-  # of the inertia drew a full-width bar. It comes back when the scale can be fixed at 100 %.
-  expect_null(tabxplor::get_bars(eig))
+  # `% variance` carries a data bar, scaled on the column's own largest axis: NA is `set_bars()`'s
+  # word for "no ceiling stated". A ceiling of 100 % would flatten every MCA scree into stubs.
+  expect_identical(tabxplor::get_bars(eig), c("% variance" = NA_real_))
+  expect_null(tabxplor::get_bars(
+    tabxplor::get_footer_tabs(mca_interpret(fx_mca(), axes = 1, color = FALSE))[[1]]))
+})
+
+test_that("the data bar reaches the RENDERED html, on the data rows alone", {
+  # A VALUE test, not a shape one: the bar was once set, documented and tested, and displayed never --
+  # `% variance` has a space in its name, and anything keyed by column name goes stale silently. Only
+  # reading the widths out of the html says whether a bar was drawn, and where.
+  h <- paste(as.character(tabxplor::tab_html(mca_interpret(fx_mca(), axes = 1, n_axes = 4))),
+             collapse = "")
+  rows <- regmatches(h, gregexpr("<tr[^>]*>.*?</tr>", h))[[1]]
+  wid  <- function(x) as.numeric(sub("%.*", "", sub(".*--tx-bar:", "", x)))
+  bars <- unlist(regmatches(h, gregexpr("--tx-bar:[0-9.]+%", h)))
+
+  expect_length(bars, 4L)                       # the four axes shown, and nothing else
+  expect_equal(wid(bars[1]), 100)               # the largest fills its cell: that IS the ceiling
+  expect_true(all(diff(wid(bars)) < 0))         # and the decline is the shape one reads
+
+  # neither the ellipsis nor the Total is on the axes' scale, so neither carries a bar
+  expect_false(any(grepl("tx-bar", rows[grepl("\\.\\.\\. of", rows)])))
+  expect_false(any(grepl("tx-bar", rows[grepl(">Total<", rows)])))
 })
 
 test_that("MCA2() keeps every axis, so the modified rate is the cloud's", {

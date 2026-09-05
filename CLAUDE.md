@@ -109,7 +109,7 @@ Every table here is built out of `tabxplor::fmt()` columns — scale, `col_var`,
 
 **Five functions, one output contract** (`?ggfacto_summary`, `R/interpret.R`). Each returns **one** `tabxplor` table, tagged with the subclass `new_tab(class =)` provides, so it can be piped, filtered and exported like any other; the format is a print-time decision, and it is **tabxplor's own**, `options(tabxplor.print)`, read by `print.` and `knit_print.`. There is no ggfacto option: a summary and the `tab()` two lines above it obey the same one, so a script sets it once. Markdown is not among its values — it is an explicit `|> tab_md()`. `gda_render()` is the one html render, so print and knit_print cannot drift on the option only ggfacto knows: the tooltip. ⚠ `gda_print_html()` reads it through `isTRUE()`: ggfacto reaches tabxplor by `tabxplor::` alone, so `library(ggfacto)` never loads its namespace and leaves the option **unset**, on which a bare `%in%` yields `logical(0)`. For the same reason the console branch **states** its medium for the delegated call — tabxplor's own print stops on an unset option (its roadmap, phase 9). An **axis summary** carries none — every figure it would reveal already has a column of its own — while `HCPC_tab()` asks for them, being an ordinary crosstab of percentages whose counts are worth hovering for. There is nothing to suppress in the footer, so a `tab_md()` written by hand needs no argument of its own. ⚠ dplyr carries a table's tabxplor attributes but not its class, so a summary that has been through `mutate()` prints as an ordinary table — which is why the render options ride a plain attribute rather than `meta`: they die with the methods that read them.
 
-**The eigenvalues travel under the table**, as a subordinate table (`tabxplor::set_footer_tabs()`), so every medium renders them below it and the rule for choosing how many axes to interpret is never a second call to remember — a pipe table in console, a `<table>` in html, a sheet in Excel. It is a table and not a barplot: a cumulated percentage — Benzecri's modified rate for an MCA, 80 % for a CA, an eigenvalue above 1 for a PCA — cannot be read off a bar. `% variance` and `cumul.` sit under a `Variance` `col_var`, the modified rate and its cumul under `Benzecri`, so each group is framed as a block, and a `Total` row states what the axes add up to. `n_axes` bounds what is printed **independently of `axes =`**, and when axes are left out an ellipsis row **states how many the cloud has** (`... of 27`) — the count being the only question a reader has, where the last axis alone gave a row with nothing above it to be read against. ⚠ The count is **passed in**, not read off `eig`, which `ncp` truncates: an MCA has `levels - questions` axes, a CA `min(dim) - 1`, a PCA `min(vars, n - 1)`. So the row appears in the two cases that differ — `n_axes` cut the display, or `ncp` cut the analysis — and **not at all** when every axis is shown, an ellipsis over nothing being a lie about the tail. The `Total` row is likewise **read off `eig`**: a truncated fit says the share it actually holds, not 100 %. ⚠ No data bar — tabxplor scales one on its column's largest value, so an MCA's first axis at a tenth of the inertia drew a full-width bar; it returns when the scale can be fixed (tabxplor's roadmap, phase 9).
+**The eigenvalues travel under the table**, as a subordinate table (`tabxplor::set_footer_tabs()`), so every medium renders them below it and the rule for choosing how many axes to interpret is never a second call to remember — a pipe table in console, a `<table>` in html, a sheet in Excel. It is a table and not a barplot, because the rule for choosing axes is a cumulated percentage — Benzecri's modified rate for an MCA, 80 % for a CA, an eigenvalue above 1 for a PCA — and no bar can be read that finely. `% variance` and `cumul.` sit under a `Variance` `col_var`, the modified rate and its cumul under `Benzecri`, so each group is framed as a block, and a `Total` row states what the axes add up to. `n_axes` bounds what is printed **independently of `axes =`**, and when axes are left out an ellipsis row **states how many the cloud has** (`... of 27`) and prints its ellipsis in every column, a row of blanks reading as missing data where the point is that axes are missing — a `"...{tok}"` display template whose token is NA there, so the literal alone survives and the unit line is unmoved (`fmt_display_label()` polls data and total rows alone) — the count being the only question a reader has, where the last axis alone gave a row with nothing above it to be read against. ⚠ The count is **passed in**, not read off `eig`, which `ncp` truncates: an MCA has `levels - questions` axes, a CA `min(dim) - 1`, a PCA `min(vars, n - 1)`. So the row appears in the two cases that differ — `n_axes` cut the display, or `ncp` cut the analysis — and **not at all** when every axis is shown, an ellipsis over nothing being a lie about the tail. The `Total` row is likewise **read off `eig`**: a truncated fit says the share it actually holds, not 100 %. **`% variance` carries a data bar** (`tabxplor::set_bars()`), the barplot inside the table: it says the SHAPE of the decline, the elbow being what a reader looks for, and the numbers beside it stay the rule. ⚠ Its ceiling is the column's own largest axis, `set_bars()`'s default. A ceiling of 100 % was measured and refused — an MCA's raw rates are diluted by construction (`tea`: 9.9, 8.1, 6.0, 5.2 %), so every scree would flatten into stubs. Total and ellipsis rows take none, tabxplor barring `row_kind == "data"` alone, and `color = FALSE` draws none at all.
 
 ⚠ **A correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of their size**, so the crosstab is asked for beside it — `tab(..., pct = "row", color = "contrib")`, percentages coloured by contribution, never `display = "ctr"`. `ca_interpret()` does not carry it: a reader who wants both asks for both, and `vars =` is what names the two margins, because `FactoMineR::CA()` destroys `names(dimnames())` of `call$X` and `call$Xtot` even when the input was a named `as.table()`.
 
@@ -653,6 +653,51 @@ sont écrits dans sa feuille de route et attendent leur session. Les exemples ro
 `options(tabxplor.print = "html")` comme un script le fait, sans le restaurer — ⚠ `options(op)`
 **retire** une option qui n'était pas posée, ce qui rallumait précisément le défaut ci-dessus au
 milieu de `R CMD check`.
+
+
+#### Phase 1j — la barre de données revient sous l'éboulis
+
+**Une ligne restaurée, et l'échelle est enfin une décision plutôt qu'un défaut.** Suite verte :
+**422** (416 avant), `check` 0/0/0. `% variance` porte de nouveau sa barre : la phase 1i l'avait
+retirée faute de pouvoir énoncer un plafond, et `tabxplor::set_bars(x, cols, max = NULL)` (sa phase
+9) le rend énonçable.
+
+**Le plafond reste le plus grand axe, et c'est mesuré.** Un plafond à 100 % a été essayé et refusé :
+les taux bruts d'une ACM sont dilués par construction (`tea` : 9,9 / 8,1 / 6,0 / 5,2 %), et tout
+éboulis s'y aplatirait en moignons indiscernables. La barre porte donc la **forme de la décroissance**
+— c'est `barplot(res$eig[, 2])` à l'intérieur du tableau, et le coude est ce qu'on y cherche — pendant
+que les nombres à côté restent la règle du choix des axes, qu'aucune barre ne peut dire.
+
+**`color = FALSE` n'en dessine aucune.** Une barre bleue sous un tableau demandé sans couleur serait
+une surprise ; `gda_eig_tab()` reprend donc son paramètre `color`, en argument nommé — sa place
+positionnelle d'avant 1i est occupée par `n_total`.
+
+**Rien à faire pour l'aspect.** La barre est un `::before` arrondi, bordure `1px` à pleine force et
+fond au mélange 30 %, encre `--tx-bar-ink` = l'`accent` du thème, c'est-à-dire le bleu `.p3` : tout
+cela vit dans la feuille de style de `tabxplor`, suit l'interrupteur clair/sombre et les palettes de
+publication, et Excel dessine maintenant son `dataBar` aux bornes épinglées.
+
+⚠ **Le test est un test de VALEUR, parce qu'un test de forme a déjà laissé passer cette panne.** En
+phase 1f la barre était posée, documentée et testée, et ne s'affichait **jamais** : `% variance` porte
+une espace dans son nom, et tout ce qui est clé par nom de colonne se périme en silence. Le nouveau
+test lit donc les `--tx-bar:…%` **dans le html rendu** : quatre barres pour quatre axes montrés, la
+première à 100 %, une décroissance stricte, et aucune sur la ligne d'ellipse ni sur `Total`.
+
+**La ligne d'ellipse imprime son ellipsis, et pas seulement dans son libellé.** Ses cinq cellules
+étaient vides, ce qui se lit comme une donnée manquante là où le propos est que des **axes** manquent.
+Chacune reçoit un `display` `"...{tok}"` dont le jeton vaut `NA` sur cette ligne : seul le littéral
+survit, et l'étiquette d'unité ne bouge pas — `fmt_display_label()` ne fait voter que les lignes
+`"data"` et `"total"`, donc `<var>` et `<col%>` tiennent et rien ne devient `mixed`. Vérifié dans les
+cinq médias, Excel compris.
+
+⚠ **Une trace périmée corrigée au passage** : `@param n_axes` annonçait encore « the last one is
+always shown besides », faux depuis la phase 1i où l'ellipse a pris la place du dernier axe pour en
+porter le compte. Trois blocs roxygen.
+
+**Ce que la phase n'a pas fait.** Aucun graphique, aucun calcul, aucune valeur : seul le balisage
+d'une colonne bouge, et les instantanés console ne s'en aperçoivent pas — une *pipe table* n'a nulle
+part où mettre une barre. ⚠ Les 19 avertissements de `test-tables.R` et `test-plots.R` préexistent et
+n'appartiennent pas à cette phase.
 
 
 ---

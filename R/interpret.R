@@ -224,7 +224,9 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 
 # The eigenvalue table, the subordinate table every axes summary carries: `n_axes` rows at most, and
 # an ellipsis row STATING HOW MANY AXES THE CLOUD HAS whenever some are missing from the display.
-# DESIGN: no barplot. The numbers ARE the rule -- a cumulated percentage cannot be read off a bar.
+# DESIGN: the numbers ARE the rule -- a cumulated percentage cannot be read off a bar -- and the
+#   data bar behind `% variance` (tabxplor::set_bars()) carries only the SHAPE of the decline, which
+#   is the barplot the course draws beside this table, at no cost in width.
 # DESIGN: `n_total` is the cloud's axis count, and it is passed in rather than read off `eig`, which
 #   `ncp` truncates. It is what makes the ellipsis honest in the two cases that differ: `n_axes` cut
 #   the display, or `ncp` cut the analysis. The ellipsis appears iff `n_total > k`, so a table that
@@ -232,15 +234,17 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 # WARNING: the last axis is NOT shown after the ellipsis. It gave a row whose numbers cannot be read
 #   against the ones above (nothing bridges the gap), where the count alone answers the only question
 #   the reader has: how many axes are there. So the label carries the count instead.
-# WARNING: no data bar. tabxplor scales a bar on its column's LARGEST value, so an MCA's first axis
-#   at 9.9 % of the inertia drew a full-width bar -- "this axis is everything". It comes back when
-#   `set_bars()` can be told to scale on 100 %; see tabxplor's roadmap.
+# DESIGN: the bar's ceiling is the column's LARGEST axis, `set_bars()`'s default, because the elbow
+#   is what a reader looks for there. A ceiling of 100 % was measured and refused: an MCA's raw rates
+#   are diluted by construction (`tea`: 9.9, 8.1, 6.0, 5.2 %), so every scree would flatten into
+#   stubs. `color = FALSE` draws none -- a blue bar under a table asked for without colour surprises.
+#   Total and ellipsis rows take none by construction: tabxplor bars `row_kind == "data"` only.
 # WARNING: every column takes a `col_var`, and the two Benzecri ones share theirs: a column with none
 #   opens no block, so no vertical rule would say that the modified rate and its cumulation belong
 #   together.
 #' @keywords internal
 #' @noRd
-gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL) {
+gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL, color = TRUE) {
   n    <- nrow(eig)
   # never fewer axes than `eig` holds: a caller's count is a hint, `eig` is a fact.
   n_total <- max(as.integer(n_total %||% n), n)
@@ -253,9 +257,15 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL) {
   kind <- ifelse(is.na(idx), "blank", "data")
   pick <- function(v) if (gap) c(v[rows], NA_real_) else v[rows]
 
+  # DESIGN: the ellipsis row PRINTS its ellipsis, in every column and not in the label alone -- a row
+  #   of blanks reads as missing data where the point is that axes are missing. `"...{tok}"` is a
+  #   display template whose token is NA there, so only the literal survives; the unit line is
+  #   unmoved, fmt_display_label() polling `row_kind == "data"` / `"total"` alone.
+  dots <- function(tok) ifelse(kind == "blank", paste0("...{", tok, "}"), tok)
+
   pctf <- function(v, col_var) tabxplor::fmt(
     n = rep(n_ind, length(v)), scale = "level_pct", pct_type = "col", pct = v / 100,
-    row_kind = kind, col_var = col_var, color = "no", digits = 1L)
+    row_kind = kind, col_var = col_var, color = "no", digits = 1L, display = dots("pct"))
 
   out <- tibble::tibble(
     "Axe" = tabxplor::new_lvl(
@@ -263,8 +273,8 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL) {
                                 paste("Axe", idx))), role = "level"),
     # a variance, and it says so: `display = "var"` (tabxplor phase 6 stopped calling it "mean-var").
     "eigenvalue" = tabxplor::fmt(
-      n = rep(n_ind, length(idx)), scale = "level_mean", var = pick(eig[, 1]), display = "var",
-      row_kind = kind, col_var = "Variance", color = "no", digits = 3L),
+      n = rep(n_ind, length(idx)), scale = "level_mean", var = pick(eig[, 1]),
+      display = dots("var"), row_kind = kind, col_var = "Variance", color = "no", digits = 3L),
     "% variance" = pctf(pick(eig[, 2]), "Variance"),
     "cumul."     = pctf(pick(eig[, 3]), "Variance")
   )
@@ -303,7 +313,9 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL) {
   }
 
   out <- dplyr::bind_rows(out, tot)
-  tabxplor::new_tab(out, meta = list(render_extras = list(n = "no")))
+  out <- tabxplor::new_tab(out, meta = list(render_extras = list(n = "no")))
+  if (color) out <- tabxplor::set_bars(out, "% variance")
+  out
 }
 
 
@@ -605,10 +617,12 @@ mca_interpret_data <- function(res.mca, axes) {
 #' level's coordinate and its cos2, and the table gains the spread between the two sides.
 #' @param min_contrib The contribution threshold, in percent. \code{NULL} (the default) is the mean
 #' contribution of the point's own set; \code{0} keeps every point.
-#' @param color Set to \code{FALSE} to build the table with no colour measure.
+#' @param color Set to \code{FALSE} to build the table with no colour measure, and no data bar
+#' under the eigenvalues.
 #' @param eig The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
 #' shows them, or that prints the summary several times to comment it column by column.
-#' @param n_axes How many axes the eigenvalue table prints; the last one is always shown besides.
+#' @param n_axes How many axes the eigenvalue table prints. When some are left out, an ellipsis
+#' row states how many the cloud has.
 #' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
 #' @param type Deprecated. The output format is now \code{options(tabxplor.print)}, or an explicit
 #' \code{\link[tabxplor]{tab_md}} / \code{\link[tabxplor]{tab_html}} call --- see
@@ -652,7 +666,8 @@ mca_interpret <- function(res.mca,
   # The cloud's axis count, which `ncp` does not touch: an MCA has (active levels - questions) axes.
   # Read off `$var$coord`, whose ROWS are the levels (only its columns are truncated by `ncp`).
   eig_tab <- gda_eig_tab(res.mca$eig, n_ind = nrow(res.mca$call$X), mrv = mrv, n_axes = n_axes,
-                         n_total = nrow(res.mca$var$coord) - length(res.mca$call$quali))
+                         n_total = nrow(res.mca$var$coord) - length(res.mca$call$quali),
+                         color = color)
 
   # The axis heading states the raw eigenvalue percentage AND Benzecri's modified rate, which is the
   # number that corrects it -- an MCA's raw percentages understate the first axes badly. An axis
@@ -713,10 +728,12 @@ ca_interpret_data <- function(res.ca, axes, var_names) {
 #' \dQuote{Rows} and \dQuote{Columns}.
 #' @param min_contrib The contribution threshold, in percent. \code{NULL} (the default) is the mean
 #' contribution of the point's own set; \code{0} keeps every point.
-#' @param color Set to \code{FALSE} to build the table with no colour measure.
+#' @param color Set to \code{FALSE} to build the table with no colour measure, and no data bar
+#' under the eigenvalues.
 #' @param eig The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
 #' shows them, or that prints the summary several times to comment it column by column.
-#' @param n_axes How many axes the eigenvalue table prints; the last one is always shown besides.
+#' @param n_axes How many axes the eigenvalue table prints. When some are left out, an ellipsis
+#' row states how many the cloud has.
 #' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
 #'
 #' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
@@ -751,7 +768,7 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
   n_ind   <- round(sum(res.ca$call$Xtot))
   # a correspondence analysis has min(rows, columns) - 1 axes
   eig_tab <- gda_eig_tab(res.ca$eig, n_ind = n_ind, n_axes = n_axes,
-                         n_total = min(dim(res.ca$call$X)) - 1L)
+                         n_total = min(dim(res.ca$call$X)) - 1L, color = color)
   label   <- gettextf("Axe %s: %s%% of variance", packed$axis, gda_num(packed$pct, lg))
 
   gda_poles_tab(packed, axis_label = label, group_name = "Variable", n_ind = n_ind,
@@ -773,10 +790,12 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
 #' The eigenvalues of the axes travel under the table.
 #' @param res.pca The result of \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.
 #' @param axes The axes to print, as a numeric vector.
-#' @param color Set to \code{FALSE} to build the table with no colour measure.
+#' @param color Set to \code{FALSE} to build the table with no colour measure, and no data bar
+#' under the eigenvalues.
 #' @param eig The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
 #' shows them, or that prints the summary several times to comment it column by column.
-#' @param n_axes How many axes the eigenvalue table prints; the last one is always shown besides.
+#' @param n_axes How many axes the eigenvalue table prints. When some are left out, an ellipsis
+#' row states how many the cloud has.
 #' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
 #'
 #' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
@@ -873,7 +892,7 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
 
   # a PCA has min(active variables, individuals - 1) axes
   eig_tab <- gda_eig_tab(res.pca$eig, n_ind = n_acp, n_axes = n_axes,
-                         n_total = min(n_var, n_acp - 1L))
+                         n_total = min(n_var, n_acp - 1L), color = color)
 
   # The generated legend names `coord`, the only column it grades; the glossary names the rest.
   glossary <- c(

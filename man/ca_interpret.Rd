@@ -32,12 +32,14 @@ contribution of the point's own set; \code{0} keeps every point.}
 \code{names(dimnames())} from every matrix it keeps, so without this the table says
 \dQuote{Rows} and \dQuote{Columns}.}
 
-\item{color}{Set to \code{FALSE} to build the table with no colour measure.}
+\item{color}{Set to \code{FALSE} to build the table with no colour measure, and no data bar
+under the eigenvalues.}
 
 \item{eig}{The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
 shows them, or that prints the summary several times to comment it column by column.}
 
-\item{n_axes}{How many axes the eigenvalue table prints; the last one is always shown besides.}
+\item{n_axes}{How many axes the eigenvalue table prints. When some are left out, an ellipsis
+row states how many the cloud has.}
 
 \item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
 }
