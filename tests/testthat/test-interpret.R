@@ -110,20 +110,59 @@ test_that("options(ggfacto.print) decides the medium, and html is the default", 
   expect_true(any(grepl("A tabxplor tab", txt)))    # console means console, whatever tabxplor asks
 })
 
-test_that("the legend is one line per statistic, and plain text in every medium", {
-  # `subtext` is fixed when the table is built, before the medium is known: an html span written here
-  # would reach a markdown file and an Excel cell as raw markup.
-  leg <- attr(mca_interpret(fx_mca(), axes = 1, complete = TRUE), "subtext")
-  expect_length(leg, 4L)
-  for (w in c("contrib:", "coord:", "cos2:", "spread:"))
-    expect_true(any(startsWith(leg, w)))
-  expect_false(any(grepl("<", leg, fixed = TRUE)))
-  expect_false(any(grepl("{", leg, fixed = TRUE)))
-  # the ladder is READ from tabxplor, so the words cannot drift from the palette
+test_that("the colour legend is tabxplor's, saying ggfacto's nouns", {
+  x   <- mca_interpret(fx_mca(), axes = 1, complete = TRUE)
+  tpl <- tabxplor::get_subtext(x)
+
+  # the template OWNS the layout, and the legend is generated -- not written here
+  expect_identical(tpl[1:2], c("<legend>", "<stars>"))
+  expect_false(any(grepl("variance of the axis", tpl)))
+
+  foot <- tabxplor::tab_footer_text(x)
+  expect_match(foot[[1]], "[Cc]ontribution to the variance of the axis")
+  expect_false(any(grepl("Chi2", foot)))   # a factorial axis has no chi-squared
+
+  # the ladder is BUILT by tabxplor from the plan the cells are painted with, never pasted here
   for (b in tabxplor::get_color_breaks()[["contrib"]])
-    expect_true(any(grepl(paste0("\u00d7", b), leg)))
-  # the concise table names only what it shows
-  expect_length(attr(mca_interpret(fx_mca(), axes = 1), "subtext"), 1L)
+    expect_match(foot[[1]], paste0("\u00d7", b), fixed = TRUE)
+  for (b in tabxplor::get_color_breaks()[["contrib"]])
+    expect_false(any(grepl(paste0("\u00d7", b), tpl, fixed = TRUE)))
+
+  # and it is coloured, in a medium the old plain-text line could not reach
+  expect_match(tabxplor::tab_footer_text(x, medium = "md")[[1]], "{.p1}", fixed = TRUE)
+})
+
+test_that("the glossary names each statistic the colours do NOT grade, and only those", {
+  gloss <- function(...) {
+    tpl <- tabxplor::get_subtext(mca_interpret(fx_mca(), axes = 1, ...))
+    tpl[!startsWith(tpl, "<")]
+  }
+  # the whole question's contribution is a column of its own, and uncoloured
+  expect_identical(length(gloss()), 1L)
+  expect_true(startsWith(gloss()[[1]], "contrib:"))
+
+  for (w in c("contrib:", "coord:", "cos2:", "spread:"))
+    expect_true(any(startsWith(gloss(complete = TRUE), w)))
+
+  # with no colour measure there is no generated legend, so `ctr` must be named here instead
+  expect_true(any(startsWith(gloss(color = FALSE), "ctr:")))
+  expect_false(any(startsWith(gloss(), "ctr:")))
+
+  # plain text, always: `subtext` reaches a markdown file and an Excel cell as written
+  expect_false(any(grepl("[<{]", gloss(complete = TRUE))))
+})
+
+test_that("a PCA gets one legend line per scale, and no line about the empty Total row", {
+  # ONE measure (`difference`) on TWO scales: `coord` in axis SD, `cos2` in percentage points.
+  foot <- tabxplor::tab_footer_text(pca_interpret(fx_pca(), axes = 1:2))
+  expect_match(foot[[1]], "[Cc]oordinate on the axis")
+  expect_match(foot[[2]], "[Qq]uality of representation")
+  # the prose form names no reference: the Total row of these two columns is empty
+  expect_false(any(grepl("Total", foot[1:2])))
+
+  # `set_legend_words()` is keyed on the measure's full name; an acronym is refused
+  expect_error(tabxplor::set_legend_words(pca_interpret(fx_pca()), diff = "x"),
+               "not a colour measure")
 })
 
 # --- mca_interpret -------------------------------------------------------------------------------
@@ -372,6 +411,21 @@ test_that("pca_interpret opens with what the variables look like, in one block",
   # ONE record printed three times: the sd and the cv are derived from the same variance
   expect_identical(tab$mean_Variables$var, tab$sd_Variables$var)
   expect_identical(unique(tab[["sd/mean_Variables"]]$display), "cv")
+
+  # ⚠ ASSERT THE VALUE, NOT ONLY THE SHAPE. The three columns were structurally perfect and
+  # ENTIRELY BLANK -- `call$ecart.red` does not exist (the slot is `ecart.type`) -- and both the
+  # snapshot and an identical-`var` check passed on NA == NA.
+  x   <- as.data.frame(fx_pca()$call$X)[, rownames(fx_pca()$var$coord), drop = FALSE]
+  ref <- vapply(x, function(v) mean((v - mean(v))^2), numeric(1))
+  expect_equal(unname(tab$sd_Variables$var[seq_along(ref)]), unname(ref))
+  expect_false(any(is.na(tab$sd_Variables$var[seq_along(ref)])))
+  expect_true(all(nzchar(trimws(format(tab$sd_Variables)[seq_along(ref)]))))
+
+  # and it is the variables' OWN spread, so `scale.unit` cannot move it: `call$ecart.type` is the
+  # scaling divisor and is 1 for every variable when the analysis does not scale.
+  unscaled <- pca_interpret(
+    FactoMineR::PCA(as.data.frame(fx_pca()$call$X), graph = FALSE, scale.unit = FALSE), axes = 1)
+  expect_equal(unscaled$sd_Variables$var, tab$sd_Variables$var)
 })
 
 

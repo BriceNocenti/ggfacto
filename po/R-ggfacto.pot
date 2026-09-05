@@ -1,0 +1,127 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: ggfacto 0.3.2.9001\n"
+"POT-Creation-Date: 2026-09-05 07:29+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: interpret.R:362
+msgid "Above mean ctr"
+msgstr ""
+
+#: interpret.R:363
+msgid "All levels"
+msgstr ""
+
+#: interpret.R:364
+#, c-format
+msgid "Above %s%%"
+msgstr ""
+
+#: interpret.R:483
+msgid "contribution to the variance of the axis"
+msgstr ""
+
+#: interpret.R:484
+msgid "a level"
+msgstr ""
+
+#: interpret.R:485
+msgid "%1$s on the positive side, contributing"
+msgstr ""
+
+#: interpret.R:486
+msgid "%1$s on the negative side, contributing"
+msgstr ""
+
+#: interpret.R:487 interpret.R:488
+msgid "the mean contribution"
+msgstr ""
+
+#: interpret.R:501
+msgid "coordinate on the axis"
+msgstr ""
+
+#: interpret.R:502
+msgid "coordinate on the axis, i.e. its correlation with it"
+msgstr ""
+
+#: interpret.R:503
+msgid "quality of representation"
+msgstr ""
+
+#: interpret.R:506
+msgid "quality of representation, against the rule of 50 %"
+msgstr ""
+
+#: interpret.R:507
+msgid "a variable"
+msgstr ""
+
+#: interpret.R:508
+msgid "%1$s above, by"
+msgstr ""
+
+#: interpret.R:509
+msgid "%1$s below, by"
+msgstr ""
+
+#: interpret.R:516
+msgid ""
+"sd/mean: coefficient of variation -- the standard deviation as a percentage "
+"of the mean, comparable between variables measured in different units"
+msgstr ""
+
+#: interpret.R:528
+msgid "ctr: the level's contribution to the variance of the axis"
+msgstr ""
+
+#: interpret.R:529
+msgid "contrib: the whole question's contribution to the axis"
+msgstr ""
+
+#: interpret.R:531
+msgid "coord: coordinate on the axis"
+msgstr ""
+
+#: interpret.R:532
+msgid "cos2: quality of representation"
+msgstr ""
+
+#: interpret.R:533
+msgid ""
+"spread: share of the group's contribution the gap between its two sides "
+"accounts for"
+msgstr ""
+
+#: interpret.R:629 interpret.R:716
+#, c-format
+msgid "Axe %s: %s%% of variance"
+msgstr ""
+
+#: interpret.R:630
+#, c-format
+msgid "Axe %s: %s%% of variance (mod. %s%%)"
+msgstr ""
+
+#: interpret.R:708
+msgid "Rows"
+msgstr ""
+
+#: interpret.R:708
+msgid "Columns"
+msgstr ""
+
+#: interpret.R:767
+msgid "Total"
+msgstr ""
+
+#: interpret.R:832
+msgid ""
+"contrib: its contribution to the variance of the axis; an axis sums to 100 %"
+msgstr ""

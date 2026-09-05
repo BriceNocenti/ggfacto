@@ -77,9 +77,7 @@ mean_sd_tab <- function(data, vars, wt) {
   )
 
   gda_summary(tabxplor::new_tab(out, meta = list(render_extras = list(n = "no"))),
-              legend = paste("sd/mean: the coefficient of variation, i.e. the standard deviation as a",
-                             "percentage of the mean -- comparable between variables measured in",
-                             "different units. Void where the mean is not strictly positive."))
+              glossary = gda_cv_line())
 }
 
 
@@ -262,6 +260,8 @@ HCPC_tab <- function(data, row_vars = character(), clust, wt,
     dplyr::group_by(.data$variables)
 
   # It joins the summary family by its return alone: one table, the format decided at print time.
-  # No eigenvalues -- a cluster description says nothing about axes.
-  gda_summary(out)
+  # No eigenvalues -- a cluster description says nothing about axes -- and no legend words: the
+  # colours grade a difference of percentages, which is exactly what tabxplor's own legend says.
+  # `tooltips`: this IS a crosstab, so the count behind each percentage is worth hovering for.
+  gda_summary(out, tooltips = TRUE)
 }

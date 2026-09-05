@@ -2,7 +2,7 @@
 % Please edit documentation in R/tables.R
 \name{mean_sd_tab}
 \alias{mean_sd_tab}
-\title{Simple Mean and SD Summary}
+\title{Simple Mean and SD Summary (deprecated)}
 \usage{
 mean_sd_tab(data, vars, wt)
 }
@@ -20,8 +20,11 @@ A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
 \description{
 One row per numeric variable: its base, its mean, its standard deviation, and its coefficient of
 variation --- the standard deviation as a percentage of the mean, which is what lets two variables
-measured in different units be compared for how dispersed they are. What to look at before a
-principal component analysis.
+measured in different units be compared for how dispersed they are.
+
+\strong{Deprecated}: \code{\link{pca_interpret}} now opens with the same three figures, taken
+from the analysis itself, so the description and the interpretation are one table and cannot
+disagree. Use it instead; this function still works and will be removed in a future release.
 }
 \examples{
 mean_sd_tab(mtcars, 1:7)

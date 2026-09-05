@@ -8,7 +8,11 @@ mca_interpret(
   res.mca,
   axes = 1:min(res.mca$call$ncp, 5),
   complete = FALSE,
+  min_contrib = NULL,
+  color = TRUE,
   eig = TRUE,
+  n_axes = 8L,
+  lang = NULL,
   type = NULL,
   spread = NULL
 )
@@ -21,8 +25,17 @@ mca_interpret(
 \item{complete}{Set to \code{TRUE} for the fuller summary: each side of the axis gains the
 level's coordinate and its cos2, and the table gains the spread between the two sides.}
 
+\item{min_contrib}{The contribution threshold, in percent. \code{NULL} (the default) is the mean
+contribution of the point's own set; \code{0} keeps every point.}
+
+\item{color}{Set to \code{FALSE} to build the table with no colour measure.}
+
 \item{eig}{The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
 shows them, or that prints the summary several times to comment it column by column.}
+
+\item{n_axes}{How many axes the eigenvalue table prints; the last one is always shown besides.}
+
+\item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
 
 \item{type}{Deprecated. The output format is now \code{options(ggfacto.print)}, or an explicit
 \code{\link[tabxplor]{tab_md}} / \code{\link[tabxplor]{tab_html}} call --- see

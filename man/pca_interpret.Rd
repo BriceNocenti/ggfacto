@@ -4,15 +4,28 @@
 \alias{pca_interpret}
 \title{Colored Table to Help Interpretation of Principal Component Analysis}
 \usage{
-pca_interpret(res.pca, axes = 1:3, eig = TRUE)
+pca_interpret(
+  res.pca,
+  axes = 1:3,
+  color = TRUE,
+  eig = TRUE,
+  n_axes = 8L,
+  lang = NULL
+)
 }
 \arguments{
 \item{res.pca}{The result of \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.}
 
 \item{axes}{The axes to print, as a numeric vector.}
 
+\item{color}{Set to \code{FALSE} to build the table with no colour measure.}
+
 \item{eig}{The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
 shows them, or that prints the summary several times to comment it column by column.}
+
+\item{n_axes}{How many axes the eigenvalue table prints; the last one is always shown besides.}
+
+\item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
 }
 \value{
 A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.

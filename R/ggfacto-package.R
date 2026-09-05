@@ -53,6 +53,10 @@ globalVariables(c(":="))
   #   getOption("ggfacto.widget_lib_dir", "libs") -- so "unset" stays distinguishable from "set to
   #   the default", which is what lets ggfacto.print be html without depending on tabxplor.print.
 
+  # Bind the R-ggfacto gettext catalog to the package's compiled .mo (harmless if absent -> English).
+  po <- system.file("po", package = pkgname)
+  if (nzchar(po)) try(bindtextdomain("R-ggfacto", po), silent = TRUE)
+
   # knitr is a soft dependency: register the methods by hand rather than declare them in NAMESPACE,
   # so loading ggfacto without knitr installed still works.
   if (requireNamespace("knitr", quietly = TRUE)) {

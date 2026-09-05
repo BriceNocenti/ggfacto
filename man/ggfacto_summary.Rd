@@ -28,7 +28,9 @@ knitted. \code{"md"} prints a markdown pipe table (\code{\link[tabxplor]{tab_md}
 to set when the reader is a text file or a language model. \code{"console"} prints the plain
 \code{tabxplor} grid. The option is ggfacto's own and is read at print time, so it can be set
 after the table is built; \code{options(tabxplor.print)} governs ordinary crosstabs and is left
-alone.
+alone. An html summary of \emph{axes} carries no hover tooltip --- every figure one would reveal
+already has a column of its own --- while \code{\link{HCPC_tab}}, being a crosstab of
+percentages, keeps them: the count behind each one is worth hovering for.
 
 An analysis-of-axes summary carries the \strong{eigenvalues} as a subordinate table
 (\code{\link[tabxplor]{set_footer_tabs}}), which every medium renders under it: the percentage of
@@ -36,7 +38,22 @@ variance of each axis, its cumulated percentage, and for an MCA Benzecri's modif
 numbers the rule for choosing how many axes to interpret is read on.
 
 \code{eig = FALSE} leaves them out, for a document that shows them already or prints the summary
-several times to comment it column by column.
+several times to comment it column by column; \code{n_axes} says how many of them to print --- past
+that, the LAST axis is still shown, under an ellipsis row, so the reader always knows how many the
+analysis has.
+
+\code{min_contrib} moves the threshold: \code{NULL} (the default) keeps the points contributing
+more than the mean --- Le Roux and Rouanet's rule --- \code{0} keeps them all, and a number keeps
+what contributes at least that many percent. The summary row's label follows it, so it can never
+name a set it does not total. \code{color = FALSE} builds the table with no colour measure at all.
+
+\code{lang} is \code{NULL} (the session's language), \code{"en"} or \code{"fr"}: it
+translates what a reader reads as prose --- the axis heading, the summary row's label, the words
+the colour legend uses and the glossary lines under it. \strong{Column names are never
+translated}: they are the tibble's own names, and a name that changed with the language could not
+be indexed. These words are fixed when the table is \emph{built}, so an export asking for the
+other language (\code{tab_md(lang = )}) gets tabxplor's grammar translated and ggfacto's nouns as
+they were written: \strong{build the table in the language you will print it in}.
 
 \code{complete = TRUE} widens an MCA or CA summary: each side of the axis gains the point's
 \strong{coordinate} (its sign says which pole, its size how far out) and its \strong{cos2} (the
@@ -46,13 +63,14 @@ and an MCA cloud has so many axes that every cos2 is small --- the 50 \% / 75 \%
 \code{\link{pca_interpret}} table reads does not transfer. Both are read by comparing the points
 shown; only the contribution carries an absolute threshold.
 }
-\section{Exporting by hand}{
+\section{The footer}{
 
-A call written by hand needs \code{color_legend = FALSE}: tabxplor's generated legend describes a
-crosstab's contribution to the chi-squared, which an axis has no notion of, and these tables carry
-a legend of their own.
-
-\code{mca_interpret(res.mca) |> tab_md(css = FALSE, print = FALSE, color_legend = FALSE)}
+The \strong{colour legend is tabxplor's, saying ggfacto's nouns} --- a factorial axis has no
+chi-squared, so \code{\link[tabxplor]{set_legend_words}} re-states what the ladder grades and
+nothing else. It is therefore built at render, in the language and the palette of the call that
+prints it, with its coloured swatches, in all five media. \strong{Nothing to suppress}: a call
+written by hand is just \code{mca_interpret(res.mca) |> tab_md(css = FALSE, print = FALSE)}.
+Under it, one plain line names each statistic the colours do \emph{not} grade.
 }
 
 \section{After a dplyr verb}{

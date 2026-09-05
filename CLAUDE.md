@@ -24,7 +24,7 @@ For anything related to crosstables, it relies heavily on `~/github/tabxplor/`.
 
 ## Repository Map
 
-Thirteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / # KEY CONSTRAINTS` header with fuller design detail: read it before the code.
+Fourteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / # KEY CONSTRAINTS` header with fuller design detail: read it before the code.
 
 **The MCA pipeline** — the package's main path, and the only one that is staged.
 
@@ -45,11 +45,12 @@ Thirteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / 
 - `interpret.R` — the interpretation tables of a factorial analysis: `mca_interpret()`, `ca_interpret()`, `pca_interpret()`, `benzecri_mrv()`, and the output contract the summary family shares (`?ggfacto_summary`, its two print methods).
 - `tables.R` — the two tables that describe the DATA rather than an axis: `mean_sd_tab()`, `HCPC_tab()`.
 - `render.R` — `theme_facto()`, the material palettes, `ggi()`, `ggsave2()`, `plot_path()`, `outlims()`.
-- `utils.R` — factor helpers, the base-R string shim that replaced stringr, `weighted.var()`, vendored `where()`.
+- `utils.R` — factor helpers, the base-R string shim that replaced stringr, `weighted.var()`, vendored `where()`, and the two soft-deprecation notices (`renamed_arg()`, `deprecated_fn()`).
+- `i18n.R` — the gettext plumbing: the `R-ggfacto` text domain, its own cache flush, the language resolver, and `with_gda_lang()`, which makes `lang =` an argument rather than an accident of the session.
 - `knit.R` — the knitr seam: tags every widget the package returns, and writes it to its own file with an `<iframe>` in its place when `options(ggfacto.widget_dir)` asks.
 - `ggfacto-package.R` — imports, global bindings, `.onLoad()`, the deprecated `%>%` re-export.
 
-**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md`).
+**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `po/` (the message catalogues, `R-ggfacto.pot` and `R-fr.po`) · `inst/po/fr/LC_MESSAGES/` (the compiled `.mo`, committed, since `R CMD build` does not compile it) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md` and `update_translations.R`).
 
 ---
 
@@ -106,17 +107,27 @@ The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fit
 
 Every table here is built out of `tabxplor::fmt()` columns — scale, `col_var`, `row_kind`, colour, `ref` — and rendered by tabxplor; `benzecri_mrv(fmt = TRUE)` does the same for one vector.
 
-**Five functions, one output contract** (`?ggfacto_summary`, `R/interpret.R`). Each returns **one** `tabxplor` table, tagged with the subclass `new_tab(class =)` provides, so it can be piped, filtered and exported like any other; the format is a print-time decision, `options(ggfacto.print = "html" | "md" | "console")`, read by `print.` and `knit_print.` — html by default, and the option is deliberately NOT seeded, so ggfacto's default does not depend on what `tabxplor.print` happens to be. `gda_render()` is the one call to the renderers, so html and md cannot drift on the two things only ggfacto knows: no tooltip and no generated legend. ⚠ A `tab_md()` written by HAND therefore needs `color_legend = FALSE`. ⚠ dplyr carries a table's tabxplor attributes but not its class, so a summary that has been through `mutate()` prints as an ordinary table — which is why the render options ride a plain attribute rather than `meta`: they die with the methods that read them.
+**Five functions, one output contract** (`?ggfacto_summary`, `R/interpret.R`). Each returns **one** `tabxplor` table, tagged with the subclass `new_tab(class =)` provides, so it can be piped, filtered and exported like any other; the format is a print-time decision, `options(ggfacto.print = "html" | "md" | "console")`, read by `print.` and `knit_print.` — html by default, and the option is deliberately NOT seeded, so ggfacto's default does not depend on what `tabxplor.print` happens to be. `gda_render()` is the one call to the renderers, so html and md cannot drift on the option only ggfacto knows: the tooltip. An **axis summary** carries none — every figure it would reveal already has a column of its own — while `HCPC_tab()` asks for them, being an ordinary crosstab of percentages whose counts are worth hovering for. There is nothing to suppress in the footer, so a `tab_md()` written by hand needs no argument of its own. ⚠ dplyr carries a table's tabxplor attributes but not its class, so a summary that has been through `mutate()` prints as an ordinary table — which is why the render options ride a plain attribute rather than `meta`: they die with the methods that read them.
 
-**The eigenvalues travel under the table**, as a subordinate table (`tabxplor::set_footer_tabs()`), so every medium renders them below it and the rule for choosing how many axes to interpret is never a second call to remember. It is a table and not a barplot: a cumulated percentage — Benzecri's modified rate for an MCA, 80 % for a CA, an eigenvalue above 1 for a PCA — cannot be read off a bar, and `gda_eig_rule()` states the rule in words underneath. `ca_interpret(crosstab =)` hangs the source crosstab there too: a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of their size.
+**The eigenvalues travel under the table**, as a subordinate table (`tabxplor::set_footer_tabs()`), so every medium renders them below it and the rule for choosing how many axes to interpret is never a second call to remember — a pipe table in console, a `<table>` in html, a sheet in Excel. It is a table and not a barplot: a cumulated percentage — Benzecri's modified rate for an MCA, 80 % for a CA, an eigenvalue above 1 for a PCA — cannot be read off a bar. `% variance` and `cumul.` sit under a `Variance` `col_var`, the modified rate and its cumul under `Benzecri`, so each group is framed as a block, and a `Total` row states what the axes add up to. `n_axes` bounds what is printed **independently of `axes =`**, and beyond it the LAST axis is still shown under an ellipsis row: the reader always knows how many axes the cloud has. A data bar behind `% variance` (`tabxplor::set_bars()`) makes the drop legible without reading a number.
+
+⚠ **A correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of their size**, so the crosstab is asked for beside it — `tab(..., pct = "row", color = "contrib")`, percentages coloured by contribution, never `display = "ctr"`. `ca_interpret()` does not carry it: a reader who wants both asks for both, and `vars =` is what names the two margins, because `FactoMineR::CA()` destroys `names(dimnames())` of `call$X` and `call$Xtot` even when the input was a named `as.table()`.
 
 `mca_interpret()` and `ca_interpret()` share one builder, `gda_poles()`. Its statistics are Le Roux and Rouanet's: only a point contributing more than the mean contribution **of its own set** is kept, and the spread between a group's positive and negative points is stated in percent of that group's own contribution. ⚠ The set matters: an MCA has one (the active levels, summing to 100 % over K points), a CA has two (its rows and its columns, summing to 100 % over different numbers of points), so one pooled mean would keep too many of one and too few of the other. The table is **the axes as blocks**: the axis is the row *variable* (so tabxplor writes its heading once per block, wrapped, with one thick rule per axis) and the group is its level; a group's positive and negative points face each other on one row, its own figure is carried in every cell and `display`ed once, and one summary row per (axis, set) gives the two sides' summed contributions — the pair that says whether an axis opposes two poles or one specific group to the average.
+
+**The threshold is an argument, and its label follows it.** `min_contrib = NULL` keeps Le Roux and Rouanet's mean, `0` keeps every level, a number keeps what contributes at least that much **on the displayed scale, in percent**. The summary row is then `Above mean ctr`, `All levels` or `Above 5%` — computed where the filter is applied, never written beside it, because a label naming a set it does not total is the one thing this table must not do.
 
 **A number is normalised before tabxplor grades it.** `pct` prints and `ctr` colours, which is what lets the sign of the coordinate ride the colour without reaching the page — but `ctr` holds the **multiple of the mean contribution**, negated on the negative side, and every summary row holds exactly 1. So a table carrying several summary rows (one per axis, or one per set) cannot grade against the wrong one, and `color = "contrib"`'s ×1/×2/×5/×10 ladder IS Le Roux and Rouanet's threshold.
 
 **Only what has a ladder is coloured**, and the two families differ because the quantities do. The contribution has that threshold everywhere. A coordinate and a cos2 have one only in a **PCA**, where under `scale.unit` the coordinate IS a correlation — so the 0.1/0.2/0.4/0.8 steps read it end to end — and where the few axes make the course's 50 % / 75 % cos2 rule meaningful. In an MCA or a CA, `complete = TRUE` prints both and colours neither: a coordinate in axis standard deviations has no conventional cut-off, and an MCA cloud has dozens of axes, so every cos2 is structurally small — measured on nine binary questions, every retained level fell between 10 % and 48 %, i.e. entirely below the PCA threshold and entirely red. A ladder that does not fit the quantity is a signal that is plausible and false.
 
-**The legend is plain text, and deliberately.** `subtext` is fixed when the table is built, before the medium is known, so an html span written there would reach a markdown file and an Excel cell as raw markup. The break values are read from `tabxplor::get_color_breaks()` at call time, so the words cannot drift from the palette.
+**The colour legend is tabxplor's, saying ggfacto's nouns.** `set_legend_words()` re-states what the ladder grades — *contribution to the variance of the axis*, not to a chi² an axis has none of — and changes nothing else, so the swatches, the ladder, both registers, the publication palettes and the five media keep working, the console included, which no exporter argument can reach. It is built at **render**, hence coloured, and in the palette and language of the call that prints it. Two vocabularies, in `R/interpret.R`: `gda_contrib_words()` for the MCA/CA poles — whose leads say the thing the old plain-text line could not, that the sign of the ladder is the POLE of the axis — and `gda_pca_words()`, one measure (`difference`) on two scales, `word_std` naming `coord` and `word` naming `cos2`. ⚠ `ref` is **refused** on `difference` (its baseline is a row of the table, not a concept), so the leads carry the meaning instead and the compact form still brackets an empty `(Total)`; the prose form, which every export prints, does not. See `~/github/tabxplor/dev/legend_and_side_tables.md`.
+
+**Under it, `gda_poles_glossary()` names each statistic the colours do NOT grade** — `contrib` (the whole question's), `coord`, `cos2`, `spread`, and `ctr` itself when `color = FALSE` leaves no legend to name it. One line each, full name and nothing more: *how to read it* belongs to the course and to `formations_stat`'s `agd.md`. They name no placeholder, so tabxplor appends them to the template. ⚠ **Plain text, always**: `subtext` is frozen at build, so an html span written there reaches a markdown file and an Excel cell as raw markup — `<breaks>` is the supported way to get a swatch. And a word set at build is frozen in the language of the build: `lang =` still has to exist here, since the axis headings and the summary-row labels are *factor levels*.
+
+**What is translated is prose, never a name** (`R/i18n.R`, domain `R-ggfacto`): the legend, the axis heading, the summary row's label, `Rows` / `Columns` / `Total`. A column name and a `col_var` become the tibble's own name — `coord_Axe 1` — and one that changed with the language could not be indexed; it is tabxplor's rule too (`dev/french_glossary.md`). A `lang =` argument on the three functions makes the choice explicit, and the cache flush **re-binds our own domain**, since glibc keys on `(domain, msgid)` and tabxplor's flush would leave `R-ggfacto` cached.
+
+**A column is named `<statistic>_<col_var>`, and the export strips the suffix.** `coord_Axe 1`, `contrib_Axe 1`, `cos2_Axe 1` keep the tibble's names unique and indexable; `tabxplor::tab_col_var_header()` shows a bare `coord` under an `Axe 1` span in html, markdown and Excel. `pca_interpret()`'s opening block — `mean`, `sd`, `sd/mean` under one `col_var`, absorbed from the now-deprecated `mean_sd_tab()` — works the same way.
 
 ### Cross-cutting invariants
 
@@ -160,13 +171,13 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 ## Testing
 
-`tests/testthat/` is the package's **contract**: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit. Nine files: `helper-fixtures.R` (the cached analyses and plot models), `test-mca2-pca2.R` (the ingress normalisers), `test-ggmca-data.R` (the plot model and the argument matrix), `test-tooltips.R` (the crosstabs behind the hover), `test-plots.R` (that every graph builds, and the render-hint seam), `test-knit.R` (the widget seam), `test-interpret.R` (the interpretation tables and the output contract the whole summary family shares), `test-tables.R` (the two tables that describe the data), plus `test-str-shim.R` and `test-non-ascii.R` from 1a.
+`tests/testthat/` is the package's **contract**: it must fail when a user-visible fact changes, must not fail when an internal is redesigned, and must stay fast enough to run on every edit. Eleven files: `helper-fixtures.R` (the cached analyses and plot models), `helper-i18n.R` (`skip_if_no_gettext()`), `test-mca2-pca2.R` (the ingress normalisers), `test-ggmca-data.R` (the plot model and the argument matrix), `test-tooltips.R` (the crosstabs behind the hover), `test-plots.R` (that every graph builds, and the render-hint seam), `test-knit.R` (the widget seam), `test-interpret.R` (the interpretation tables and the output contract the whole summary family shares), `test-tables.R` (the two tables that describe the data), `test-i18n.R` (the French catalogue), plus `test-str-shim.R` and `test-non-ascii.R` from 1a.
 
 **Argument coverage is the point, not function coverage.** Several arguments are inert alone and only act alongside an enabling one — `keep_levels`/`discard_levels` need `sup_vars`, `tooltip_vars`/`tooltip_vars_1lv` need a table to be built at all, `cah` needs `profiles`. A test that omits the enabler passes while exercising nothing; the vacuous paths are pinned deliberately so nobody "simplifies" them back into nothing.
 
 **Fixtures are `tea[1:6]`, never `tea[1:18]`.** Tooltip crosstabs are quadratic in the number of active variables: `active_tables = "active"` costs 1.2 s on six and 10.4 s on eighteen. Six reaches every code path. The models the suite reuses are memoised in `helper-fixtures.R`; the whole suite runs in about 30 s. The one exception is `fx_mca_multi()`, local to `test-interpret.R`: `tea[1:6]` is all binary, so `mca_interpret()`'s row packing collapses every question to one line there and its display blanking has nothing to hide — that needs multi-level variables and a third axis.
 
-The suite is **small and serial**: 322 assertions, no `Config/testthat/parallel`, no `setup.R`, no i18n. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
+The suite is **small and serial**: 377 assertions, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
 
 **Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(ggfacto.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
 
@@ -368,6 +379,192 @@ n'a aucune couture pour insérer un graphique et `openxlsx` n'est pas une dépen
 écrit à la main a besoin de `color_legend = FALSE` — la légende engendrée par tabxplor parle de
 contribution au chi², ce qu'un axe factoriel ignore ; les méthodes de ggfacto la coupent d'elles-mêmes,
 et la console, elle, la garde (elle est toujours terse et n'a pas d'interrupteur).
+
+#### Phase 1f — affiner les tableaux-résumés, et les traduire
+
+Relecture du *maintainer* sur la famille livrée en 1e : des étiquettes de type pillar qui disaient
+faux, des légendes trop bavardes, un seuil de contribution non paramétrable, des noms de colonnes
+opaques, et aucune version française. Suites vertes : `ggfacto` **377** (333 avant), `R CMD check`
+0/0/0 ; `tabxplor` **4 704** (4 677 avant), `check` 0/0/0.
+
+**Chaque étiquette de type dit désormais ce que la colonne somme.** `cos2` s'écrit `<row%>`, parce
+qu'un cos² somme à 100 % **sur les axes**, c'est-à-dire le long d'une ligne de `$var$cos2` ; les deux
+pourcentages de l'éboulis s'écrivent `<col%>`, parce qu'ils somment sur les axes empilés ; et
+`eigenvalue` s'écrit `<var>`. ⚠ Cette dernière a demandé un correctif **dans `tabxplor`** : le jeton
+`var` n'avait pas `geometry = "level"`, alors que son propre `sd` l'a, donc `display = "var"` sur une
+colonne `level_mean` sortait `<mean-var>` — « la variance de la moyenne ». Une variance est un niveau,
+pas une comparaison.
+
+**Le seuil de contribution est un argument, et son libellé le suit.** `min_contrib = NULL` garde la
+moyenne (Le Roux et Rouanet), `0` garde tout, un nombre garde ce qui contribue au moins autant, **sur
+l'échelle affichée, en pourcentages**. La ligne de résumé s'appelle alors `Above mean ctr`,
+`All levels` ou `Above 5%`. ⚠ **Un libellé qui nomme un ensemble qu'il ne totalise pas est la seule
+chose que ce tableau ne doit jamais faire** : les trois formes sont donc calculées à l'endroit où le
+filtre est appliqué, jamais écrites à côté.
+
+**La légende passe de deux pavés à trois lignes, une par statistique.** Chacune donne le nom complet
+et rien d'autre ; celles qui sont colorées ajoutent leur échelle en forme terse. Le « comment lire » —
+quel pôle, quel signe, quelle taille — disparaît : il vit dans le cours et dans la référence `agd.md`
+du skill, pas sous chaque tableau. `subtext` étant un vecteur, une ligne par élément suffit.
+
+**Le tableau des valeurs propres devient lisible d'un coup d'œil.** `% variance` et `cumul.` sous un
+`col_var` `Variance`, le taux modifié et son cumul sous `Benzecri` — deux blocs encadrés là où il n'y
+avait aucun `col_var`, donc aucun filet. Une ligne `Total` dit ce que les axes totalisent. `n_axes = 8`
+borne l'impression **indépendamment de `axes =`**, et au-delà la **dernière** ligne est montrée quand
+même, précédée d'une ligne d'ellipse (`row_kind = "blank"`, le vocabulaire que `ROW_KINDS` a déjà) : le
+lecteur sait toujours combien d'axes le nuage porte. La légende de pied disparaît — la règle du choix
+des axes est un enseignement, pas une note de tableau.
+
+**Une barre de données derrière `% variance`, et c'est une vraie barre html.** `tabxplor` gagne
+`set_bars()` / `get_bars()` et une classe `.tx-bar` ; ce qui est inline sur le `<td>` est une
+**longueur**, jamais une couleur, donc `theme = "auto"` reste entier et la règle du header de
+`tab-css.R` est réécrite pour l'énoncer au lieu d'être contredite en silence.
+
+**`pca_interpret()` absorbe `mean_sd_tab()`, qui est dépréciée.** `mean`, `sd` et `sd/mean` sont les
+premières colonnes `fmt`, sous un `col_var` commun, **sans colonne `n`** : ce qui décrit les variables
+et ce qui interprète les axes se lisent dans le même tableau, ce qui était la raison d'être de la
+fonction. Et le `contrib` d'une ACP n'est plus coloré — la coordonnée à côté dit déjà quelles variables
+bâtissent l'axe, et graduer un même fait deux fois est deux canaux saturés pour une seule lecture.
+
+**Une colonne s'appelle `<statistique>_<col_var>`, et l'export retire le suffixe.** `coord_Axe 1`,
+`contrib_Axe 1`, `cos2_Axe 1` dans le tibble — des noms uniques qu'on peut indexer — et un `coord` nu
+sous un en-tête `Axe 1` en html, en markdown et en Excel. C'est `tab_col_var_header()` qui strippe,
+exactement comme pour `Other_race`. ⚠ **Un défaut y a été trouvé et corrigé dans `tabxplor`** : la
+comparaison portait sur le nom **enveloppé** (espaces fines insécables, `<br>` aux coupures) face à un
+`col_var` brut, donc tout `col_var` contenant une espace laissait fuiter son suffixe dans l'en-tête.
+
+**`crosstab =` disparaît de `ca_interpret()`, et `vars =` le remplace.** Le lecteur — humain ou IA —
+demande les deux tableaux séparément, et la page de manuel dit lequel : `tab(..., pct = "row",
+color = "contrib")`, des pourcentages colorés par la contribution, jamais `display = "ctr"`. ⚠ **Il
+fallait quand même une entrée pour les noms des deux marges** : `FactoMineR::CA()` **détruit**
+`names(dimnames())` de `call$X` comme de `call$Xtot`, même quand l'entrée était une `as.table()` aux
+dimnames nommés. Sans `vars =`, les deux marges s'appelleraient `Rows` et `Columns` pour toujours.
+
+**La traduction française est le dispositif de `tabxplor`, transposé au domaine `R-ggfacto`.**
+`R/i18n.R` neuf, `po/R-ggfacto.pot`, `po/R-fr.po` (17 messages, tous traduits), le `.mo` committé,
+`Config/potools/style: explicit`, `dev/update_translations.R`, et un `lang =` sur les trois fonctions.
+⚠ **Le vidage de cache doit re-lier NOTRE domaine** : glibc indexe sur `(domaine, msgid)`, donc celui
+de `tabxplor` laisse `R-ggfacto` en cache et la seconde bascule de langue d'une session ne fait rien.
+⚠ **Ce qui est traduit est de la prose, jamais un nom** : la légende, l'en-tête d'axe, le libellé de la
+ligne de résumé, `Rows`/`Columns`/`Total`. Un nom de colonne qui changerait avec la langue ne pourrait
+plus être indexé — c'est aussi la règle de `tabxplor` (`dev/french_glossary.md`). ⚠ Un `%` littéral
+dans un `msgstr` de `gettextf()` est lu comme une spécification de conversion : les trois chaînes de
+format le doublent (`%%`), les `gettext()` gardent le leur simple. `test-i18n.R` éprouve chaque trait
+**deux fois** — un bloc anglais non gardé, son jumeau français gardé par `skip_if_no_gettext()` —,
+parce que `R CMD check` force une locale C où gettext ne traduit pas du tout.
+
+**Un tableau subordonné s'imprime en *pipe table* en console.** `tabxplor` exporte `tab_pipe()` et
+`print.tabxplor_tab()` s'en sert pour ses `meta$footer_tabs` : l'éboulis était un second
+`tabxplor_tab` avec sa propre grille pillar, il est désormais une note, comme les tables de forme et
+d'hypothèses le sont déjà.
+
+⚠ **Deux défauts silencieux trouvés en relisant la page d'exemples à l'écran, et non en lisant le code.**
+(1) Les trois colonnes qui ouvrent `pca_interpret()` étaient **entièrement vides** : le nom de champ
+lu était `call$ecart.red`, qui n'existe pas — celui de `FactoMineR` est `call$ecart.type` —, et le
+repli sur `NA` ne dit rien. L'instantané montrait les blancs et l'assertion « une seule variance pour
+les trois colonnes » passait sur `NA == NA` : **un test de forme ne remplace pas un test de valeur**,
+et la garde en éprouve maintenant une. L'écart-type est désormais **calculé** depuis `call$X` et
+`call$row.w` plutôt que lu : `ecart.type` est le diviseur de normalisation, il vaut 1 pour toutes les
+variables sous `scale.unit = FALSE`, et une colonne d'écarts-types qui n'affiche que des 1 est pire
+qu'une colonne vide. (2) La barre de données ne s'affichait **jamais** — un défaut de `tabxplor`,
+corrigé là-bas : `tab_wrap_text()` renomme les colonnes avant le rendu html, et la liste `bars`
+gardait les noms bruts, donc `% variance` ne correspondait plus à rien. Son test de la phase 6
+employait `"Married"`, un seul mot ; le nom du seul appelant réel en contient une espace.
+
+⚠ **La crainte du *maintainer* sur les modalités multiples d'un même côté d'axe est infondée, et c'est
+mesuré.** `gda_poles()` complète le côté court de `NA` (`k = max(nrow(pos), nrow(neg), 1)`), donc rien
+n'est coupé : le livre rendu porte **trois** lignes de continuation — `JV` sur l'Axe 2, `RADIO` sur
+l'Axe 3, `MUSIQUE` sur l'Axe 4 —, et sur l'Axe 1 les huit contributions positives affichées somment
+exactement à la ligne de résumé. Seul défaut, cosmétique : rien ne relie visuellement une ligne de
+continuation à la ligne du dessus — voir la phase 1g.
+
+**Ce que la phase n'a pas fait, et pourquoi.** Le **cadre des légendes de `tabxplor`** n'est pas
+construit : le *maintainer* l'a demandé **esquissé**, et il l'est dans
+`~/github/tabxplor/dev/legend_and_side_tables.md`, qui dit en tête qu'il est un brouillon. Tant qu'il
+n'existe pas, `ggfacto` coupe la légende engendrée (`color_legend = FALSE`, parce qu'elle parle de
+contribution au chi², ce qu'un axe factoriel ignore) et écrit la sienne en texte simple : **elle n'est
+donc ni colorée, ni traduite au rendu** — elle l'est à la construction, avant que le médium et la
+langue de lecture soient connus. C'est le prix à payer, et il est nommé. La barre de données en Excel
+et l'étiquette `<row%-ctr>` d'une colonne de contributions partent en phase 7 de `tabxplor`.
+
+#### Phase 1g — lier une ligne de continuation à sa question
+
+Quand une question garde plusieurs modalités du **même** côté d'un axe, `gda_poles()` les empile sur
+des lignes successives dont les cellules `Question` et `contrib` sont blanchies (le jeton `blank`).
+Rien ne dit visuellement que ces lignes appartiennent à la question du dessus : ni retrait, ni
+*rowspan*. Un retrait sur le libellé de modalité est la piste la moins coûteuse ; un `rowspan` sur la
+cellule de question serait plus juste en html mais n'a d'équivalent ni en markdown ni en console, et
+c'est `tabxplor` qui rend les trois. À éprouver sur `05-ACM.qmd`, où les trois cas du corpus vivent.
+
+#### Phase 1h — le pied de tableau vient de tabxplor
+
+**`ggfacto` n'écrit plus de légende : il en re-nomme une.** Suite verte : **397** (377 avant),
+`R CMD check` **0/0/0**. Les mots sont dits par `set_legend_words()`, la phrase et l'échelle sont
+engendrées au rendu, et `gda_poles_legend()` disparaît avec les quatre choses qu'elle coûtait —
+l'échelle recopiée, un seul registre pour cinq médias, une phrase figée dans la langue de la
+construction, et, en console, la ligne de tabxplor imprimée **au-dessus** de la sienne, là où
+`color_legend = FALSE` ne portait pas.
+
+**Ce que la console imprimait, et qui résume la phase :**
+
+```text
+# contribution to Chi2 (vs the mean): x10 x5 x2 x1 x1 x2 x5 x10        <- tabxplor, et faux ici
+# contrib: contribution to the variance of the axis, vs the mean contribution: x1 x2 x5 x10
+```
+
+**Les mots disent maintenant ce que l'ancienne ligne taisait : le signe de l'échelle est le PÔLE de
+l'axe.** `gda_poles_tab()` nie `ctr` du côté négatif, donc `.m1`-`.m4` marquent le pôle négatif et
+non une sous-contribution — un lecteur ne pouvait pas le déduire de « vs la contribution moyenne ».
+`lead_over` / `lead_under` le disent en toutes lettres.
+
+**Le glossaire ne garde que ce que la couleur ne gradue pas**, et il gagne une justesse au passage :
+la ligne unique d'avant portait le nom d'une colonne (`contrib`, la contribution de la question) et
+l'échelle d'une autre (`ctr`, celle de la modalité). Une ligne chacune. Sous `color = FALSE`, où
+aucune légende n'est engendrée, `ctr` est nommée là.
+
+⚠ **L'ACP colore deux quantités avec UNE mesure.** `difference` sur deux échelles : `word_std` va à
+`coord` (écarts-types), `word` à `cos2` (points de %). `lead_over` / `lead_under` sont **partagés**
+par les deux lignes, donc neutres et vrais des deux. Et `ref` est **refusé** sur `difference` — sa
+référence est une ligne du tableau, pas un concept —, si bien que la forme compacte bracketise
+encore « (Total) » alors que la ligne Total de ces deux colonnes est vide ; la forme longue, celle
+de tous les exports, ne la nomme pas. Assumé, pas contourné.
+
+**Une correction dans `tabxplor` était nécessaire, et elle est petite** (sa phase 7c) :
+une légende qui nomme ses colonnes imprimait le nom BRUT du tibble, `coord_Axe 1, coord_Axe 2`,
+alors que l'en-tête montre `coord` sous un bandeau `Axe 1`. La convention `<statistic>_<col_var>`
+d'ici rendait donc le pied illisible dès que la légende engendrée revenait. Elle nomme maintenant
+ce que l'en-tête nomme.
+
+⚠ **Un contournement périmé était devenu porteur d'autre chose.** Les dix
+`mutate(across(where(is_fmt), ~ set_color(., "diff"))) # sinon bug (no color)` des cours de M2 sont
+un no-op mesuré (html **identique au bit près**) — mais ils font tomber la classe `ggfacto_summary`,
+donc le tableau passait par `tab_html()` et gardait ses info-bulles, que `gda_render()` coupait.
+`tooltips` devient donc une option par table : aucune pour un résumé d'axes, où chaque chiffre caché
+a déjà sa colonne ; **toutes** pour `HCPC_tab()`, qui est un tableau croisé de pourcentages dont
+l'effectif vaut d'être survolé. Les deux chemins de rendu produisent alors le même html, et les dix
+lignes partent des cours.
+
+**`HCPC_tab()` gagne une légende là où elle n'en avait aucune.** `gda_render()` la coupait et la
+fonction n'en écrivait pas : ses exports html et md montraient un tableau coloré sans un mot sur ses
+couleurs. Celle de tabxplor est juste telle quelle — c'est une différence de points de pourcentage.
+`mean_sd_tab()`, dépréciée, cesse d'être la seule ligne non traduite du paquet : elle partage
+désormais le msgid `sd/mean` de `pca_interpret()`.
+
+**Le catalogue passe de 17 à 27 messages**, tous traduits, `tools::checkPoFile()` propre. ⚠ Un `%`
+suivi d'une lettre dans un msgid est lu comme une spécification de format : « the 50 % mark » est
+refusé, « of 50 % » passe. Le signe ferme donc la phrase.
+
+**Les tests changent d'objet.** Ils lisaient `attr(x, "subtext")`, c'est-à-dire une phrase ; ils
+lisent `tab_footer_text()`, c'est-à-dire ce qui s'imprime — plus un garde qui refuse toute valeur de
+`get_color_breaks()` recopiée dans le gabarit, et un autre sur les deux lignes de l'ACP.
+⚠ Les quatre instantanés de console bougent aussi pour une raison **étrangère** à la phase : depuis
+la phase 7 de tabxplor un tableau subordonné s'imprime **au-dessus** en console (« la dernière chose
+imprimée est l'objet qu'on peut piper »), et les instantanés dataient d'avant. Vérifié sur un
+`tab()` nu, hors de ggfacto.
+
+**Ce que la phase n'a pas fait.** Aucun graphique, aucun calcul, aucune valeur : le balisage du pied
+seul bouge. `mca_interpret()`, `ca_interpret()`, `pca_interpret()`, `HCPC_tab()` et `mean_sd_tab()`
+gardent leurs arguments. La phase 1g reste ouverte.
 
 ---
 

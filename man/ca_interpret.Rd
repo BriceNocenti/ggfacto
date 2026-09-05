@@ -4,7 +4,17 @@
 \alias{ca_interpret}
 \title{Helper table to interpret simple correspondence analysis}
 \usage{
-ca_interpret(res.ca, axes = 1:2, complete = FALSE, eig = TRUE, crosstab = NULL)
+ca_interpret(
+  res.ca,
+  axes = 1:2,
+  complete = FALSE,
+  min_contrib = NULL,
+  vars = NULL,
+  color = TRUE,
+  eig = TRUE,
+  n_axes = 8L,
+  lang = NULL
+)
 }
 \arguments{
 \item{res.ca}{An object created with \code{FactoMineR::\link[FactoMineR]{CA}}.}
@@ -14,14 +24,22 @@ ca_interpret(res.ca, axes = 1:2, complete = FALSE, eig = TRUE, crosstab = NULL)
 \item{complete}{Set to \code{TRUE} for the fuller summary: each side of the axis gains the point's
 coordinate and its cos2, and the table gains the spread between the two sides.}
 
+\item{min_contrib}{The contribution threshold, in percent. \code{NULL} (the default) is the mean
+contribution of the point's own set; \code{0} keeps every point.}
+
+\item{vars}{The two margins' names, as a character vector of length 2 --- \code{c("CSER",
+"PR2017")}. They cannot be recovered from the analysis: \code{FactoMineR::CA()} drops
+\code{names(dimnames())} from every matrix it keeps, so without this the table says
+\dQuote{Rows} and \dQuote{Columns}.}
+
+\item{color}{Set to \code{FALSE} to build the table with no colour measure.}
+
 \item{eig}{The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
 shows them, or that prints the summary several times to comment it column by column.}
 
-\item{crosstab}{The crosstab the analysis was made from, as a \code{tabxplor} table, to travel
-under the summary --- a correspondence analysis shows the STRUCTURE of the deviations of a
-crosstab and says nothing of their size, so the table is what keeps a reading honest. Build it
-with \code{tab(..., color = "contrib", display = "ctr", test = TRUE)} to see the same
-contributions cell by cell. It also names the two margins.}
+\item{n_axes}{How many axes the eigenvalue table prints; the last one is always shown besides.}
+
+\item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
 }
 \value{
 A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
@@ -38,9 +56,13 @@ The eigenvalues of the axes travel under the table.
 }
 \examples{
 \donttest{
-crosstab <- tabxplor::tab(forcats::gss_cat, race, marital, pct = "row")
+crosstab <- tabxplor::tab(forcats::gss_cat, race, marital)
 res.ca   <- FactoMineR::CA(as.matrix(crosstab), graph = FALSE)
-ca_interpret(res.ca, crosstab = crosstab)
+ca_interpret(res.ca, vars = c("race", "marital"))
+
+# a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of
+# their size, so the crosstab is asked for beside it, never instead of it:
+tabxplor::tab(forcats::gss_cat, race, marital, pct = "row", color = "contrib", test = TRUE)
 }
 }
 \seealso{

@@ -3,6 +3,17 @@
     Code
       print(mca_interpret(fx_mca(), axes = 1:2), n = Inf, width = Inf)
     Output
+      | Axe     |eigenvalue  |% variance  |cumul.  | |Benzecri's modified rate  |cumul. mod.  |
+      |:--------|-----------:|-----------:|-------:|-|-------------------------:|------------:|
+      |         | *Variance* |            |        | | *Benzecri*               |             |
+      |         |   *<var>*  |  *<col%>*  |        | |                *<col%>*  |             |
+      | Axe 1   |     0.234  |     23.4%  | 23.4%  | |                   82.6%  |      82.6%  |
+      | Axe 2   |     0.196  |     19.6%  | 43.0%  | |                   15.4%  |      98.0%  |
+      | Axe 3   |     0.177  |     17.7%  | 60.7%  | |                    2.0%  |       100%  |
+      | Axe 4   |     0.146  |     14.6%  | 75.4%  | |                          |             |
+      | Axe 5   |     0.131  |     13.1%  | 88.4%  | |                          |             |
+      |**Total**|   **0.884**|    **100%**|        | |                  **100%**|             |
+      
       # A tabxplor tab: 8 x 7
         Axe                                 Question       contrib Positive_levels
                                                             <col%>                
@@ -24,9 +35,14 @@
       6  20.8% "Not.evening"    10.9%
       7  13.3% "breakfast"      14.4%
       8  55.2% ""               36.3%
-      # contribution to Chi2 (vs the mean): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
-      # contrib: contribution to the variance of the axis, vs the mean contribution: ×1 ×2 ×5 ×10
-      
+      # contribution to the variance of the axis (vs the mean contribution): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
+      # contrib: the whole question's contribution to the axis
+
+---
+
+    Code
+      print(mca_interpret(fx_mca(), axes = 1:2, complete = TRUE), n = Inf, width = Inf)
+    Output
       | Axe     |eigenvalue  |% variance  |cumul.  | |Benzecri's modified rate  |cumul. mod.  |
       |:--------|-----------:|-----------:|-------:|-|-------------------------:|------------:|
       |         | *Variance* |            |        | | *Benzecri*               |             |
@@ -37,12 +53,7 @@
       | Axe 4   |     0.146  |     14.6%  | 75.4%  | |                          |             |
       | Axe 5   |     0.131  |     13.1%  | 88.4%  | |                          |             |
       |**Total**|   **0.884**|    **100%**|        | |                  **100%**|             |
-
----
-
-    Code
-      print(mca_interpret(fx_mca(), axes = 1:2, complete = TRUE), n = Inf, width = Inf)
-    Output
+      
       # A tabxplor tab: 8 x 12
         Axe                                 Question       contrib Positive_levels
                                                             <col%>                
@@ -64,28 +75,25 @@
       6  20.8%   0.84    37% "Not.evening"    10.9%    -0.44     37%   100%
       7  13.3%   0.55    33% "breakfast"      14.4%    -0.59     33%   100%
       8  55.2%               ""               36.3%                   88.6%
-      # contribution to Chi2 (vs the mean): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
-      # contrib: contribution to the variance of the axis, vs the mean contribution: ×1 ×2 ×5 ×10
+      # contribution to the variance of the axis (vs the mean contribution): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
+      # contrib: the whole question's contribution to the axis
       # coord: coordinate on the axis
       # cos2: quality of representation
       # spread: share of the group's contribution the gap between its two sides accounts for
-      
-      | Axe     |eigenvalue  |% variance  |cumul.  | |Benzecri's modified rate  |cumul. mod.  |
-      |:--------|-----------:|-----------:|-------:|-|-------------------------:|------------:|
-      |         | *Variance* |            |        | | *Benzecri*               |             |
-      |         |   *<var>*  |  *<col%>*  |        | |                *<col%>*  |             |
-      | Axe 1   |     0.234  |     23.4%  | 23.4%  | |                   82.6%  |      82.6%  |
-      | Axe 2   |     0.196  |     19.6%  | 43.0%  | |                   15.4%  |      98.0%  |
-      | Axe 3   |     0.177  |     17.7%  | 60.7%  | |                    2.0%  |       100%  |
-      | Axe 4   |     0.146  |     14.6%  | 75.4%  | |                          |             |
-      | Axe 5   |     0.131  |     13.1%  | 88.4%  | |                          |             |
-      |**Total**|   **0.884**|    **100%**|        | |                  **100%**|             |
 
 # the CA interpretation table is stable
 
     Code
       print(ca_interpret(fx_ca(), complete = TRUE), n = Inf, width = Inf)
     Output
+      | Axe     |eigenvalue  |% variance  |cumul.  |
+      |:--------|-----------:|-----------:|-------:|
+      |         | *Variance* |            |        |
+      |         |   *<var>*  |  *<col%>*  |        |
+      | Axe 1   |     0.041  |     88.8%  | 88.8%  |
+      | Axe 2   |     0.005  |     11.2%  |  100%  |
+      |**Total**|   **0.046**|    **100%**|        |
+      
       # A tabxplor tab: 9 x 11
         Axe                      Variable         Positive_levels    ctr  coord   cos2
                                                                   <col%> <mean> <row%>
@@ -109,35 +117,37 @@
       7 "Married"        21.1%    -0.05      8%  86.2%
       8 ""                                            
       9 ""               21.1%                   86.2%
-      # contribution to Chi2 (vs the mean): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
-      # contrib: contribution to the variance of the axis, vs the mean contribution: ×1 ×2 ×5 ×10
+      # contribution to the variance of the axis (vs the mean contribution): ×10 ×5 ×2 ×1 ×1 ×2 ×5 ×10
       # coord: coordinate on the axis
       # cos2: quality of representation
       # spread: share of the group's contribution the gap between its two sides accounts for
-      
-      | Axe     |eigenvalue  |% variance  |cumul.  |
-      |:--------|-----------:|-----------:|-------:|
-      |         | *Variance* |            |        |
-      |         |   *<var>*  |  *<col%>*  |        |
-      | Axe 1   |     0.041  |     88.8%  | 88.8%  |
-      | Axe 2   |     0.005  |     11.2%  |  100%  |
-      |**Total**|   **0.046**|    **100%**|        |
 
 # the PCA interpretation table is stable
 
     Code
       print(pca_interpret(fx_pca(), axes = 1:2), n = Inf, width = Inf)
     Output
+      | Axe     |eigenvalue  |% variance  |cumul.  |
+      |:--------|-----------:|-----------:|-------:|
+      |         | *Variance* |            |        |
+      |         |   *<var>*  |  *<col%>*  |        |
+      | Axe 1   |     5.086  |     72.7%  | 72.7%  |
+      | Axe 2   |     1.157  |     16.5%  | 89.2%  |
+      | Axe 3   |     0.345  |      4.9%  | 94.1%  |
+      | Axe 4   |     0.158  |      2.3%  | 96.4%  |
+      | Axe 5   |     0.129  |      1.8%  | 98.2%  |
+      |**Total**|   **6.875**|    **100%**|        |
+      
       # A tabxplor tab: 8 x 10
         variable mean_Variables sd_Variables `sd/mean_Variables` `coord_Axe 1`
                          <mean>         <sd>                <cv>        <mean>
-      1 mpg               20.09                                          -0.93
-      2 cyl                6.19                                           0.96
-      3 disp             230.72                                           0.95
-      4 hp               146.69                                           0.87
-      5 drat               3.60                                          -0.75
-      6 weight             3.22                                           0.88
-      7 qsec              17.85                                          -0.54
+      1 mpg               20.09         5.93                 30%         -0.93
+      2 cyl                6.19         1.76                 28%          0.96
+      3 disp             230.72       121.99                 53%          0.95
+      4 hp               146.69        67.48                 46%          0.87
+      5 drat               3.60         0.53                 15%         -0.75
+      6 weight             3.22         0.96                 30%          0.88
+      7 qsec              17.85         1.76                 10%         -0.54
       8 Total                                                                 
         `contrib_Axe 1` `cos2_Axe 1` `coord_Axe 2` `contrib_Axe 2` `cos2_Axe 2`
                  <col%>       <row%>        <mean>          <col%>       <row%>
@@ -149,21 +159,8 @@
       6             15%          78%          0.35             10%          12%
       7              6%          29%          0.81             56%          65%
       8            100%                                       100%             
-      # coord_Axe 1, coord_Axe 2: standardized difference (Total): -0.8 -0.4 -0.2 -0.1 +0.1 +0.2 +0.4 +0.8
-      # cos2_Axe 1, cos2_Axe 2: difference (Total): -30 -20 -10 -5 +5 +10 +20 +30
-      # coord: the variable's coordinate on the axis -- its correlation with it
+      # coord: coordinate on the axis (Total): -0.8 -0.4 -0.2 -0.1 +0.1 +0.2 +0.4 +0.8
+      # cos2: quality of representation (Total): -30 -20 -10 -5 +5 +10 +20 +30
       # contrib: its contribution to the variance of the axis; an axis sums to 100 %
-      # cos2: quality of representation -- the share of the variable's own variance this axis holds; a variable sums to 100 % over all the axes
-      # sd/mean: coefficient of variation -- the standard deviation as a percentage of the mean
-      
-      | Axe     |eigenvalue  |% variance  |cumul.  |
-      |:--------|-----------:|-----------:|-------:|
-      |         | *Variance* |            |        |
-      |         |   *<var>*  |  *<col%>*  |        |
-      | Axe 1   |     5.086  |     72.7%  | 72.7%  |
-      | Axe 2   |     1.157  |     16.5%  | 89.2%  |
-      | Axe 3   |     0.345  |      4.9%  | 94.1%  |
-      | Axe 4   |     0.158  |      2.3%  | 96.4%  |
-      | Axe 5   |     0.129  |      1.8%  | 98.2%  |
-      |**Total**|   **6.875**|    **100%**|        |
+      # sd/mean: coefficient of variation -- the standard deviation as a percentage of the mean, comparable between variables measured in different units
 
