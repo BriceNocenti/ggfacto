@@ -139,16 +139,19 @@ gda_plain <- function(x) {
   x
 }
 
-# THE one predicate for "does options(tabxplor.print) ask for html?", mirroring tabxplor's own
-# tx_print_html(): "kable" is its pre-2.0.0 synonym, kept working. There is no ggfacto option -- a
-# summary and a crosstab obey the same one, so a script sets it once.
-# WARNING: `isTRUE()`, not a bare `%in%`. tabxplor seeds the option in its .onLoad(), but ggfacto
-#   reaches it through `tabxplor::` alone, so `library(ggfacto)` leaves the namespace unloaded and
-#   the option UNSET -- on which a bare `%in%` yields logical(0) and `if` stops. Measured.
+# THE one reading of options(tabxplor.print) for a summary -- the three media tabxplor's own router
+# names: "html" (with "kable", its pre-2.0.0 synonym), "md", or the console. There is no ggfacto
+# option: a summary and a crosstab obey the same one, so a script sets it once.
+# WARNING: `%||%`, never a bare read. tabxplor seeds the option in its .onLoad(), but ggfacto reaches
+#   it through `tabxplor::` alone, so `library(ggfacto)` leaves the namespace unloaded and the option
+#   UNSET -- on which `switch()` stops. Measured.
+# DESIGN: an unknown value falls back to the console, which is what tabxplor's own router does with
+#   it -- a summary and the `tab()` two lines above must not disagree about a typo.
 #' @keywords internal
 #' @noRd
-gda_print_html <- function() {
-  isTRUE(getOption("tabxplor.print") %in% c("html", "kable"))
+gda_medium <- function() {
+  switch(getOption("tabxplor.print") %||% "console",
+         html = , kable = "html", md = "md", "console")
 }
 
 # The ONE html render, so print and knit_print cannot drift on the options only ggfacto knows.
@@ -172,14 +175,16 @@ gda_render <- function(x, ...) {
 #' @rdname ggfacto_summary
 #' @export
 print.ggfacto_summary <- function(x, ...) {
-  if (gda_print_html()) {
+  medium <- gda_medium()
+  if (identical(medium, "html")) {
     out <- gda_render(x, ...)
     print(out)
     return(invisible(out))
   }
-  # The medium is STATED for the delegated call, never left to be re-read: tabxplor's own print
-  # stops on an unset option, and `library(ggfacto)` alone leaves it unset (see gda_print_html()).
-  withr::with_options(list(tabxplor.print = "console"), print(gda_plain(x), ...))
+  # The medium is STATED for the delegated call, never left to be re-read: `library(ggfacto)` alone
+  # leaves the option unset (see gda_medium()). Console and markdown both delegate -- only html has
+  # arguments of its own, which is why it is the one branch here.
+  withr::with_options(list(tabxplor.print = medium), print(gda_plain(x), ...))
   invisible(x)
 }
 
@@ -187,8 +192,9 @@ print.ggfacto_summary <- function(x, ...) {
 #' @keywords internal
 #' @noRd
 knit_print.ggfacto_summary <- function(x, ...) {
-  if (gda_print_html()) return(knitr::knit_print(gda_render(x)))
-  withr::with_options(list(tabxplor.print = "console"),
+  medium <- gda_medium()
+  if (identical(medium, "html")) return(knitr::knit_print(gda_render(x)))
+  withr::with_options(list(tabxplor.print = medium),
                       knitr::knit_print(gda_plain(x), ...))
 }
 
