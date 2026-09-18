@@ -30,7 +30,7 @@ fx_active <- function() names(fx_tea())[1:6]
 # never the HCPC object itself.
 fx_tea_clust <- function() fx("tea_clust", function() {
   d <- fx_tea()
-  d$clust <- hierarchical_clust(fx_mca(), ncp = 3, nb.clust = 4, tree = FALSE)
+  d$clust <- hierarchical_clust(fx_mca(), ncp = 3, nb_clust = 4, tree = FALSE)
   d
 })
 

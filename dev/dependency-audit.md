@@ -166,12 +166,16 @@ Recorded so the question is not reopened.
 
 Applied in 0.4.0:
 
-- `Imports` --- dropped `gridExtra`, `ggforce`, `stringr`; added `stats`, `grDevices`, `scales`;
+- `Imports` --- dropped `gridExtra`, `ggforce`, `stringr`; added `stats`, `grDevices`, `graphics`, `scales`;
   `ggplot2` raised to `>= 3.4.0` and `R` to `>= 4.1.0` (the package already used `|>`, which 4.0
   does not have).
 - `Suggests` --- dropped `finalfit`, `stringi`, `kableExtra`; added `testthat`. `plotly`,
   `htmlwidgets` and `widgetframe` stay for good.
 - `data.table` --- dropped from `Imports` (see Tier 5).
+- `fastcluster` --- added to `Imports`: 1 package / 0.3 MB, no dependency of its own (139 to 140
+  packages, 218.3 to 218.6 MB on today's library, which has grown upstream since the figures
+  below). `hierarchical_clust()` builds its Ward tree with it in memory linear in the points,
+  where `FactoMineR::HCPC()` and the `flashClust` it imports need an n x n dissimilarity.
 - `magrittr` stays one deprecation cycle: every internal use is now `|>`, but `%>%` is still
   re-exported for users. It costs 0 MB, so there is no hurry.
 

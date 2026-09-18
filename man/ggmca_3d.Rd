@@ -81,7 +81,7 @@ ggmca_3d(res.mca)
 
 # 3D graph with colored clusters
 tea <- tea |>
-  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 ggmca_3d(res.mca, tea, clust = clust)
 }
 }

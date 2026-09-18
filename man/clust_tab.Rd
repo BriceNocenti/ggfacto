@@ -74,7 +74,7 @@ mean rows, and the last two rows give each cluster's share of the population and
 data(tea, package = "FactoMineR")
 res.mca <- multiple_correspondence_analysis(tea, 1:18)
 tea <- tea |>
-  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 
 # ONE option decides how every tabxplor table prints, an interpretation table included.
 # In a script it goes once, at the top, beside the library() calls.

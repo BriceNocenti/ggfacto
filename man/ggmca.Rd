@@ -307,7 +307,7 @@ ggmca(res.mca, ylim = c(NA, 1.2), active_tables = "active") |>
 
 # Graph with colored clusters (hierarchical clustering on the first three axes)
 tea <- tea |>
-  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 ggmca(res.mca, tea, clust = clust, profiles = TRUE)
 
 # Concentration ellipses for each levels of a supplementary variable :

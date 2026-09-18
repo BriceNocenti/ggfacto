@@ -4,51 +4,68 @@
 \alias{hierarchical_clust}
 \title{Hierarchical Clustering on the Axes of an Analysis}
 \usage{
-hierarchical_clust(res, ncp, nb.clust = -1, tree = nb.clust == -1, ...)
+hierarchical_clust(
+  res,
+  ncp,
+  nb_clust = -1,
+  tree = nb_clust == -1,
+  consol = TRUE,
+  margin = "rows"
+)
 }
 \arguments{
-\item{res}{An analysis made with \code{\link{multiple_correspondence_analysis}} or
-\code{\link{principal_component_analysis}} (or with \code{FactoMineR::MCA()} or
-\code{FactoMineR::PCA()}), keeping all its axes.}
+\item{res}{An analysis made with \code{\link{multiple_correspondence_analysis}},
+\code{\link{principal_component_analysis}} or \code{\link{correspondence_analysis}} (or with
+\code{FactoMineR::MCA()}, \code{FactoMineR::PCA()} or \code{FactoMineR::CA()}).}
 
 \item{ncp}{The number of axes to cluster on: the first ones, those worth interpreting (see the
 eigenvalues under \code{\link{mca_interpret}}). There is no default: on every axis, the
 clustering would follow noise.}
 
-\item{nb.clust}{The number of clusters. With `-1`, the default, the tree is cut where the gain in
+\item{nb_clust}{The number of clusters. With `-1`, the default, the tree is cut where the gain in
 between-cluster inertia drops the most.}
 
 \item{tree}{Should the clustering tree be drawn, to choose the number of clusters? By default,
-only when `nb.clust = -1`.}
+only when `nb_clust = -1`. Its leaves are the distinct points of the cloud: the answer profiles
+of a multiple correspondence analysis, the levels of a correspondence analysis.}
 
-\item{...}{Additional arguments to pass to \code{FactoMineR::\link[FactoMineR]{HCPC}}: with many
-individuals, `kk = 100` clusters them first into 100 groups, which is much faster.}
+\item{consol}{Set to `FALSE` to keep the clusters as the tree cuts them, without the k-means
+consolidation that then moves each individual to its nearest cluster.}
+
+\item{margin}{For a correspondence analysis, the levels to cluster: `"rows"`, the default, or
+`"columns"`.}
 }
 \value{
-A factor with the clusters, `"1"`, `"2"`, etc., returned invisibly: a bare call only
-draws the tree. Inside \code{dplyr::mutate()}, it has one
+A factor with the clusters, `"1"`, `"2"`, etc., numbered along the first axis and
+returned invisibly: a bare call only draws the tree. Inside \code{dplyr::mutate()}, it has one
 value per row of that data frame, and `NA` on the rows the analysis did not use (when it was made
 on a subset of the population). Outside \code{mutate()}, it has one value per row of the data
-frame the analysis started from.
+frame the analysis started from. For a correspondence analysis, each row of the data frame gets
+the cluster of its level (`NA` for a level outside the table); outside \code{mutate()}, there is
+one value per level, named after it.
 }
 \description{
-Clusters the individuals of a multiple correspondence analysis or of a principal component
-analysis on its first `ncp` axes, with \code{FactoMineR::\link[FactoMineR]{HCPC}}, and returns
-the clusters, one per row of the data. Use it inside \code{dplyr::mutate()} to add them to the
-data frame:
+Clusters the individuals of a principal component analysis or of a multiple correspondence
+analysis, or the levels of one margin of a correspondence analysis, on the first `ncp` axes. The
+clusters are those of \code{FactoMineR::\link[FactoMineR]{HCPC}}: Ward's hierarchical
+clustering, cut into `nb_clust` clusters, then consolidated by k-means. Use it inside
+\code{dplyr::mutate()} to add them to the data frame:
 
-`data <- data |> mutate(clust = hierarchical_clust(res, ncp = 3, nb.clust = 6))`
+`data <- data |> mutate(clust = hierarchical_clust(res, ncp = 3, nb_clust = 6))`
 
 To choose the number of clusters, look at the tree first: `hierarchical_clust(res, ncp = 3)`.
 The clusters can then be renamed with \code{forcats::fct_recode()}, described with
 \code{\link{clust_tab}} and drawn with \code{\link{ggmca}(clust = )}.
+
+Individuals giving the same answers share one point, and the tree is built on these distinct
+points: the memory it needs grows with their number, not with its square.
 }
 \examples{
 data(tea, package = "FactoMineR")
 res.mca <- multiple_correspondence_analysis(tea, 1:18)
 
 tea <- tea |>
-  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 
 clust_tab(tea, tidyselect::all_of(names(tea)[1:18]), clust)
 ggmca(res.mca, tea, clust = clust, profiles = TRUE)
@@ -58,5 +75,13 @@ res.mca_young <- tea |>
   dplyr::filter(age < 30) |>
   multiple_correspondence_analysis(1:18)
 tea <- tea |>
-  dplyr::mutate(clust_young = hierarchical_clust(res.mca_young, ncp = 3, nb.clust = 4))
+  dplyr::mutate(clust_young = hierarchical_clust(res.mca_young, ncp = 3, nb_clust = 4))
+
+# A correspondence analysis clusters the levels of one margin: each individual gets the
+# cluster of its level
+res.ca <- forcats::gss_cat |>
+  tabxplor::tab(relig, partyid) |>
+  correspondence_analysis()
+gss <- forcats::gss_cat |>
+  dplyr::mutate(relig_clust = hierarchical_clust(res.ca, ncp = 2, nb_clust = 4))
 }
