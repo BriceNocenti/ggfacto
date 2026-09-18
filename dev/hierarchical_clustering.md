@@ -265,7 +265,7 @@ Refused means "the fitted rows only": the subset data frame itself still works e
 
 The old research scripts extended clusters to a later survey by kNN on the MCA coordinates. The principled version is the k-means rule the consolidation already uses: project the other rows as supplementary individuals (the barycentric formula on the fitted levels, excluded levels left out) and give each the cluster of the nearest weighted centre on the `ncp` axes. It would be an argument of `hierarchical_clust()` (e.g. `extend = TRUE`), writing clusters on every row rather than `NA` outside the subset. It needs care with levels unseen in the fit and with specific MCA, and is not implemented.
 
-A class-specific MCA (`GDAtools::csMCA()`, the analysis of a subpopulation within the space of the whole one) is a different question, answered by a different analysis; `varsup()` already handles its supplementary variables.
+A class-specific MCA (`GDAtools::csMCA()`, the analysis of a subpopulation within the space of the whole one) is a different question, answered by a different analysis; ggfacto reads a `csMCA()` fit through its model, and `hierarchical_clust()` clusters its subcloud.
 
 ---
 
@@ -340,7 +340,7 @@ The MCA, as a student writes it:
 
 ```r
 acm <- multiple_correspondence_analysis(pc_AGD, all_of(variables_actives), wt = POND)
-mca_interpret(acm, axes = 1:3)
+interpret(acm, axes = 1:3)
 
 hierarchical_clust(acm, ncp = 3)                   # the tree, to choose the number of clusters
 
@@ -362,7 +362,7 @@ On a subpopulation, only the analysis's line changes (section 8.1). A PCA:
 
 ```r
 acp <- principal_component_analysis(ee_sal19, all_of(variables_actives), wt = EXTRID)
-pca_interpret(acp)
+interpret(acp)
 hierarchical_clust(acp, ncp = 2)
 ee_sal19 <- ee_sal19 |> mutate(cah = hierarchical_clust(acp, ncp = 2, nb_clust = 4))
 clust_tab(acp, ee_sal19, cah)                        # means, coloured in standard deviations

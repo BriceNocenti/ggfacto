@@ -8,8 +8,9 @@
 #     because of the package-level `. = NULL` binding.
 #   - WARNING -- several arguments are NESTED and test vacuously on their own:
 #       * keep_levels / discard_levels only act inside `if (length(sup_vars) != 0)`;
-#       * tooltip_vars / tooltip_vars_1lv only act when a tooltip is built at all, i.e. alongside
-#         sup_vars or active_tables -- on their own the result is byte-identical to a plain call;
+#       * tooltip_vars / tooltip_vars_1lv only act when a tooltip is built at all -- by default
+#         (active_tables = "active"), or alongside sup_vars -- so with active_tables = NULL alone
+#         the result is byte-identical to a plain call;
 #       * clust draws the profiles by default, and colours nothing under profiles = FALSE.
 #     Every case below therefore supplies the enabling argument too, and the vacuous paths are
 #     pinned explicitly so a future reader does not "simplify" them back into nothing.
@@ -69,6 +70,24 @@ test_that("the levels FactoMineR renames keep their data's names", {
   expect_setequal(interp$level[interp$group == "always"], c("n", "y"))
 })
 
+test_that("the plot model is the same whether FactoMineR saw the profiles or the individuals", {
+  d    <- fx_tea_wt()
+  prof <- md(fx_mca_wt(), d, sup_vars = SPC, profiles = TRUE)
+  ind  <- md(mca_ind(d, 1:6, wt = "w"), d, sup_vars = SPC, profiles = TRUE)
+  expect_equal(prof$vars_data, ind$vars_data, tolerance = 1e-10)
+  expect_equal(prof$ind_data, ind$ind_data, tolerance = 1e-10)
+  expect_equal(prof$individuals, ind$individuals, tolerance = 1e-10)
+})
+
+test_that("a GDAtools speMCA() is drawn like the equivalent specific MCA", {
+  skip_if_not_installed("GDAtools")
+  spe <- md(GDAtools::speMCA(fx_tea()[1:6], excl = 3), fx_tea(), sup_vars = SPC)$vars_data
+  gg  <- md(MCA2(fx_tea(), 1:6, excl = "Not.tea time"), fx_tea(), sup_vars = SPC)$vars_data
+  expect_identical(spe[c("vars", "lvs", "wcount", "begin_text")],
+                   gg[c("vars", "lvs", "wcount", "begin_text")])
+  expect_equal(abs(spe$`Dim 1`), abs(gg$`Dim 1`), tolerance = 1e-10)
+})
+
 test_that("lvs stays a FACTOR", {
   # It is the label a user renames or reorders between the halves, the forcats way.
   expect_s3_class(fx_pd_plain()$vars_data$lvs, "factor")
@@ -103,24 +122,49 @@ test_that("sup_vars adds supplementary rows in their own colour group", {
 
 test_that("sup_vars are read from `data`, so a column absent there is an error", {
   expect_error(md(fx_mca(), fx_tea(), sup_vars = "not_a_column"))
+  expect_error(md(fx_mca(), fx_tea(), sup_vars = not_a_column))
+})
+
+test_that("sup_vars takes bare names, as in tab(), strings, or a vector of names", {
+  bare <- md(fx_mca(), fx_tea(), sup_vars = c(SPC, sex))$vars_data
+  expect_true(all(c("SPC", "sex") %in% bare$vars))
+  expect_identical(md(fx_mca(), fx_tea(), sup_vars = c("SPC", "sex"))$vars_data, bare)
+  sup <- c("SPC", "sex")
+  expect_identical(md(fx_mca(), fx_tea(), sup_vars = sup)$vars_data, bare)
+  expect_identical(md(fx_mca(), fx_tea(), sup_vars = tidyselect::all_of(sup))$vars_data, bare)
+  expect_identical(suppressMessages(ggmca(fx_mca(), fx_tea(), sup_vars = c(SPC, sex),
+                                         get_data = TRUE))$vars_data$vars,
+                   suppressMessages(ggmca(fx_mca(), fx_tea(), sup_vars = sup,
+                                          get_data = TRUE))$vars_data$vars)
+})
+
+test_that("a supplementary level sits at the barycentre of its individuals, over sqrt(eigenvalue)", {
+  d  <- fx_tea_wt()
+  vd <- md(fx_mca_wt(), d, sup_vars = SPC)$vars_data
+  x  <- axis_coord(fx_mca_wt(), 1)
+  bary <- tapply(d$w * x, d$SPC, sum) / tapply(d$w, d$SPC, sum) / fx_mca_wt()$svd$vs[1]
+  got  <- vd$`Dim 1`[vd$vars == "SPC"]
+  names(got) <- as.character(vd$lvs[vd$vars == "SPC"])
+  expect_equal(got[names(bary)], c(bary), tolerance = 1e-10, ignore_attr = TRUE)
 })
 
 # --- active_tables: the crosstabs that are the package's whole point ----------------------------
 
-test_that("active_tables puts the crosstabs in the tooltip body", {
-  # This is the bet: the Burt table travels inside the hover of each point.
-  plain  <- md(fx_mca(), fx_tea())
+test_that("the crosstabs are in the tooltip body by default, and active_tables = NULL removes them", {
+  # This is the bet: the Burt table travels inside the hover of each point, unasked.
+  plain  <- md(fx_mca(), fx_tea(), active_tables = NULL)
   active <- fx_pd_active()
 
   expect_true(all(is.na(plain$vars_data$interactive_text)))
   expect_match(active$vars_data$interactive_text[1], "Active variables")
+  expect_identical(md(fx_mca())$vars_data, active$vars_data)
 })
 
 test_that("wcount is present on every path, and agrees with the crosstabs where both exist", {
   # wcount used to appear only when a tooltip table had been built, which left type = "points"
   # -- it sizes points by wcount -- failing on a plain call. It is now derived from the column
   # margin whenever the crosstabs do not supply it, and the two must agree exactly.
-  plain  <- md(fx_mca(), fx_tea())
+  plain  <- md(fx_mca(), fx_tea(), active_tables = NULL)
   active <- fx_pd_active()
 
   expect_true("wcount" %in% names(plain$vars_data))
@@ -153,8 +197,8 @@ test_that("tooltip_vars only acts when a tooltip is built at all", {
   # WARNING: this is the vacuous path. Without sup_vars/active_tables no tooltip is built, so
   # tooltip_vars changes precisely nothing -- a test that omitted active_tables would pass while
   # exercising none of the code it claims to cover.
-  plain <- md(fx_mca(), fx_tea())
-  alone <- md(fx_mca(), fx_tea(), tooltip_vars = "SPC")
+  plain <- md(fx_mca(), fx_tea(), active_tables = NULL)
+  alone <- md(fx_mca(), fx_tea(), active_tables = NULL, tooltip_vars = "SPC")
   expect_identical(plain, alone)
 
   expect_false(grepl("Distribution by", fx_pd_active()$vars_data$interactive_text[1]))
@@ -267,8 +311,8 @@ test_that("a profile split between clusters takes the one weighing most", {
   heavier <- names(which.max(tapply(d$w[rows], d$split[rows], sum)))
 
   ind  <- md(fx_mca_wt(), d, clust = "split", profiles = TRUE)$ind_data
-  here <- abs(ind$`Dim 1` - fx_mca_wt()$ind$coord[rows[1], 1]) < 1e-9 &
-    abs(ind$`Dim 2` - fx_mca_wt()$ind$coord[rows[1], 2]) < 1e-9
+  coord <- axis_coord(fx_mca_wt(), 1:2)[rows[1], ]
+  here <- abs(ind$`Dim 1` - coord$axis1) < 1e-9 & abs(ind$`Dim 2` - coord$axis2) < 1e-9
   expect_equal(sum(here), 1L)
   expect_equal(as.character(ind$clust[here]), heavier)
 })

@@ -1,5 +1,7 @@
-# PURPOSE: the interpretation tables -- mca_interpret(), ca_interpret(), pca_interpret(), and the
-#   contract they share with clust_tab() and mean_sd_tab().
+# PURPOSE: the interpretation tables -- interpret() and its three builders, mca_interpret(),
+#   ca_interpret() and pca_interpret() -- and the contract they share with clust_tab() and
+#   mean_sd_tab(). interpret() dispatches on the analysis; an MCA is read through its model
+#   (R/model.R), whatever engine made it.
 # ROLE: reading a factorial analysis WITHOUT the cloud: which points build an axis, on which side,
 #   and how well the axis represents them. One family, one output contract.
 # KEY CONSTRAINTS:
@@ -44,8 +46,8 @@
 #' The interpretation tables, and how they print
 #'
 #' @description
-#' \code{\link{mca_interpret}}, \code{\link{ca_interpret}}, \code{\link{pca_interpret}},
-#' \code{\link{clust_tab}} and \code{\link{mean_sd_tab}} all return \strong{one}
+#' \code{\link{interpret}} (for the three analyses), \code{\link{clust_tab}} and
+#' \code{\link{mean_sd_tab}} all return \strong{one}
 #' \code{tabxplor} table, so it can be piped, filtered and exported like any other. What differs is
 #' only how it is \emph{shown}:
 #'
@@ -90,7 +92,7 @@
 #' share of the point's own variance the axis holds), plus the \emph{spread} between the two sides.
 #' Neither is coloured there: a coordinate in axis standard deviations has no conventional cut-off,
 #' and an MCA cloud has so many axes that every cos2 is small --- the 50 \% / 75 \% rule a
-#' \code{\link{pca_interpret}} table reads does not transfer. Both are read by comparing the points
+#' \code{\link{interpret}} table of a PCA reads does not transfer. Both are read by comparing the points
 #' shown; only the contribution carries an absolute threshold.
 #'
 #' @section The footer:
@@ -98,7 +100,7 @@
 #' chi-squared, so \code{\link[tabxplor]{set_legend_words}} re-states what the ladder grades and
 #' nothing else. It is therefore built at render, in the language and the palette of the call that
 #' prints it, with its coloured swatches, in all five media. \strong{Nothing to suppress}: a call
-#' written by hand is just \code{mca_interpret(res.mca) |> tab_md(css = FALSE, print = FALSE)}.
+#' written by hand is just \code{interpret(res.mca) |> tab_md(css = FALSE, print = FALSE)}.
 #' Under it, one plain line names each statistic the colours do \emph{not} grade.
 #'
 #' @section After a dplyr verb:
@@ -108,7 +110,7 @@
 #' either way. What is lost is only the hover policy and the margin names.
 #'
 #' @name ggfacto_summary
-#' @seealso [mca_interpret()], [ca_interpret()], [pca_interpret()], [clust_tab()], [mean_sd_tab()].
+#' @seealso [interpret()], [clust_tab()], [mean_sd_tab()].
 NULL
 
 
@@ -205,7 +207,9 @@ knit_print.ggfacto_summary <- function(x, ...) {
 
 #' Benzecri's modified rate of variance
 #'
-#' @param res.mca The result of \link[FactoMineR]{MCA}.
+#' @param res.mca A multiple correspondence analysis, made with
+#' \code{\link{multiple_correspondence_analysis}} (or \code{FactoMineR::MCA()},
+#' \code{GDAtools::speMCA()} or \code{csMCA()}).
 #' @param fmt By default, the result is given as a numeric vector. Set to `TRUE` to have
 #' a \pkg{tabxplor} \code{link[tabxplor]{fmt}} vector instead.
 #'
@@ -218,7 +222,8 @@ knit_print.ggfacto_summary <- function(x, ...) {
 #' benzecri_mrv(res.mca)
 benzecri_mrv <- function(res.mca, fmt = FALSE) {
   Q   <- length(res.mca$call$quali)
-  eig <- purrr::keep(res.mca$eig[, 1], res.mca$eig[, 1] > 1/Q)
+  eig <- eig_table(res.mca)[, 1]
+  eig <- eig[eig > 1/Q]
   eig <- (Q/(Q-1))^2 * (eig - 1/Q)^2
   eig <- eig/sum(eig)
 
@@ -583,46 +588,66 @@ gda_poles_glossary <- function(contrib = TRUE, complete = FALSE, color = TRUE) {
 
 # === SECTION: multiple correspondence analysis =====================================================
 
-# res.mca -> one row per (axis, active level). `set` is a single value: every active level of an MCA
-# belongs to one population whose contributions sum to 100 % per axis.
+# The model of an MCA -> one row per (axis, active level). `set` is a single value: every active
+# level of an MCA belongs to one population whose contributions sum to 100 % per axis.
 #' @keywords internal
 #' @noRd
-mca_interpret_data <- function(res.mca, axes) {
-  # WARNING: FactoMineR's rows are read by POSITION (mca_levels()): it renames levels.
-  lv <- mca_levels(res.mca)
-  lv <- lv[lv$kept, ]
+mca_interpret_data <- function(m, axes) {
+  if (!inherits(m, "ggfacto_mca_model")) m <- mca_model(m)
+  lv <- m$levels[m$levels$kept, ]
   purrr::map_dfr(axes, function(a) tibble::tibble(
     axis  = as.character(a),
     set   = factor("levels"),
     group = lv$vars,
     level = lv$lvs,
-    coord = res.mca$var$coord[, a],
-    ctr   = res.mca$var$contrib[, a],
-    cos2  = res.mca$var$cos2[, a],
+    coord = m$var$coord[, a],
+    ctr   = m$var$contrib[, a],
+    cos2  = m$var$cos2[, a],
     fk    = lv$freq,
-    eig   = res.mca$eig[a, 1],
-    pct   = round(res.mca$eig[a, 2], 1)
+    eig   = m$eig[a, 1],
+    pct   = round(m$eig[a, 2], 1)
   ))
 }
 
 
-#' Helper table to interpret multiple correspondence analysis
-#' @description A table to help to interpret the meaning of axes in multiple
-#' correspondence analysis (MCA), based on Brigitte Le Roux, \emph{Analyse geometrique des
-#' donnees multidimensionnelles}, Dunod, Paris, 2014 / Brigitte Le Roux and Henri Rouanet,
-#' \emph{Geometric data analysis : from correspondence analysis to structured data
-#' analysis}, Kluwer, Boston, 2004. Only levels whose relative contribution to the
-#' variance of axis is superior to the mean contribution are kept. The spread between
-#' positive levels and negative levels of the same variable is calculated in percentages
-#' of the variance of the question/variable.
+#' Interpret the Axes of an Analysis
 #'
-#' The eigenvalues of the axes travel under the table, Benzecri's modified rate beside them.
-#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-#' @param axes The axes to interpret, as an integer vector. Default to the first five axes.
-#' @param complete Set to \code{TRUE} for the fuller summary: each side of the axis gains the
-#' level's coordinate and its cos2, and the table gains the spread between the two sides.
-#' @param min_contrib The contribution threshold, in percent. \code{NULL} (the default) is the mean
-#' contribution of the point's own set; \code{0} keeps every point.
+#' @description
+#' One table to read the axes of a factorial analysis, whatever the analysis:
+#'
+#' \itemize{
+#'   \item a \strong{multiple correspondence analysis}: per axis, the active levels contributing more
+#'   than the mean contribution, the positive side facing the negative one, and the spread between
+#'   the two sides in percent of each question's contribution (Brigitte Le Roux and Henri Rouanet,
+#'   \emph{Geometric data analysis}, Kluwer, 2004; Brigitte Le Roux, \emph{Analyse geometrique des
+#'   donnees multidimensionnelles}, Dunod, 2014);
+#'   \item a \strong{correspondence analysis}: the same for the row points and the column points,
+#'   each margin against its own mean contribution, since each sums to 100 % of the axis over a
+#'   different number of points;
+#'   \item a \strong{principal component analysis}: each active variable's mean and spread, then,
+#'   per axis, its coordinate --- which under `scale.unit` IS its correlation with the axis ---, its
+#'   contribution and its cos2.
+#' }
+#'
+#' The eigenvalues of the axes travel under the table, with Benzecri's modified rate for an MCA.
+#' `mca_interpret()` and `pca_interpret()` are the same tables, for one analysis each.
+#'
+#' @param res An analysis made with \code{\link{multiple_correspondence_analysis}},
+#' \code{\link{correspondence_analysis}} or \code{\link{principal_component_analysis}} (or with
+#' \code{FactoMineR::MCA()}, \code{CA()} or \code{PCA()}, or \code{GDAtools::speMCA()} or
+#' \code{csMCA()}).
+#' @param ... The arguments below. A correspondence analysis takes one more, `vars`: the two
+#' margins' names, as in `vars = c("CSER", "PR2017")`. By default, the names
+#' \code{\link{correspondence_analysis}} kept; after a bare \code{FactoMineR::CA()}, which keeps
+#' none, the table says \dQuote{Rows} and \dQuote{Columns}.
+#' @param res.mca,res.pca The analysis, for `mca_interpret()` and `pca_interpret()`.
+#' @param axes The axes to interpret, as an integer vector. By default, the first five of an MCA,
+#' two of a CA, three of a PCA.
+#' @param complete For an MCA or a CA, set to \code{TRUE} for the fuller summary: each side of the
+#' axis gains the point's coordinate and its cos2, and the table gains the spread between the two
+#' sides.
+#' @param min_contrib For an MCA or a CA, the contribution threshold, in percent. \code{NULL} (the
+#' default) is the mean contribution of the point's own set; \code{0} keeps every point.
 #' @param color Set to \code{FALSE} to build the table with no colour measure, and no data bar
 #' under the eigenvalues.
 #' @param eig The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
@@ -637,19 +662,55 @@ mca_interpret_data <- function(res.mca, axes) {
 #'
 #' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
 #' @export
-#' @seealso [ggfacto_summary], [ca_interpret()], [pca_interpret()], [benzecri_mrv()].
+#' @seealso [ggfacto_summary], [benzecri_mrv()].
 #' @examples \donttest{
-#' data(tea, package = "FactoMineR")
-#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
-#'
 #' # ONE option decides how every tabxplor table prints, an interpretation table included.
 #' # In a script it goes once, at the top, beside the library() calls.
 #' options(tabxplor.print = "html")
-#' mca_interpret(res.mca)
-#' mca_interpret(res.mca, axes = 1:2, complete = TRUE)
+#'
+#' data(tea, package = "FactoMineR")
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
+#' interpret(res.mca)
+#' interpret(res.mca, axes = 1:2, complete = TRUE)
+#'
+#' # a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of
+#' # their size, so the crosstab is asked for beside it, never instead of it:
+#' crosstab <- tabxplor::tab(forcats::gss_cat, race, marital)
+#' interpret(correspondence_analysis(crosstab))
+#' tabxplor::tab(forcats::gss_cat, race, marital, pct = "row", color = "contrib", test = TRUE)
+#'
+#' cars <- dplyr::rename(mtcars[1:7], weight = wt)
+#' interpret(principal_component_analysis(cars, 1:7))
 #' }
+interpret <- function(res, ...) UseMethod("interpret")
+
+#' @export
+#' @noRd
+interpret.MCA <- function(res, ...) mca_interpret(res, ...)
+
+#' @export
+#' @noRd
+interpret.speMCA <- function(res, ...) mca_interpret(res, ...)
+
+#' @export
+#' @noRd
+interpret.CA <- function(res, ...) ca_interpret(res, ...)
+
+#' @export
+#' @noRd
+interpret.PCA <- function(res, ...) pca_interpret(res, ...)
+
+#' @export
+#' @noRd
+interpret.default <- function(res, ...) stop(
+  "interpret() reads a multiple correspondence, correspondence or principal component analysis, ",
+  "made with multiple_correspondence_analysis(), correspondence_analysis() or ",
+  "principal_component_analysis().", call. = FALSE)
+
+#' @rdname interpret
+#' @export
 mca_interpret <- function(res.mca,
-                          axes = 1:min(res.mca$call$ncp, 5),
+                          axes = 1:5,
                           complete = FALSE,
                           min_contrib = NULL,
                           color = TRUE,
@@ -659,21 +720,20 @@ mca_interpret <- function(res.mca,
                           type = NULL,
                           spread = NULL) {
   if (!is.null(spread)) complete <- renamed_arg(spread, "spread", "complete", "mca_interpret")
-  # the guard `ca_interpret()` and `pca_interpret()` already had: an axis the fit did not keep
-  # indexes past the end of `$var$coord` and returns garbage rather than stopping.
-  axes <- axes[axes <= nrow(res.mca$eig)]
+  model <- mca_model(res.mca)
+  # an axis the fit did not keep would index past the end of `$var$coord`: it is left out
+  axes <- axes[axes <= ncol(model$var$coord)]
   if (!is.null(type))   renamed_arg(type, "type", "options(tabxplor.print)", "mca_interpret")
   with_gda_lang(lang, function(lg) {
 
-  long   <- mca_interpret_data(res.mca, axes)
+  long   <- mca_interpret_data(model, axes)
   packed <- gda_poles(long, min_contrib)
 
   mrv     <- benzecri_mrv(res.mca)
   # The cloud's axis count, which `ncp` does not touch: an MCA has (active levels - questions) axes.
   # Read off `$var$coord`, whose ROWS are the levels (only its columns are truncated by `ncp`).
-  eig_tab <- gda_eig_tab(res.mca$eig, n_ind = nrow(res.mca$call$X), mrv = mrv, n_axes = n_axes,
-                         n_total = nrow(res.mca$var$coord) - length(res.mca$call$quali),
-                         color = color)
+  eig_tab <- gda_eig_tab(model$eig, n_ind = model$n, mrv = mrv, n_axes = n_axes,
+                         n_total = nrow(model$var$coord) - model$Q, color = color)
 
   # The axis heading states the raw eigenvalue percentage AND Benzecri's modified rate, which is the
   # number that corrects it -- an MCA's raw percentages understate the first axes badly. An axis
@@ -685,7 +745,7 @@ mca_interpret <- function(res.mca,
                            packed$axis, gda_num(packed$pct, lg), round(m)))
 
   gda_poles_tab(packed, axis_label = label, group_name = "Question",
-                n_ind = nrow(res.mca$call$X),
+                n_ind = model$n,
                 eig_tab = if (eig) eig_tab, contrib = TRUE, complete = complete, color = color)
   })
 }
@@ -714,50 +774,12 @@ ca_interpret_data <- function(res.ca, axes, var_names) {
 }
 
 
-#' Helper table to interpret simple correspondence analysis
-#' @description
-#' The counterpart of \code{\link{mca_interpret}} for a simple correspondence analysis: per axis, the
-#' row points and the column points whose contribution to its variance is above the mean, the
-#' positive side facing the negative one. The two margins are two populations --- each sums to 100 %
-#' of the axis over a different number of points --- so each has its own threshold and its own
-#' summary row, whose two figures say whether the axis opposes two poles or one specific group to the
-#' average of the population.
-#'
-#' The eigenvalues of the axes travel under the table.
-#' @param res.ca An object created with \code{\link{correspondence_analysis}} or
-#' \code{FactoMineR::\link[FactoMineR]{CA}}.
-#' @param axes The axes to interpret, as an integer vector.
-#' @param complete Set to \code{TRUE} for the fuller summary: each side of the axis gains the point's
-#' coordinate and its cos2, and the table gains the spread between the two sides.
-#' @param vars The two margins' names, as a character vector of length 2 --- \code{c("CSER",
-#' "PR2017")}. By default, the names \code{\link{correspondence_analysis}} kept; after a bare
-#' \code{FactoMineR::CA()}, which keeps none, the table says \dQuote{Rows} and \dQuote{Columns}.
-#' @param min_contrib The contribution threshold, in percent. \code{NULL} (the default) is the mean
-#' contribution of the point's own set; \code{0} keeps every point.
-#' @param color Set to \code{FALSE} to build the table with no colour measure, and no data bar
-#' under the eigenvalues.
-#' @param eig The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
-#' shows them, or that prints the summary several times to comment it column by column.
-#' @param n_axes How many axes the eigenvalue table prints. When some are left out, an ellipsis
-#' row states how many the cloud has.
-#' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
-#'
-#' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
-#' @export
-#' @seealso [ggfacto_summary], [mca_interpret()], [ggca()].
-#' @examples \donttest{
-#' crosstab <- tabxplor::tab(forcats::gss_cat, race, marital)
-#' res.ca   <- correspondence_analysis(crosstab)
-#'
-#' # ONE option decides how every tabxplor table prints, an interpretation table included.
-#' # In a script it goes once, at the top, beside the library() calls.
-#' options(tabxplor.print = "html")
-#' ca_interpret(res.ca)
-#'
-#' # a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of
-#' # their size, so the crosstab is asked for beside it, never instead of it:
-#' tabxplor::tab(forcats::gss_cat, race, marital, pct = "row", color = "contrib", test = TRUE)
-#' }
+# The counterpart of mca_interpret() for a simple correspondence analysis, reached through
+# interpret(): per axis, the row points and the column points above their own mean contribution,
+# the positive side facing the negative one. The two margins are two populations, each with its own
+# threshold and its own summary row.
+#' @keywords internal
+#' @noRd
 ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NULL,
                          vars = NULL, color = TRUE, eig = TRUE, n_axes = 8L, lang = NULL) {
   with_gda_lang(lang, function(lg) {
@@ -786,39 +808,8 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
 
 # === SECTION: principal component analysis ========================================================
 
-#' Colored Table to Help Interpretation of Principal Component Analysis
-#'
-#' @description
-#' One row per active variable, one block of three columns per axis: its coordinate --- which under
-#' \code{scale.unit} IS its correlation with the axis ---, its contribution to the variance of the
-#' axis, and its cos2, the share of its own variance the axis holds.
-#'
-#' The eigenvalues of the axes travel under the table.
-#' @param res.pca The result of \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.
-#' @param axes The axes to print, as a numeric vector.
-#' @param color Set to \code{FALSE} to build the table with no colour measure, and no data bar
-#' under the eigenvalues.
-#' @param eig The eigenvalues travel under the table. Set to \code{FALSE} in a document that already
-#' shows them, or that prints the summary several times to comment it column by column.
-#' @param n_axes How many axes the eigenvalue table prints. When some are left out, an ellipsis
-#' row states how many the cloud has.
-#' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
-#'
-#' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
+#' @rdname interpret
 #' @export
-#' @seealso [ggfacto_summary], [mca_interpret()], [ggpca_cor_circle()].
-#'
-#'@examples
-#'
-#' data(mtcars, package = "datasets")
-#' mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
-#' res.pca <- FactoMineR::PCA(mtcars, graph = FALSE)
-#'
-#' # ONE option decides how every tabxplor table prints, an interpretation table included.
-#' # In a script it goes once, at the top, beside the library() calls.
-#' options(tabxplor.print = "html")
-#' pca_interpret(res.pca)
-#'
 pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes = 8L,
                           lang = NULL) {
   with_gda_lang(lang, function(lg) {

@@ -22,7 +22,7 @@ One row per numeric variable: its base, its mean, its standard deviation, and it
 variation --- the standard deviation as a percentage of the mean, which is what lets two variables
 measured in different units be compared for how dispersed they are.
 
-\strong{Deprecated}: \code{\link{pca_interpret}} now opens with the same three figures, taken
+\strong{Deprecated}: \code{\link{interpret}} now opens with the same three figures, taken
 from the analysis itself, so the description and the interpretation are one table and cannot
 disagree. Use it instead; this function still works and will be removed in a future release.
 }
@@ -30,5 +30,5 @@ disagree. Use it instead; this function still works and will be removed in a fut
 mean_sd_tab(mtcars, 1:7)
 }
 \seealso{
-[ggfacto_summary], [pca_interpret()].
+[ggfacto_summary], [interpret()].
 }

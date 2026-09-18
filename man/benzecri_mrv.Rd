@@ -7,7 +7,9 @@
 benzecri_mrv(res.mca, fmt = FALSE)
 }
 \arguments{
-\item{res.mca}{The result of \link[FactoMineR]{MCA}.}
+\item{res.mca}{A multiple correspondence analysis, made with
+\code{\link{multiple_correspondence_analysis}} (or \code{FactoMineR::MCA()},
+\code{GDAtools::speMCA()} or \code{csMCA()}).}
 
 \item{fmt}{By default, the result is given as a numeric vector. Set to `TRUE` to have
 a \pkg{tabxplor} \code{link[tabxplor]{fmt}} vector instead.}

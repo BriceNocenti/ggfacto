@@ -26,13 +26,13 @@
 #' @param ... Additional arguments to pass to \code{\link[FactoMineR]{CA}}.
 #'
 #' @return A `CA` object from \pkg{FactoMineR}, which remembers the names of the two variables, so
-#' that \code{\link{ca_interpret}} can print them.
+#' that \code{\link{interpret}} can print them.
 #' @export
 #'
 #' @examples
 #' tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
 #' res.ca <- correspondence_analysis(tableau)
-#' ca_interpret(res.ca)
+#' interpret(res.ca)
 #' ggca(res.ca) |> ggi()
 correspondence_analysis <- function(table, ncp = Inf, ...) {
   if (inherits(table, "tabxplor_tab")) {
@@ -55,7 +55,7 @@ correspondence_analysis <- function(table, ncp = Inf, ...) {
 
   res <- FactoMineR::CA(X, ncp = ncp, graph = FALSE, ...)
   # WARNING: FactoMineR::CA() drops `names(dimnames())` from every matrix it keeps; they are written
-  #   back on `call$X`, where ca_interpret() reads the names of the two variables.
+  #   back on `call$X`, where interpret() reads the names of the two variables.
   names(dimnames(res$call$X)) <- names(dimnames(X))
   res
 }

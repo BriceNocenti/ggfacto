@@ -14,7 +14,7 @@ ggfacto calls exactly three FactoMineR functions: `MCA()` (`R/mca-data.R`), `PCA
 - **CA** --- `eig`; `row` and `col`, each with `coord`, `contrib` and `cos2`; `row.sup$coord` and `col.sup$coord`; and in `call`: `X`, `Xtot`, `marge.row` and `marge.col`.
 - **PCA** --- `eig`; `var` and `ind`, each with `coord`, `contrib` and `cos2`; `svd$V` and `svd$vs`; and in `call`: `X`, `centre`, `ecart.type`, `col.w`, `row.w`, `quali.sup` and `quanti.sup`.
 
-It never reads `var$eta2`, `var$v.test`, the fitted supplementary elements, `svd$U`, or an MCA's individual contributions and cos2. Supplementary variables are projected at plot time by the vendored `varsup()`.
+It never reads `var$eta2`, `var$v.test`, the fitted supplementary elements, `svd$U`, or an MCA's individual contributions and cos2. Supplementary variables are projected at plot time, as barycentres over the answer profiles.
 
 Two FactoMineR conventions leak into the code:
 
@@ -190,7 +190,7 @@ It composes with what exists:
   | Enquête Emploi, 1 million rows |        3.78 s |     0.86 s |
 
   This needs no new engine, and is the largest single saving available to a student (section 2.4).
-- **Ellipses.** They are `stat_ellipse(type = "t")`, ggplot2's robust ellipse (`MASS::cov.trob()`), weighted by `row.w` since ggplot2 4.0.0. `cov.trob()` treats a weight as a count of identical cases, so the same ellipse follows from the (profile × level) weights.
+- **Ellipses.** They are `stat_ellipse(type = "t")`, ggplot2's robust ellipse (`MASS::cov.trob()`), weighted by `row.w` since ggplot2 4.0.0. ⚠ They cannot be drawn from the (profile × level) weights: ggplot2 sizes the radius on `nrow(data) - 1` degrees of freedom (`calculate_ellipse()`), and `cov.trob()` tests its convergence on absolute weights. The plot model keeps one row per individual for them.
 - **Clustering.** The Ward tree already works on the distinct points (`R/clust.R`), which are the profiles. Its time is quadratic in P, so at 15 questions over several years (P ≈ 600 000) the tree, not the MCA, is the limit.
 
 ### 4.6 What stays n-sized
@@ -272,12 +272,7 @@ Parity:
 
 For a CA or a PCA the tables are small: an engine of our own gains no speed there, only the dependency.
 
-What a native engine would let ggfacto delete:
-
-- `varsup()`, 95 lines whose GDAtools branches are dead (section 7), replaced by the 14-line crosstab projection.
-- The `"Dim k"` / `"Dim.k"` duality, across 61 sites.
-- The four derivations of the active side.
-- Every read of `call$Xtot` and `call$X`.
+What a native engine would still let ggfacto delete: the `"Dim k"` / `"Dim.k"` duality, across 61 sites. The rest — `varsup()`, the derivations of the active side, the reads of `call$X` and `call$Xtot` — went with the profile-centric reader, FactoMineR staying the engine (`R/model.R`).
 
 ---
 
@@ -300,7 +295,7 @@ A FactoMineR-shaped object works in all three **without FactoMineR loaded**, sin
 
 explor keeps working.
 
-⚠ **ggfacto today rejects a GDAtools fit.** `ggmca()`, `mca_interpret()` and `benzecri_mrv()` all fail on `speMCA()`, so `varsup()`'s five-class dispatch serves nothing.
+ggfacto reads GDAtools' `speMCA()` and `csMCA()` fits through the same model as its own (`R/model.R`): GDAtools orients some axes the other way and rounds its coordinates and contributions to six decimals, both harmless.
 
 ### 7.1 A profile-fitted object, and what can be slimmed
 
@@ -369,17 +364,14 @@ ggfacto sits in a community with its ways: FactoMineR (Husson, Josse, Lê, Mazet
 
 - The object keeps FactoMineR's class first and FactoMineR's slot names, so factoextra, explor, GDAtools, Factoshiny and FactoInvestigate keep working (section 7).
 - No FactoMineR method is ever overwritten.
-- ggfacto keeps accepting FactoMineR fits, and should start accepting GDAtools' `speMCA()` and `csMCA()`.
+- ggfacto accepts FactoMineR fits and GDAtools' `speMCA()` and `csMCA()`.
 - A parity test pins the latest FactoMineR release, from `Suggests`, in CI. A divergence is reported upstream, never silently kept.
 
 **Attribution.** The CRAN Repository Policy:
 
 > Where code is copied (or derived) from the work of others (including from R itself), care must be taken that any copyright/license statements are preserved and authorship is not misrepresented. Preferably, an 'Authors@R' field would be used with 'ctb' roles for the authors of such code. [...] Where copyrights are held by an entity other than the package authors, this should preferably be indicated via 'cph' roles in the 'Authors@R' field.
 
-`Authors@R` credits, as `ctb` and `cph`:
-
-- **Nicolas Robette**, for `varsup()`, copied from GDAtools (GPL ≥ 2);
-- **François Husson, Guillaume Le Ray and Quentin Molto**, the authors of `HCPC()`, for the cut rule and the tree plot `R/clust.R` derives from it.
+`Authors@R` credits, as `ctb` and `cph`, **François Husson, Guillaume Le Ray and Quentin Molto**, the authors of `HCPC()`, for the cut rule and the tree plot `R/clust.R` derives from it. No code copied from GDAtools remains (`varsup()` gave way to the barycentre over the answer profiles).
 
 `inst/CITATION` cites ggfacto, then the software and methods it rests on:
 
@@ -396,7 +388,7 @@ ggfacto is GPL ≥ 3, compatible with both.
 **Talk before code.**
 
 - Open a FactoMineR issue with section 2's measurements and the profile result before any vendoring.
-- Tell Robette about the `varsup()` credit and the coming `speMCA()` support.
+- Tell Robette that ggfacto reads `speMCA()` and `csMCA()` fits.
 - Ask Barnier whether explor would read a lighter object.
 
 Where the community meets:
@@ -434,12 +426,12 @@ Where the community meets:
 | readability           | one reader, one axis naming, no `Xtot`     | one reader in front of FactoMineR         |
 | lone-wolf risk        | real, mitigated only by section 9          | none                                      |
 
-**The ruling.** FactoMineR stays the engine. The next implementation phase is a profile-centric reader of the analysis (CLAUDE.md's roadmap, phase 1q-iii):
+**The ruling.** FactoMineR stays the engine, fed the answer profiles, and ggfacto reads every MCA through one profile-centric reader (`R/model.R`):
 
-- one model built once per fit (profiles, the individual-to-profile map, weights, source rows, both Burt tables);
-- FactoMineR fed the profiles, or its `svd.triplet()` fed the Burt table at the largest scales;
-- every consumer reading that model: tooltips by the Burt route, supplementary levels by the crosstab, clustering on the profiles;
-- FactoMineR's object shape and class kept, as far as the ecosystem reads profiles.
+- one model per fit: the profiles, the individual-to-profile map, the weights, the source rows;
+- FactoMineR's `MCA()` fed the profiles; its `svd.triplet()` fed the Burt table (`mca_fm_burt()`, above) stays here, for a cloud of several hundred thousand profiles;
+- every consumer reading that model: the tooltips by the Burt route, the supplementary levels as barycentres over the profiles, the clustering on the profiles;
+- FactoMineR's object shape and class kept: the ecosystem reads the profiles as individuals.
 
 The upstream proposals (section 8) and the credits (section 9) come first. The native engine is not pursued: FactoMineR's own SVD reaches the same scale.
 
@@ -458,7 +450,6 @@ The upstream proposals (section 8) and the credits (section 9) come first. The n
 **Open:**
 
 - **The sign convention.** FactoMineR's rule is undefined for a mirrored question and skipped at one axis (B5). Feeding profiles can flip the sign in those two cases only; they are documented as known limits.
-- **The object's public shape:** O2′, a `mutate()` accessor for individual coordinates, and GDAtools fits as input (phase 1q-iii).
 
 ---
 

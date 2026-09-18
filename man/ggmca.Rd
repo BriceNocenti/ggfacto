@@ -10,7 +10,7 @@ ggmca(
   res.mca,
   data,
   sup_vars,
-  active_tables,
+  active_tables = "active",
   tooltip_vars_1lv,
   tooltip_vars,
   axes = c(1, 2),
@@ -56,7 +56,7 @@ ggmca_data(
   res.mca,
   data,
   sup_vars,
-  active_tables,
+  active_tables = "active",
   tooltip_vars_1lv,
   tooltip_vars,
   color_groups = "^.{0}",
@@ -112,25 +112,22 @@ variables and the clusters: the whole data frame, even when the analysis was mad
 of it with \code{\link{multiple_correspondence_analysis}}. Only needed with `sup_vars`,
 `clust` or the tooltip variables.}
 
-\item{sup_vars}{A character vector of supplementary qualitative variables
-to print (they don't need to be passed in \code{\link[FactoMineR]{MCA}} before).}
+\item{sup_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The supplementary variables to
+draw, as in `tab()`: `sup_vars = c(SEXE, AGE)` (strings work too). They need not be given to the
+analysis before.}
 
-\item{active_tables}{Should colored crosstables be added in interactive tooltips ?
-`active_tables = "sup"` crosses each `sup_vars` with active variables.
-`active_tables = "active"` crosses each active_variables with the other ones,
-giving results closely related with the burt table used to calculate multiple
-correspondance analysis. It may take time to calculate with many variables.
-`active_tables = c("active", "sup")` do both. In tooltips, percentages are colored
-in blue when spread from mean is positive (over-representations), and in red when
-spread from mean is negative (under-representations), like in
-\code{\link[tabxplor]{tab}} with `color = "diff"`.}
+\item{active_tables}{The coloured crosstabs shown in the tooltips. `"active"`, the default,
+crosses each active variable with the others: it is the Burt table the analysis was computed
+from, so a level at the edge of the cloud shows many colours and one near the centre few.
+`"sup"` crosses each supplementary variable with the active ones, `c("active", "sup")` does both,
+and `NULL` none. Percentages are coloured blue when over-represented and red when
+under-represented, as in \code{tabxplor::tab(color = "diff")}.}
 
-\item{tooltip_vars_1lv}{A character vectors of variables, whose first level
-(if character/factor) or weighted_mean (if numeric) will be added
-at the top of interactive tooltips.}
+\item{tooltip_vars_1lv}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> Variables whose first level
+(a factor), or weighted mean (a number), is added at the top of the tooltips.}
 
-\item{tooltip_vars}{A character vector of variables (character/factors),
-whose complete levels will be added at the bottom of interactive tooltips.}
+\item{tooltip_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> Variables whose levels are all
+added at the bottom of the tooltips.}
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 
@@ -295,14 +292,12 @@ data(tea, package = "FactoMineR")
 res.mca <- multiple_correspondence_analysis(tea, 1:18)
 
 # Interactive graph for multiple correspondence analysis :
-ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2)) |>
+ggmca(res.mca, tea, sup_vars = SPC, ylim = c(NA, 1.2)) |>
   ggi() # to make the graph interactive
 
-# Interactive graph with access to all crosstables between active variables (burt table).
-#  Spread from mean are colored and, usually, points near the middle will have less
-#  colors, and points at the edges will have plenty. It may takes time to print, but
-#  helps to interpret the MCA in close proximity with the underlying data.
-ggmca(res.mca, ylim = c(NA, 1.2), active_tables = "active") |>
+# Hover a level: its crosstabs with every other active variable, the Burt table the analysis
+#  was computed from. Points near the middle show few colours, points at the edges plenty.
+ggmca(res.mca, ylim = c(NA, 1.2)) |>
   ggi()
 
 # Graph with colored clusters (hierarchical clustering on the first three axes)
@@ -311,11 +306,11 @@ tea <- tea |>
 ggmca(res.mca, tea, clust = clust)
 
 # Concentration ellipses for each levels of a supplementary variable :
-ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
+ggmca(res.mca, tea, sup_vars = SPC, ylim = c(NA, 1.2),
   ellipses = 0.5, profiles = TRUE)
 
 # Graph of profiles of answer for each levels of a supplementary variable :
-ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
+ggmca(res.mca, tea, sup_vars = SPC, ylim = c(NA, 1.2),
   type = "facets", ellipses = 0.5, profiles = TRUE)
 }
 }

@@ -75,7 +75,7 @@ bibentry(bibtype = "TechReport",
 )
 
 bibentry(bibtype = "Manual",
-  header      = "Supplementary variables are projected with code from GDAtools (varsup()):",
+  header      = "Its specific and class-specific MCA, whose fits ggfacto reads:",
   title       = "{GDAtools}: Geometric Data Analysis in {R}",
   author      = person(given = "Nicolas", family = "Robette"),
   year        = "2025",

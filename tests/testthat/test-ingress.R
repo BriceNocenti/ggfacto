@@ -4,8 +4,9 @@
 #   correspondence_analysis() are the only functions that compute an analysis; R/ingress.R is what
 #   every later function uses to take the microdata back (the other half: test-clust.R).
 # KEY CONSTRAINTS:
-#   - What is asserted is the FITTED OBJECT's slots, because everything downstream reads those
-#     directly ($call$X, $call$row.w, $call$excl, $call$quali, $source). They are the real interface.
+#   - What is asserted is the FITTED OBJECT's slots -- $call$excl, $call$quali, $source -- because
+#     the MCA's model (R/model.R) reads them, and a user's own code may too. The profile fit itself
+#     is pinned in test-model.R.
 #   - The source-row contract is pinned in both directions: every pipe shape that CAN be proved is
 #     recorded, and every one that cannot falls back to "the fitted rows only" -- never a guess.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract.
@@ -29,11 +30,9 @@ test_that("MCA2 takes active_vars by position, by name and by all_of()", {
   expect_equal(by_index$eig, by_name$eig)
 })
 
-test_that("MCA2 keeps the active variables as the first columns of $call$X", {
-  # Four separate places re-derive active_vars as `colnames($call$X)[1:length($call$quali)]`.
-  # That arithmetic is only correct while the active variables come first.
-  res <- fx_mca()
-  expect_identical(colnames(res$call$X)[seq_along(res$call$quali)], fx_active())
+test_that("the active variables are read from the fit, in their order", {
+  expect_identical(mca_model(fx_mca())$vars, fx_active())
+  expect_identical(active_names(fx_mca()), fx_active())
 })
 
 test_that("PCA2 takes active_vars by position and by name alike", {
@@ -44,19 +43,17 @@ test_that("PCA2 takes active_vars by position and by name alike", {
 
 # --- weights ------------------------------------------------------------------------------------
 
-test_that("MCA2 passes wt through to row.w unchanged", {
-  # The weight is normalised by FactoMineR, so what must hold is proportionality to the input and
-  # the fact that it is recoverable from the fitted object at all.
+test_that("MCA2 keeps the weights of the individuals, and gives each profile the sum of its own", {
+  # The weights ride one channel: `source$w`, the individuals', from which every tooltip, table and
+  # cluster reads them; `call$row.w` is what FactoMineR was fed, one weight per answer profile.
   res <- fx_mca_wt()
-  expect_length(res$call$row.w, nrow(fx_tea_wt()))
-  expect_equal(res$call$row.w / sum(res$call$row.w),
-               fx_tea_wt()$w / sum(fx_tea_wt()$w))
+  expect_identical(fit_weights(res), fx_tea_wt()$w)
+  expect_equal(sum(res$call$row.w), sum(fx_tea_wt()$w))
 })
 
-test_that("an unweighted MCA2 still exposes a row.w, so downstream code has one channel", {
-  # tooltips.R always reads res.mca$call$row.w; it must exist even with no wt =.
-  expect_length(fx_mca()$call$row.w, nrow(fx_tea()))
-  expect_true(all(fx_mca()$call$row.w > 0))
+test_that("an unweighted MCA2 counts each individual once", {
+  expect_identical(fit_weights(fx_mca()), rep(1, nrow(fx_tea())))
+  expect_equal(sum(fx_mca()$call$row.w), nrow(fx_tea()))
 })
 
 test_that("weighting changes the coordinates it is supposed to change", {
@@ -77,7 +74,7 @@ test_that("a zero weight leaves its row out, and the whole data frame still alig
   # FactoMineR's MCA() crashes on a zero weight; in a survey it marks an out-of-scope row.
   d <- fx_tea(); d$w <- c(0, 0, rep(1, nrow(d) - 2))
   expect_message(res <- MCA2(d, 1:6, wt = "w"), "2 row")
-  expect_equal(nrow(res$call$X), nrow(d) - 2)
+  expect_length(res$source$key, nrow(d) - 2)
   expect_identical(res$source$rows, 3:nrow(d))
   clust <- dplyr::mutate(d, cl = hierarchical_clust(res, ncp = 2, nb_clust = 3, tree = FALSE))$cl
   expect_true(all(is.na(clust[1:2])) && !anyNA(clust[-(1:2)]))
@@ -160,7 +157,7 @@ src <- function(expr, data) {
 }
 
 test_that("a bare data frame records every row", {
-  expect_identical(fx_mca()$source, list(n = nrow(fx_tea()), rows = NULL, wt = NULL, name = NULL))
+  expect_identical(fx_mca()$source[c("n", "rows", "wt", "name")], list(n = nrow(fx_tea()), rows = NULL, wt = NULL, name = NULL))
   tea <- fx_tea()
   expect_identical(MCA2(tea, 1:6)$source$name, "tea")
 })
@@ -168,7 +165,7 @@ test_that("a bare data frame records every row", {
 test_that("every provable pipe shape records the rows it kept", {
   d <- fx_tea()
   young <- which(d$age < 30)
-  expect_identical(fx_mca_young()$source, list(n = nrow(d), rows = young, wt = NULL, name = "d"))
+  expect_identical(fx_mca_young()$source[c("n", "rows", "wt", "name")], list(n = nrow(d), rows = young, wt = NULL, name = "d"))
 
   expect_identical(MCA2(d[which(d$age < 30), ], 1:6)$source$rows, young)
   expect_identical(MCA2(d[d$age < 30 & !is.na(d$age), ], 1:6)$source$rows, young)

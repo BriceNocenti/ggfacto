@@ -17,10 +17,11 @@ hierarchical_clust(
 \arguments{
 \item{res}{An analysis made with \code{\link{multiple_correspondence_analysis}},
 \code{\link{principal_component_analysis}} or \code{\link{correspondence_analysis}} (or with
-\code{FactoMineR::MCA()}, \code{FactoMineR::PCA()} or \code{FactoMineR::CA()}).}
+\code{FactoMineR::MCA()}, \code{PCA()} or \code{CA()}, or \code{GDAtools::speMCA()} or
+\code{csMCA()}, whose subcloud alone is clustered).}
 
 \item{ncp}{The number of axes to cluster on: the first ones, those worth interpreting (see the
-eigenvalues under \code{\link{mca_interpret}}). There is no default: on every axis, the
+eigenvalues under \code{\link{interpret}}). There is no default: on every axis, the
 clustering would follow noise.}
 
 \item{nb_clust}{The number of clusters. With `-1`, the default, the tree is cut where the gain in
@@ -72,7 +73,7 @@ draw them with \code{\link{ggmca}(clust = )}.
 }
 \details{
 The tree is kept in memory for the session, under a key made of everything it is built from ---
-the coordinates on the `ncp` axes, the weights, the answers --- so a tree made from other data is
+the coordinates on the `ncp` axes, the weights, the answer profiles --- so a tree made from other data is
 never reused. The last 20 trees are kept; `options(ggfacto.clust_cache = 50)` keeps more, and
 `options(ggfacto.clust_cache = 0)` none.
 }

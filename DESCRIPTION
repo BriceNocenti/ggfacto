@@ -6,10 +6,6 @@ Authors@R: c(
            family = "Nocenti",
            role = c("aut", "cre"),
            email = "brice.nocenti@gmail.com"),
-    person(given = "Nicolas",
-           family = "Robette",
-           role = c("ctb", "cph"),
-           comment = "varsup(), from the 'GDAtools' package"),
     person(given = "Francois",
            family = "Husson",
            role = c("ctb", "cph"),
@@ -58,6 +54,7 @@ Imports:
     stats (>= 4.0.0),
     scales (>= 1.1.0)
 Suggests: 
+    GDAtools (>= 2.0),
     htmlwidgets (>= 1.4.0),
     knitr (>= 1.30),
     rmarkdown (>= 2.0),

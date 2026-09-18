@@ -14,7 +14,7 @@
 #' Principal Component Analysis
 #' @description A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to
 #'  work with \pkg{ggfacto} functions like \code{\link{ggpca_cor_circle}},
-#'  \code{\link{pca_interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
+#'  \code{\link{interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
 #'  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
 #'  function.
 #' @param data The data frame. To analyse a subset of the population, filter it inside the call with
@@ -42,7 +42,7 @@
 #' @examples
 #' active_vars <- c("mpg", "cyl", "hp", "drat", "qsec")
 #' res.pca <- principal_component_analysis(mtcars, tidyselect::all_of(active_vars))
-#' pca_interpret(res.pca)
+#' interpret(res.pca)
 principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, ind_name,
                                          scale.unit = TRUE, ind.sup = NULL, ncp = Inf,
                                          graph = FALSE, ...) {
@@ -352,7 +352,7 @@ PCA_ind.sup_coord <- function(X.ind.sup, res.pca, center = TRUE) { #no_sd = FALS
 #' variation --- the standard deviation as a percentage of the mean, which is what lets two variables
 #' measured in different units be compared for how dispersed they are.
 #'
-#' \strong{Deprecated}: \code{\link{pca_interpret}} now opens with the same three figures, taken
+#' \strong{Deprecated}: \code{\link{interpret}} now opens with the same three figures, taken
 #' from the analysis itself, so the description and the interpretation are one table and cannot
 #' disagree. Use it instead; this function still works and will be removed in a future release.
 #'
@@ -363,12 +363,12 @@ PCA_ind.sup_coord <- function(X.ind.sup, res.pca, center = TRUE) { #no_sd = FALS
 #'
 #' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
 #' @export
-#' @seealso [ggfacto_summary], [pca_interpret()].
+#' @seealso [ggfacto_summary], [interpret()].
 #'
 #' @examples
 #' mean_sd_tab(mtcars, 1:7)
 mean_sd_tab <- function(data, vars, wt) {
-  deprecated_fn("mean_sd_tab", "pca_interpret")
+  deprecated_fn("mean_sd_tab", "interpret")
   vars <- names(tidyselect::eval_select(rlang::enquo(vars), data))
 
   not_num <- data |>

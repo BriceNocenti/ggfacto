@@ -7,7 +7,8 @@
 #   - Tables are tabxplor's job: clust_tab() builds tabxplor::fmt() columns and lets tabxplor render
 #     them. Numbers are asserted as facts rather than as digits wherever possible.
 #   - hierarchical_clust() computes HCPC()'s clusters itself: every analysis is compared with HCPC()
-#     run on the same analysis, fitted with `ncp` axes.
+#     run on the same analysis fitted with `ncp` axes -- an MCA on its individuals (mca_ind()), since
+#     HCPC() on a fit made on the answer profiles would cluster the profiles.
 #   - The tree cache is shared by the whole run (the fixtures fill it): a test counting trees
 #     empties it first.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract.
@@ -28,12 +29,12 @@ test_that("hierarchical_clust gives HCPC()'s clusters for an MCA, weighted or no
   # tea[1:6] is binary: 300 individuals on 35 distinct points, and symmetric enough to tie
   for (k in c(-1, 4, 6)) {
     expect_identical(hc(fx_mca(), ncp = 3, nb_clust = k),
-                     hcpc(MCA2(fx_tea(), 1:6, ncp = 3), nb.clust = k)$clust)
+                     hcpc(mca_ind(fx_tea(), 1:6, ncp = 3), nb.clust = k)$clust)
   }
   expect_identical(hc(fx_mca(), ncp = 3, nb_clust = 4, consol = FALSE),
-                   hcpc(MCA2(fx_tea(), 1:6, ncp = 3), nb.clust = 4, consol = FALSE)$clust)
+                   hcpc(mca_ind(fx_tea(), 1:6, ncp = 3), nb.clust = 4, consol = FALSE)$clust)
   expect_identical(hc(fx_mca_wt(), ncp = 3, nb_clust = 5),
-                   hcpc(MCA2(fx_tea_wt(), 1:6, wt = "w", ncp = 3), nb.clust = 5)$clust)
+                   hcpc(mca_ind(fx_tea_wt(), 1:6, wt = "w", ncp = 3), nb.clust = 5)$clust)
 })
 
 test_that("hierarchical_clust gives HCPC()'s clusters for a PCA", {
@@ -64,8 +65,8 @@ test_that("consol = \"weighted\" counts an individual weighted 2 as two copies o
 
 test_that("consol = \"weighted\" leaves each individual in the cluster of its nearest weighted centre", {
   cl <- hc(fx_mca_wt(), ncp = 3, nb_clust = 5, consol = "weighted")
-  X  <- fx_mca_wt()$ind$coord[, 1:3]
-  w  <- fx_mca_wt()$call$row.w
+  X  <- as.matrix(axis_coord(fx_mca_wt(), 1:3))
+  w  <- fx_mca_wt()$source$w
   centres <- rowsum(X * w, cl) / as.vector(rowsum(w, cl))
   d <- vapply(seq_len(nrow(centres)), function(k) rowSums(sweep(X, 2, centres[k, ])^2),
               numeric(nrow(X)))
@@ -95,6 +96,16 @@ test_that("hierarchical_clust asks for what it needs, and says why", {
                "supplementary individuals")
   expect_error(dplyr::mutate(forcats::gss_cat, cl = hc(fx_ca(), ncp = 2, nb_clust = 2)),
                "correspondence_analysis")
+})
+
+test_that("a GDAtools csMCA() clusters its subcloud, NA elsewhere", {
+  skip_if_not_installed("GDAtools")
+  women <- fx_tea()$sex == "F"
+  cs <- GDAtools::csMCA(fx_tea()[1:6], subcloud = women)
+  cl <- hc(cs, ncp = 3, nb_clust = 3)
+  expect_length(cl, nrow(fx_tea()))
+  expect_identical(which(!is.na(cl)), which(women))
+  expect_identical(dplyr::mutate(fx_tea(), cl = hc(cs, ncp = 3, nb_clust = 3))$cl, cl)
 })
 
 test_that("hierarchical_clust draws the tree when it cuts it itself", {
@@ -209,7 +220,7 @@ test_that("names are refused unless they name each cluster once", {
 
 test_that("the tree states the share of the inertia its clusters keep", {
   pts <- ggfacto:::clust_points(fx_mca_wt(), 3, "rows")
-  t   <- ggfacto:::ward_tree(pts$coord, pts$w, pts$answers)
+  t   <- ggfacto:::ward_tree(pts$coord, pts$w, pts$groups)
   h   <- rev(t$tree$height)
   # the gains add up to the inertia of the ncp axes
   expect_equal(sum(h), sum(fx_mca_wt()$eig[1:3, 1]))

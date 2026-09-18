@@ -16,7 +16,7 @@ variable. A matrix or a \code{table} of counts works too.}
 }
 \value{
 A `CA` object from \pkg{FactoMineR}, which remembers the names of the two variables, so
-that \code{\link{ca_interpret}} can print them.
+that \code{\link{interpret}} can print them.
 }
 \description{
 Makes the correspondence analysis of a crosstab with
@@ -28,6 +28,6 @@ without its Total row and column. To leave out some rows or columns, filter the 
 \examples{
 tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
 res.ca <- correspondence_analysis(tableau)
-ca_interpret(res.ca)
+interpret(res.ca)
 ggca(res.ca) |> ggi()
 }

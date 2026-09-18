@@ -41,15 +41,20 @@ rate. To cluster on the first axes, give \code{\link{hierarchical_clust}} its ow
 \item{graph}{By default no graph is made, since the result can be plotted with
 \code{\link{ggmca}}.}
 
-\item{...}{Additional arguments to pass to \code{\link[FactoMineR]{MCA}}.}
+\item{...}{Additional arguments to pass to \code{\link[FactoMineR]{MCA}}, except those that
+index its rows or columns (`ind.sup`, `quali.sup`, `quanti.sup`, `tab.disj`).}
 }
 \value{
-A `MCA` object from \pkg{FactoMineR}, with one more element, `source`, which records the
- rows of `data` that were analysed.
+A `MCA` object from \pkg{FactoMineR}, fitted on the distinct answer profiles (the
+ combinations of active answers), each weighted by its individuals: the eigenvalues and every
+ result on the levels are the individuals', and `$ind` has one row per profile. Use
+ \code{\link{axis_coord}} and \code{\link{hierarchical_clust}} to write coordinates and clusters
+ into the data frame (`FactoMineR::HCPC()` would cluster the profiles). One more element,
+ `source`, records the rows of `data` that were analysed, their weights and their profiles.
 }
 \description{
 A user-friendly wrapper around \code{\link[FactoMineR]{MCA}}, made to
- work with \pkg{ggfacto} functions like \code{\link{ggmca}}, \code{\link{mca_interpret}} and
+ work with \pkg{ggfacto} functions like \code{\link{ggmca}}, \code{\link{interpret}} and
  \code{\link{hierarchical_clust}}. Variables are selected the way of the `tidyverse`, as in
  \code{tabxplor::tab()}. Supplementary variables are not given here: they are added afterwards,
  in \code{\link{ggmca}}. `MCA2()` is a shorter name for the same function.
@@ -57,9 +62,9 @@ A user-friendly wrapper around \code{\link[FactoMineR]{MCA}}, made to
 \examples{
 data(tea, package = "FactoMineR")
 res.mca <- multiple_correspondence_analysis(tea, 1:18)
-mca_interpret(res.mca)
+interpret(res.mca)
 
-ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2)) |>
+ggmca(res.mca, tea, sup_vars = SPC, ylim = c(NA, 1.2)) |>
   ggi() # to make the graph interactive
 
 # A subset of the population: the analysis remembers which rows it used

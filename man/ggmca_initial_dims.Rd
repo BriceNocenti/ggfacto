@@ -16,8 +16,8 @@ ggmca_initial_dims(
 \item{res.mca}{An object created with \code{\link{multiple_correspondence_analysis}} or
 \code{FactoMineR::\link[FactoMineR]{MCA}}.}
 
-\item{data}{Optionally, the data frame the analysis was made on, whose order of levels is then
-used.}
+\item{data}{The data frame the analysis was made on. Optional: the analysis keeps its levels in
+the data's order. It is accepted so that every `ggmca_*` function takes `(res.mca, data)`.}
 
 \item{proj_just}{Horizontal justification of text of the coordinates on axes,
 as a character vector of length 2 (x and y).}

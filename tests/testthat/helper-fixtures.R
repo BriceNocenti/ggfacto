@@ -2,9 +2,10 @@
 # ROLE: ggfacto computes no analysis of its own, so every test needs a fitted FactoMineR object
 #   first. Building one per test_that() would dominate the suite's runtime.
 # KEY CONSTRAINTS:
-#   - MCA fixtures use tea[1:6], NEVER tea[1:18]. Tooltip crosstabs are quadratic in the number of
-#     active variables: active_tables = "active" measures 1.2 s on six variables and 10.4 s on
-#     eighteen. Six exercises every code path the eighteen do.
+#   - MCA fixtures use tea[1:6]: six binary questions exercise every code path the eighteen do, and
+#     keep the goldens short.
+#   - mca_ind() is FactoMineR on the individuals: the reference a fit on the answer profiles must
+#     equal, since multiple_correspondence_analysis() feeds FactoMineR the profiles.
 #   - The fixtures mirror the datasets the roxygen examples use (tea, mtcars, gss_cat), so a test
 #     failure points at a call a user can actually reproduce from the manual.
 #   - testthat sources helpers once per worker, so the cache is shared across files.
@@ -62,6 +63,14 @@ fx_mca_young <- function() fx("mca_young", function() {
   d |> dplyr::filter(age < 30) |> multiple_correspondence_analysis(1:6)
 })
 
+# FactoMineR::MCA() on the INDIVIDUALS, through ggfacto's own ingress (the `<VAR>.NA` levels, the
+# `excl` rule): the reference an analysis fitted on the answer profiles must equal.
+mca_ind <- function(data, vars, wt = NULL, excl = NA, ncp = Inf) {
+  X <- na_levels(as.data.frame(data[vars]), names(data[vars]))
+  FactoMineR::MCA(X, ncp = ncp, row.w = if (!is.null(wt)) data[[wt]], graph = FALSE,
+                  excl = excl_index(X, names(X), excl))
+}
+
 fx_pca <- function() fx("pca", function() {
   d <- mtcars[1:7]; names(d)[names(d) == "wt"] <- "weight"
   FactoMineR::PCA(d, graph = FALSE)
@@ -76,9 +85,7 @@ fx_ca <- function() fx("ca", function() {
 # ggmca_data() messages the colour groups it found on every call; that is not what is under test.
 md <- function(...) suppressMessages(ggmca_data(...))
 
-# The handful of ggmca_data() calls the suite makes over and over. Building the crosstab model is
-# the single most expensive operation here -- it is quadratic in the number of active variables --
-# so the shapes used by more than one test are cached rather than rebuilt.
+# The handful of ggmca_data() calls the suite makes over and over, cached rather than rebuilt.
 # A caller may edit what it gets back: R copies on modify, so the cache cannot be corrupted.
 fx_pd <- function(name, ...) {
   args <- list(...)

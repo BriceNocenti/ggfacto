@@ -66,12 +66,12 @@ A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which rec
 \description{
 A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to
  work with \pkg{ggfacto} functions like \code{\link{ggpca_cor_circle}},
- \code{\link{pca_interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
+ \code{\link{interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
  function.
 }
 \examples{
 active_vars <- c("mpg", "cyl", "hp", "drat", "qsec")
 res.pca <- principal_component_analysis(mtcars, tidyselect::all_of(active_vars))
-pca_interpret(res.pca)
+interpret(res.pca)
 }

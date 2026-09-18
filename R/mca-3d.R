@@ -82,14 +82,13 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
 
   # if (missing(color_groups)) color_groups <- "^.{1}"
 
-  acm <- res.mca |>
-    ggmca(data = data,
-          clust = !!clust,
-          # color_groups = color_groups,
-          profiles = TRUE,
-          get_data = TRUE,
-          ...
-    )
+  # The 3D view hovers on the profiles alone: no level crosstab to build, unless asked for.
+  acm <- if ("active_tables" %in% ...names()) {
+    ggmca(res.mca, data = data, clust = !!clust, profiles = TRUE, get_data = TRUE, ...)
+  } else {
+    ggmca(res.mca, data = data, clust = !!clust, profiles = TRUE, get_data = TRUE,
+          active_tables = NULL, ...)
+  }
 
   acm_clust <- acm$vars_data |>
     dplyr::filter(str_detect(.data$color_group, paste0("^", clust_name)))
@@ -263,9 +262,10 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
 
   # To get a fixed aspect ratio, put a point in max range * aspectratio on all axes
   if (aspectratio_from_eig) {
-    aspectratio <- list(x = res.mca$svd$vs[axes[1]],
-                        y = res.mca$svd$vs[axes[2]],
-                        z = if (D2) {NULL} else {res.mca$svd$vs[axes[3]]}
+    vs <- mca_model(res.mca)$vs
+    aspectratio <- list(x = vs[axes[1]],
+                        y = vs[axes[2]],
+                        z = if (D2) {NULL} else {vs[axes[3]]}
     )
 
   } else {

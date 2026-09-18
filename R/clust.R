@@ -6,14 +6,17 @@
 #   resolve_clust() is the one reader of a `clust =` argument, shared with R/mca-data.R.
 # KEY CONSTRAINTS:
 #   - The clusters are FactoMineR::HCPC()'s, computed here for their memory: Ward's tree is built on
-#     the DISTINCT points of the cloud by fastcluster, in memory linear in their number; the point
-#     order, the cut and, by default, the unweighted k-means consolidation are HCPC()'s, and
-#     test-clust.R pins the equality. `consol = "weighted"` opts in to a weighted k-means.
+#     the DISTINCT points of the cloud by fastcluster, in memory linear in their number -- an MCA's
+#     answer profiles, read from its model (R/model.R); the point order, the cut and, by default,
+#     the unweighted k-means consolidation on the individuals are HCPC()'s, and test-clust.R pins
+#     the equality with HCPC() run on individuals. `consol = "weighted"` opts in to a weighted
+#     k-means.
 #   - The tree is built once and cut many times: ward_tree() is memoised for the session on the
 #     content it is built from, so another `nb_clust` or `names` costs only cut_ward_tree(). That
 #     split is also the seam a jamovi module keeps in its state.
-#   - The clusters are a column of the data frame, never an HCPC object, aligned by context through
-#     R/ingress.R: the mutate() they are written in, else the frame the analysis started from.
+#   - The clusters are a column of the data frame, never an HCPC object, written back by
+#     to_data_rows() (R/model.R): aligned on the mutate() they are written in, else on the frame the
+#     analysis started from.
 #   - clust_tab() reads the analysis -- its active variables, weights and fitted rows -- so nothing
 #     is given twice. HCPC_tab() and a data frame given first are the former form, on one builder.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract, and
@@ -37,9 +40,10 @@
 #'
 #' @param res An analysis made with \code{\link{multiple_correspondence_analysis}},
 #' \code{\link{principal_component_analysis}} or \code{\link{correspondence_analysis}} (or with
-#' \code{FactoMineR::MCA()}, \code{FactoMineR::PCA()} or \code{FactoMineR::CA()}).
+#' \code{FactoMineR::MCA()}, \code{PCA()} or \code{CA()}, or \code{GDAtools::speMCA()} or
+#' \code{csMCA()}, whose subcloud alone is clustered).
 #' @param ncp The number of axes to cluster on: the first ones, those worth interpreting (see the
-#' eigenvalues under \code{\link{mca_interpret}}). There is no default: on every axis, the
+#' eigenvalues under \code{\link{interpret}}). There is no default: on every axis, the
 #' clustering would follow noise.
 #' @param nb_clust The number of clusters. With `-1`, the default, the tree is cut where the gain in
 #' between-cluster inertia drops the most. Given `names`, it is the number of names.
@@ -63,7 +67,7 @@
 #'
 #' @details
 #' The tree is kept in memory for the session, under a key made of everything it is built from ---
-#' the coordinates on the `ncp` axes, the weights, the answers --- so a tree made from other data is
+#' the coordinates on the `ncp` axes, the weights, the answer profiles --- so a tree made from other data is
 #' never reused. The last 20 trees are kept; `options(ggfacto.clust_cache = 50)` keeps more, and
 #' `options(ggfacto.clust_cache = 0)` none.
 #'
@@ -111,13 +115,13 @@
 #'   dplyr::mutate(relig_clust = hierarchical_clust(res.ca, ncp = 2, nb_clust = 4))
 hierarchical_clust <- function(res, ncp, nb_clust = -1, tree = nb_clust == -1, consol = TRUE,
                                margin = "rows", names = NULL) {
-  if (!inherits(res, c("MCA", "PCA", "CA"))) stop(
+  if (!(is_mca(res) || inherits(res, c("PCA", "CA")))) stop(
     "hierarchical_clust() clusters the individuals of a principal component analysis or of a ",
     "multiple correspondence analysis, or the levels of a correspondence analysis.", call. = FALSE)
   if (missing(ncp)) stop(
     "`ncp` is required: the number of axes to cluster on, those worth interpreting (read the ",
-    "eigenvalues under mca_interpret(), pca_interpret() or ca_interpret()). On every axis, the ",
-    "clustering would follow noise.", call. = FALSE)
+    "eigenvalues under interpret()). On every axis, the clustering would follow noise.",
+    call. = FALSE)
   if (!is.null(names)) {
     if (missing(nb_clust)) nb_clust <- length(names) else if (nb_clust == -1) stop(
       "`names` names the clusters of one cut: give their number with `nb_clust`, or leave it out ",
@@ -132,34 +136,24 @@ hierarchical_clust <- function(res, ncp, nb_clust = -1, tree = nb_clust == -1, c
     "its weight) or FALSE (no consolidation).", call. = FALSE)
 
   pts <- clust_points(res, ncp, margin)
-  hc  <- cut_ward_tree(cached_ward_tree(pts$coord, pts$w, pts$answers), pts$coord, pts$w,
+  hc  <- cut_ward_tree(cached_ward_tree(pts$coord, pts$w, pts$groups), pts$coord, pts$w,
                        nb_clust, consol)
   if (tree) plot_clust_tree(hc, labels = inherits(res, "CA"), ncp = ncp)
   clust <- if (is.null(names)) hc$clust else name_clusters(hc$clust, names)
 
-  expand <- function(n, idx) {
-    out <- factor(rep(NA_character_, n), levels = levels(clust))
-    out[idx] <- clust
-    out
-  }
-
-  # Inside mutate(): the data frame being written into is at hand, so the rows are aligned -- and
-  # verified -- on it. Outside, on the data frame the analysis started from.
-  target <- tryCatch(dplyr::pick(tidyselect::any_of(pts$vars)), error = function(e) NULL)
-  if (!is.null(target) && ncol(dplyr::cur_group()) != 0) stop(
-    "hierarchical_clust() must be used in an ungrouped mutate(): call dplyr::ungroup() first.",
-    call. = FALSE)
-
   # invisible: a bare call, made to look at the tree, must not print one cluster per individual
   if (inherits(res, "CA")) {
     names(clust) <- rownames(pts$coord)
-    return(invisible(if (is.null(target)) clust else level_clusters(clust, target, pts$vars)))
+    target <- tryCatch(dplyr::pick(tidyselect::any_of(pts$vars)), error = function(e) NULL)
+    return(invisible(if (is.null(target)) clust else {
+      level_values(clust, target, pts$vars, "hierarchical_clust")
+    }))
   }
-  if (!is.null(target)) return(invisible(expand(nrow(target), fit_rows(res, target))))
-  invisible(if (is.null(res$source$rows)) clust else expand(res$source$n, res$source$rows))
+  invisible(to_data_rows(pts$fit, clust, pts$vars, "hierarchical_clust"))
 }
 
-# The points HCPC() clusters, their weights, and the variables that locate them in a data frame.
+# The points HCPC() clusters, one per fitted individual (or per level of a CA), their weights, the
+# distinct points they group into, and the variables that locate them in a data frame.
 clust_points <- function(res, ncp, margin) {
   if (inherits(res, "CA")) {
     margin  <- match.arg(margin, c("rows", "columns"))
@@ -168,18 +162,27 @@ clust_points <- function(res, ncp, margin) {
     w       <- (if (rows) res$call$marge.row else res$call$marge.col) * sum(res$call$X)
     vars    <- names(dimnames(res$call$X))[if (rows) 1L else 2L]
     vars    <- vars[!is.na(vars) & nzchar(vars)]     # FactoMineR::CA() keeps no variable names
-    answers <- NULL
+    groups  <- NULL
+    fit     <- res
+  } else if (is_mca(res)) {
+    fit     <- mca_model(res)
+    coord   <- fit$coord[fit$key, , drop = FALSE]
+    w       <- fit_weights(fit)
+    vars    <- fit$vars
+    groups  <- fit$key
   } else {
     if (length(res$call$ind.sup) != 0) stop(
       "hierarchical_clust() does not handle supplementary individuals.", call. = FALSE)
+    fit     <- res
     coord   <- res$ind$coord
     w       <- fit_weights(res)
     vars    <- active_names(res)
-    answers <- res$call$X[vars]
+    groups  <- as.integer(vctrs::vec_group_id(res$call$X[vars]))
   }
   if (ncp > ncol(coord)) stop(
     "`ncp` is ", ncp, ", and the analysis keeps ", ncol(coord), " axes.", call. = FALSE)
-  list(coord = coord[, seq_len(ncp), drop = FALSE], w = w, answers = answers, vars = vars)
+  list(coord = coord[, seq_len(ncp), drop = FALSE], w = w, groups = groups, vars = vars,
+       fit = fit)
 }
 
 clust_cache <- new.env(parent = emptyenv())
@@ -189,13 +192,13 @@ clust_cache <- new.env(parent = emptyenv())
 #   stale, a refit hits it, and a jamovi state can store the same key beside the same tree.
 # WARNING: every input of ward_tree() must be in the key -- the dimnames too (a CA's leaves carry
 #   its row names). The last `ggfacto.clust_cache` trees are kept, first in first out.
-cached_ward_tree <- function(coord, w, answers) {
+cached_ward_tree <- function(coord, w, groups) {
   size <- getOption("ggfacto.clust_cache", 20)
-  if (!isTRUE(size >= 1)) return(ward_tree(coord, w, answers))
-  key   <- rlang::hash(list(coord, w, answers))
+  if (!isTRUE(size >= 1)) return(ward_tree(coord, w, groups))
+  key   <- rlang::hash(list(coord, w, groups))
   trees <- clust_cache$trees
   if (is.null(trees[[key]])) {
-    trees[[key]] <- ward_tree(coord, w, answers)
+    trees[[key]] <- ward_tree(coord, w, groups)
     clust_cache$trees <- trees[seq.int(max(1L, length(trees) - size + 1L), length(trees))]
   }
   trees[[key]]
@@ -204,23 +207,22 @@ cached_ward_tree <- function(coord, w, answers) {
 # Ward's tree of FactoMineR::HCPC() -- its point order, from its code by F. Husson, G. Le Ray and
 # Q. Molto (credited in DESCRIPTION) -- built on the distinct points. A plain list, so it can be
 # stored as it is.
-ward_tree <- function(coord, w, answers) {
+ward_tree <- function(coord, w, groups) {
   # DESIGN: the points in HCPC()'s order, sorted along the first axis: it decides which pair merges
   #   on a tie and where the k-means starts, so the clusters are HCPC()'s own and not a variant.
   ord <- order(coord[, 1])
   X   <- coord[ord, , drop = FALSE]
-  # DESIGN: the leaves are the DISTINCT points, weighted by their individuals: Ward merges identical
-  #   points first, at no cost, so the tree above them is the same (ids keep HCPC()'s order).
-  leaf  <- if (is.null(answers)) seq_len(nrow(X)) else {
-    vctrs::vec_group_id(answers[ord, , drop = FALSE])
-  }
+  # DESIGN: the leaves are the DISTINCT points (`groups`: an MCA's answer profiles), weighted by
+  #   their individuals: Ward merges identical points first, at no cost, so the tree above them is
+  #   the same (leaves numbered in HCPC()'s order).
+  leaf  <- if (is.null(groups)) seq_len(nrow(X)) else vctrs::vec_group_id(groups[ord])
   first <- which(!duplicated(leaf))
   lw    <- as.vector(rowsum(w[ord], leaf))
   tree  <- fastcluster::hclust.vector(X[first, , drop = FALSE], method = "ward", members = lw)
   # WARNING: fastcluster's Ward height is sqrt(2 x the inertia gain); HCPC() plots and cuts the
   #   gain, as a share of the total weight.
   tree$height <- tree$height^2 / 2 / sum(w)
-  if (!is.null(answers)) tree$labels <- NULL       # only a CA's leaves, its levels, are drawn named
+  if (!is.null(groups)) tree$labels <- NULL        # only a CA's leaves, its levels, are drawn named
   list(tree = tree, ord = ord, leaf = leaf, first = first, lw = lw)
 }
 
@@ -365,26 +367,6 @@ clust_tree_caption <- function(k, between, ncp, lang = NULL) {
   })
 }
 
-# Why this exists: a CA clusters LEVELS; in mutate(), each individual gets the cluster of its level.
-level_clusters <- function(clust, target, var) {
-  if (length(var) == 0 || !var %in% names(target)) stop(
-    "In mutate(), hierarchical_clust() gives each individual the cluster of its level, which needs ",
-    if (length(var) == 0) {
-      "the name of the variable: make the analysis with correspondence_analysis(), which keeps it."
-    } else {
-      str_c("the variable `", var, "` in the data frame.")
-    },
-    call. = FALSE)
-  lv  <- as.character(target[[var]])
-  lv[is.na(lv)] <- "NA"                            # tab() names the missing answers' level "NA"
-  idx <- match(lv, names(clust))
-  if (all(is.na(idx))) stop(
-    "No level of `", var, "` in the data frame is a level of the correspondence analysis. Was its ",
-    "table made with `cleannames = TRUE`?", call. = FALSE)
-  unname(clust[idx])
-}
-
-
 #' Describe Clusters with One Table
 #'
 #' @description
@@ -398,7 +380,7 @@ level_clusters <- function(clust, target, var) {
 #'
 #' @param res The analysis the clusters were made on, with
 #' \code{\link{multiple_correspondence_analysis}} or \code{\link{principal_component_analysis}}
-#' (or \code{FactoMineR::MCA()} or \code{FactoMineR::PCA()}). For a correspondence analysis, cross
+#' (or \code{FactoMineR::MCA()} or \code{PCA()}, or \code{GDAtools::speMCA()} or \code{csMCA()}). For a correspondence analysis, cross
 #' the clusters with the other variable of the table with \code{tabxplor::tab()} instead.
 #' @param data The data frame, with the clusters. The whole data frame will do when the analysis
 #' was made on a subset of it: only the rows the analysis used are described.
@@ -426,7 +408,7 @@ level_clusters <- function(clust, target, var) {
 #'
 #' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
 #' @export
-#' @seealso [ggfacto_summary], [hierarchical_clust()], [mca_interpret()].
+#' @seealso [ggfacto_summary], [hierarchical_clust()], [interpret()].
 #'
 #' @examples
 #' data(tea, package = "FactoMineR")
@@ -458,7 +440,7 @@ clust_tab <- function(res, data, clust, row_vars, pct = "col", excl = NA, color 
     if ("res" %in% names(call)) names(call)[names(call) == "res"] <- "data"
     return(eval(call, parent.frame()))
   }
-  if (!inherits(res, c("MCA", "PCA", "CA"))) stop(
+  if (!(is_mca(res) || inherits(res, c("PCA", "CA")))) stop(
     "clust_tab() describes the clusters of an analysis: give it first, then the data frame and the ",
     "clusters, as in `clust_tab(res.mca, data, clust)`.", call. = FALSE)
   if (inherits(res, "CA")) stop(
@@ -473,17 +455,18 @@ clust_tab <- function(res, data, clust, row_vars, pct = "col", excl = NA, color 
   clust <- resolve_clust(rlang::enquo(clust), data)
   if (length(clust$name) == 0) stop("`clust` is required: the variable with the clusters.",
                                     call. = FALSE)
-  data     <- align_to_fit(res, clust$data)
+  view     <- fit_view(res)
+  data     <- align_to_fit(view, clust$data)
   row_vars <- if (missing(row_vars)) {
-    active_names(res)
+    view$vars
   } else {
     names(tidyselect::eval_select(rlang::enquo(row_vars), data))
   }
 
-  w  <- fit_weights(res)
+  w  <- fit_weights(if (is_mca(res)) view else res)
   wt <- character()
   if (any(w != 1)) {
-    wt <- if (is.null(res$source$wt)) "row.w" else res$source$wt
+    wt <- if (is.null(view$source$wt)) "row.w" else view$source$wt
     data[[wt]] <- w
   }
   clust_tab_build(data, row_vars, clust$name, wt, excl, color, pct, row_tot, cleannames, ...)

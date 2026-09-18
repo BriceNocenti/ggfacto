@@ -15,8 +15,9 @@
 
 #' A ggplot2 Theme for Geometrical Data Analysis
 #'
-#' @param res An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
-#' \code{\link[FactoMineR]{CA}}, etc.
+#' @param res An analysis, made with \code{\link{multiple_correspondence_analysis}},
+#' \code{\link{correspondence_analysis}}, \code{\link{principal_component_analysis}}, FactoMineR or
+#' GDAtools.
 #' @param axes The axes to print, as a numeric vector of length 2.
 #' @param legend.position One of \code{c("none", "left", "right", "bottom", "top")}.
 #' @param no_color_scale When TRUE, you can provide color_scale next without warning.
@@ -30,26 +31,27 @@
 theme_facto <- function(res, axes = c(1,2), # res = res.mca
                         legend.position = c("none", "left", "right", "bottom", "top"),
                         no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
+  pct <- eig_table(res)[, 2]
   if (exists("axes_names", where = res)) {
     first_axe_title  <-
       str_c(
-        "Axe ", axes[1]," (", round(res$eig[axes[1],2], 1),
+        "Axe ", axes[1]," (", round(pct[axes[1]], 1),
         "%)",
         if (!is.null(res$axes_names[axes[1]]) ) paste0(" : ", res$axes_names[axes[1]])
       )
     second_axe_title <-
       str_c(
-        "Axe ", axes[2]," (", round(res$eig[axes[2],2], 1),
+        "Axe ", axes[2]," (", round(pct[axes[2]], 1),
         "%)",
         if (!is.null(res$axes_names[axes[2]]) ) paste0(" : ", res$axes_names[axes[2]])
       )
   } else {
     first_axe_title  <-
       str_c("Axe ", axes[1]," (",
-                     round(res$eig[axes[1],2], 1), "%)")
+                     round(pct[axes[1]], 1), "%)")
     second_axe_title <-
       str_c("Axe ", axes[2]," (",
-                     round(res$eig[axes[2],2], 1), "%)")
+                     round(pct[axes[2]], 1), "%)")
   }
 
 

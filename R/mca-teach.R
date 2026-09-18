@@ -8,9 +8,11 @@
 #   - ggmca_initial_dims() plots x2 against x1, where the x* columns are one per level of a
 #     variable GROUP. A battery of binary variables never yields an x2, so it is defaulted before
 #     the branch rather than inside one of them.
-#   - ggmca_with_base_ref() takes `data` in second position for consistency with the rest of the
-#     ggmca_* family, and forwards it; it draws only active variables, read from res.mca, so the
-#     argument changes no output. A bare numeric there is routed to `axes` for back-compatibility.
+#   - Both read the analysis through its model (R/model.R): the levels, their counts and their
+#     order are the data's, whatever engine made the fit.
+#   - Both take `data` in second position for consistency with the rest of the ggmca_* family; they
+#     draw only active variables, so the argument changes no output. A bare numeric there is routed
+#     to `axes` for back-compatibility (ggmca_with_base_ref()).
 # See: CLAUDE.md section What ggfacto is, and why.
 
 #' Plot Initial Dimensions (Active Variables) of Multiple Correspondence Analysis
@@ -24,8 +26,8 @@
 #'
 #' @param res.mca An object created with \code{\link{multiple_correspondence_analysis}} or
 #' \code{FactoMineR::\link[FactoMineR]{MCA}}.
-#' @param data Optionally, the data frame the analysis was made on, whose order of levels is then
-#' used.
+#' @param data The data frame the analysis was made on. Optional: the analysis keeps its levels in
+#' the data's order. It is accepted so that every `ggmca_*` function takes `(res.mca, data)`.
 #' @param proj_just Horizontal justification of text of the coordinates on axes,
 #' as a character vector of length 2 (x and y).
 #' @param cleannames Set to \code{TRUE} to clean levels names, by removing
@@ -47,44 +49,10 @@
 ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
                                cleannames = TRUE, keep = NULL) {
 
-  levels_fit    <- mca_levels(res.mca)
-  mca_excl_done <- levels_fit$x[!levels_fit$kept]
-
-  row.w <- res.mca$call$row.w
-
-  active_vars <- str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
-
-  # the order of the levels is the data's own; a missing answer is named as MCA2() names it
-  has_data <- !missing(data)
-  active_var_levels <- purrr::map(active_vars, function(v) {
-    x <- if (has_data) data[[v]] else res.mca$call$X[[v]]
-    levels(forcats::fct_na_value_to_level(as.factor(x), str_c(v, ".NA")))
-  }) |>
-    purrr::set_names(active_vars) |>
-    purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs2 = .x))  |>
-    dplyr::mutate(vars = forcats::as_factor(.data$vars))
-
-  active_var_levels_disordered <-
-    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) |>
-                 as.factor() |> levels()) |>
-    purrr::set_names(active_vars) |>
-    purrr::imap_dfr(~ tibble::tibble(
-      vars = .y,
-      lvs  = .x,
-      lvs2 = str_remove_all(.x, paste0("^", .y, "_") ),
-    )) |>
-    dplyr::mutate(vars = forcats::as_factor(.data$vars))
-
-  active_var_levels <- active_var_levels |>
-    dplyr::left_join(active_var_levels_disordered,
-                     by = c("vars", "lvs2"),
-                     relationship = "one-to-one") |>
-    dplyr::filter(!.data$lvs %in% mca_excl_done) |>
-    dplyr::group_by(.data$vars) |>
-    dplyr::group_split() |>
-    (\(g) purrr::set_names(g, purrr::map_chr(g, ~ as.character(dplyr::first(.$vars)))))() |>
-    purrr::map(~ .$lvs)
-
+  m  <- mca_model(res.mca)
+  lv <- m$levels[m$levels$kept, ]
+  # the order of the levels is the data's own, which the analysis keeps
+  active_var_levels <- split(lv$lvs, factor(lv$vars, unique(lv$vars)))
 
   if(length(keep) > 0) active_var_levels <- active_var_levels |>
     purrr::keep(names(active_var_levels) %in% keep)
@@ -93,7 +61,6 @@ ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
     active_var_levels |>
     purrr::imap_dfr(~ tibble::tibble(vars = .y,
                                      lvs = sort(.x, decreasing = TRUE),
-                                     #rn  = length(.x):1
     )
     ) |>
     dplyr::mutate(vars = forcats::as_factor(.data$vars)) |>
@@ -148,45 +115,24 @@ ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
     purrr::map(~ list(vars = .$vars[1], vars_group = .$vars_group[1], lvs = .$lvs))
 
 
-
-  # Table disjonctive
-  disj <-
-    purrr::pmap(active_var_level_grouped |> purrr::transpose(),
-         ~ {
-           # WARNING: Xtot's columns are FactoMineR's names (`var.y`): selected by position.
-           disj <- res.mca$call$Xtot[match(..3, levels_fit$x)] |>
-             rlang::set_names(..3) |>
-             tibble::as_tibble() |>
-             tibble::add_column(row.w = row.w)
-           # disj <- dplyr::select(disj, tidyselect::all_of(..3) )
-
-           if (cleannames) {
-             disj <- disj |>
-               dplyr::rename_with(~ str_remove_all(., cleannames_condition()))
-           }
-
-           disj |>
-             dplyr::group_by(!!!rlang::syms(names(disj)[names(disj) != "row.w"])) |>
-             dplyr::summarise(n = dplyr::n(),
-                              wn = sum(row.w, na.rm = TRUE),
-                              .groups = "drop") |>
-             dplyr::mutate(freq = .data$wn/sum(.data$wn, na.rm = TRUE) ) |>
-             dplyr::filter(!dplyr::if_all(-tidyselect::all_of(c("n", "wn", "freq")), ~ . == 0L)) |> # Remove NA line (only zeros)
-             dplyr::rowwise() |>
-             dplyr::mutate(lvs = which(dplyr::c_across(tidyselect::everything()) == "1") |>
-                             dplyr::first()) |>
-             dplyr::ungroup() |>
-             (\(d) dplyr::mutate(d, lvs = names(d)[.data$lvs]))() |>
-             dplyr::rename_with(~ paste0("x", 0:(length(.)-1)),
-                                .cols = -tidyselect::all_of(c("n", "wn", "lvs", "freq"))) |>
-             dplyr::mutate(vars = ..1, vars_group = ..2, .before = 1)
-
-           #dplyr::mutate(dplyr::across(tidyselect::starts_with("x"), ~ . * n / sum(n), .names = "mean_{.col}"))
-
-
-         }
+  # The disjunctive table of each group of levels, as one row per level: its indicator pattern in the
+  # x* columns (level i of the group has x<i-1> = 1), its count, its weighted count and its share of
+  # the population -- the model's level counts, rows in the order the pattern sorts.
+  disj <- purrr::map(active_var_level_grouped, function(g) {
+    l <- lv[lv$vars == as.character(g$vars), ]
+    l <- l[match(g$lvs, l$lvs), ]
+    k <- length(g$lvs)
+    r <- rev(seq_len(k))
+    x <- diag(k)[r, , drop = FALSE]
+    colnames(x) <- paste0("x", seq_len(k) - 1L)
+    dplyr::bind_cols(
+      tibble::tibble(vars = g$vars, vars_group = g$vars_group,
+                     lvs = if (cleannames) str_remove_all(g$lvs[r], cleannames_condition())
+                           else g$lvs[r]),
+      tibble::as_tibble(x),
+      tibble::tibble(n = l$n[r], wn = l$wn[r], freq = l$wn[r] / m$W)
     )
-  # disj[c("VIDEOS", "MUSIQUE",  "LIVRES (1-3)", "LIVRES (4)")]
+  })
 
   # Point moyen (barycentre)
   disj <-
@@ -413,17 +359,13 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
   dim1 <- rlang::sym(str_c("Dim ", axes[1]))
   dim2 <- rlang::sym(str_c("Dim ", axes[2]))
 
-  active_vars <-
-    str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
-
-  freqs <- mca_levels(res.mca) |>
+  m     <- mca_model(res.mca)
+  freqs <- m$levels |>
     dplyr::transmute(vars = .data$vars,
                      lvs  = str_remove_all(.data$lvs, cleannames_condition()),
-                     freq = .data$freq * length(active_vars))
+                     freq = .data$wn / m$W)
 
-
-  vars_data <- (if (is.null(data)) ggmca_data(res.mca) else
-                  ggmca_data(res.mca, data))$vars_data
+  vars_data <- ggmca_data(res.mca, active_tables = NULL)$vars_data
   acm_orga_from_base_ref <- vars_data |>
     dplyr::filter(.data$color_group == "active_vars")
 
@@ -577,7 +519,8 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
 
   acm_orga_from_base_ref |>
     ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
-    theme_facto(res.mca, no_color_scale = TRUE) +
+    theme_facto(list(eig = m$eig, axes_names = res.mca$axes_names), axes = axes,
+                no_color_scale = TRUE) +
     #acm_orga_1_clust$graph_theme_acm +
     ggplot2::geom_point(
       data = tibble::tibble(!!dim1 := 0, !!dim2 := 0),

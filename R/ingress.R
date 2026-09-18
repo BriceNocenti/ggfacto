@@ -1,20 +1,22 @@
 # PURPOSE: What an analysis remembers of its input -- its missing levels, its excluded levels, its
-#   weights, the rows of the data frame it was fitted on, and its levels as FactoMineR numbers them.
+#   weights, the rows of the data frame it was fitted on -- and the one gate through which the
+#   microdata comes back.
 # ROLE: Shared by the ingress normalisers (multiple_correspondence_analysis(),
 #   principal_component_analysis()) and by every function that takes the microdata back afterwards
-#   (ggmca_data(), ggmca_3d(), ggmca_initial_dims(), hierarchical_clust(), clust_tab()).
+#   (ggmca_data(), ggmca_3d(), hierarchical_clust(), clust_tab(), axis_coord()).
 # KEY CONSTRAINTS:
 #   - A missing answer becomes a level named `<VAR>.NA`: unique across variables, so FactoMineR never
 #     renames it `var_lv`, and it is the name a user writes in `excl` to drop that one alone.
 #   - `excl` names levels EXACTLY, never as a regex: level names hold "+", "?" and "(". `NA` (or
 #     "NA") stands for every missing level -- `<VAR>.NA`, or a level literally named "NA".
 #   - The fit stores `res$source = list(n, rows, wt, name)`: the size of the frame the user named,
-#     its rows analysed (`NULL`: all), the names of the weight column and of the frame. Rows are
-#     recorded only when PROVED; every alignment re-checks the answers, and refuses an edited frame.
+#     its rows analysed (`NULL`: all), the names of the weight column and of the frame. An MCA adds
+#     `key` and `w`, each fitted individual's answer profile and weight. Rows are recorded only when
+#     PROVED; every alignment re-checks the answers, and refuses an edited frame.
 #   - A weight of 0 leaves its row out of the fit (recorded in `source`); a missing or negative one
 #     is refused. FactoMineR crashes on both, or gives an infinite coordinate.
-#   - FactoMineR renames an MCA's levels in its results: mca_levels() reads them by POSITION, and
-#     every consumer goes through it rather than matching names.
+#   - The alignment reads a fit view: an MCA's model (R/model.R), whatever engine made it, or a
+#     PCA's own slots.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract, and
 #   dev/hierarchical_clustering.md section 8 for subpopulations.
 
@@ -109,48 +111,45 @@ usable_weights <- function(data, wt, source, keep = integer()) {
   list(data = data[kept, , drop = FALSE], wt = wt[kept], source = source, kept = kept)
 }
 
-# Why this exists: FactoMineR renames an MCA's levels in its results -- a level two variables share
-# becomes `var_lv` (in `call$X` too), a level named y/n/Y/N becomes `var.y` (in `var` and
-# `marge.col` only) -- so its rows are matched by POSITION in the indicator table, never by name.
-# One row per active level, in the indicator table's order: its variable, its name in the data
-# (`lvs`), in `call$X` (`x`) and in FactoMineR's results (`fm`), its column margin, and whether
-# `excl` left it out of the axes.
-mca_levels <- function(res) {
-  X    <- res$call$X[res$call$quali]
-  x    <- lapply(X, function(x) levels(as.factor(x)))
-  vars <- rep(names(X), lengths(x))
-  # FactoMineR prefixes EVERY level of a variable that shares one; undone only then.
-  lvs  <- unlist(purrr::imap(x, function(l, v) {
-    if (all(startsWith(l, str_c(v, "_")))) str_sub(l, str_length(v) + 2L) else l
-  }), use.names = FALSE)
-  tibble::tibble(vars = vars, lvs = lvs, x = unlist(x, use.names = FALSE),
-                 fm = names(res$call$marge.col), freq = unname(res$call$marge.col),
-                 kept = !seq_along(lvs) %in% res$call$excl)
+# What the alignment needs of a fit: the fitted rows and their active answers. An MCA's come from
+# its model, whose profiles `key` expands back to the individuals; a PCA's from its own slots.
+# `res` may be the model already built.
+fit_view <- function(res) {
+  if (inherits(res, "ggfacto_fit_view")) return(res)
+  if (is_mca(res)) return(mca_model(res))
+  vars <- rownames(res$var$coord)
+  structure(list(
+    n = nrow(res$call$X), vars = vars, X = res$call$X[vars], key = NULL,
+    source = if (is.null(res$source)) list(n = nrow(res$call$X), rows = NULL) else res$source
+  ), class = "ggfacto_fit_view")
 }
 
-# The one reader of the weights a fit was made with, raw: a PCA keeps them so in `row.w.init` only.
+# The one reader of the weights of the fitted individuals: an MCA's from its model (`source$w`), a
+# PCA's from `row.w.init`, where it keeps them raw.
 fit_weights <- function(res) {
+  if (is_mca(res) || inherits(res, "ggfacto_mca_model")) {
+    v <- fit_view(res)
+    return(if (is.null(v$w)) rep(1, v$n) else v$w)
+  }
   if (is.null(res$call$row.w.init)) res$call$row.w else res$call$row.w.init
 }
 
 # The names of an analysis's active variables, for an MCA or a PCA.
-active_names <- function(res) {
-  if (inherits(res, "MCA")) names(res$call$X)[res$call$quali] else rownames(res$var$coord)
-}
+active_names <- function(res) fit_view(res)$vars
 
 # Do rows `idx` of `data` hold the answers the analysis was fitted on? Compared as the fit saw them:
 # a missing answer as `<VAR>.NA`, a level without FactoMineR's `var_` prefix.
-same_answers <- function(res, data, idx) {
-  vars <- active_names(res)
-  if (!all(vars %in% names(data))) return(FALSE)
+same_answers <- function(view, data, idx) {
+  if (!all(view$vars %in% names(data))) return(FALSE)
   as_fit <- function(x, v) {
     if (is.numeric(x)) return(x)
     x <- dplyr::if_else(is.na(x), str_c(v, ".NA"), as.character(x))
     dplyr::if_else(startsWith(x, str_c(v, "_")), str_sub(x, str_length(v) + 2L), x)
   }
-  all(purrr::map_lgl(vars, function(v) {
+  all(purrr::map_lgl(view$vars, function(v) {
     new <- as_fit(data[[v]][idx], v)
-    fit <- as_fit(res$call$X[[v]], v)
+    fit <- as_fit(view$X[[v]], v)
+    if (!is.null(view$key)) fit <- fit[view$key]
     if (is.numeric(new)) {
       ok <- !is.na(new)          # FactoMineR's PCA imputes a missing value with the column mean
       isTRUE(all.equal(as.numeric(new[ok]), as.numeric(fit[ok])))
@@ -163,8 +162,9 @@ same_answers <- function(res, data, idx) {
 # The one gate for microdata handed back after the fit: the positions, in `data`, of the fitted rows.
 # `data` is the frame the analysis started from, or the fitted rows; either way, answers must match.
 fit_rows <- function(res, data) {
-  n_fit <- nrow(res$call$X)
-  src   <- res$source
+  view  <- fit_view(res)
+  n_fit <- view$n
+  src   <- view$source
   cand  <- list()
   if (!is.null(src$rows) && nrow(data) == src$n) cand <- c(cand, list(src$rows))
   if (nrow(data) == n_fit)                        cand <- c(cand, list(seq_len(n_fit)))
@@ -180,9 +180,9 @@ fit_rows <- function(res, data) {
     call. = FALSE
   )
 
-  for (idx in cand) if (same_answers(res, data, idx)) return(idx)
+  for (idx in cand) if (same_answers(view, data, idx)) return(idx)
 
-  missing_vars <- setdiff(active_names(res), names(data))
+  missing_vars <- setdiff(view$vars, names(data))
   stop(
     if (length(missing_vars) != 0) {
       str_c("`data` lacks the active variable(s) ", str_c(missing_vars, collapse = ", "), ". ")

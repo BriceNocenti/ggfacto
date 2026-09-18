@@ -22,6 +22,28 @@ fx_mca_multi <- function() fx("mca_multi", function() {
 
 # --- benzecri_mrv --------------------------------------------------------------------------------
 
+test_that("interpret() reads each analysis with its own table", {
+  expect_identical(as.character(interpret(fx_mca())), as.character(mca_interpret(fx_mca())))
+  expect_identical(as.character(interpret(fx_ca())),  as.character(ca_interpret(fx_ca())))
+  expect_identical(as.character(interpret(fx_pca())), as.character(pca_interpret(fx_pca())))
+  expect_identical(as.character(interpret(fx_mca(), axes = 1:2, complete = TRUE)),
+                   as.character(mca_interpret(fx_mca(), axes = 1:2, complete = TRUE)))
+  expect_error(interpret(mtcars), "multiple correspondence")
+})
+
+test_that("a GDAtools speMCA() is interpreted like the equivalent specific MCA", {
+  skip_if_not_installed("GDAtools")
+  spe <- mca_interpret_data(GDAtools::speMCA(fx_tea()[1:6], excl = 3), 1:2)
+  gg  <- mca_interpret_data(MCA2(fx_tea(), 1:6, excl = "Not.tea time"), 1:2)
+  expect_identical(spe[c("axis", "group", "level")], gg[c("axis", "group", "level")])
+  # GDAtools rounds its contributions and coordinates to six decimals
+  expect_equal(spe$ctr, gg$ctr, tolerance = 1e-6)
+  expect_equal(abs(spe$coord), abs(gg$coord), tolerance = 1e-6)
+  expect_s3_class(interpret(GDAtools::speMCA(fx_tea()[1:6], excl = 3)), "ggfacto_summary")
+  expect_equal(benzecri_mrv(GDAtools::speMCA(fx_tea()[1:6], excl = 3)),
+               benzecri_mrv(MCA2(fx_tea(), 1:6, excl = "Not.tea time")), tolerance = 1e-10)
+})
+
 test_that("benzecri_mrv returns one modified rate per retained axis", {
   mrv <- benzecri_mrv(fx_mca())
   expect_type(as.numeric(mrv), "double")
@@ -584,5 +606,5 @@ test_that("mean_sd_tab() says it is retired, and names its replacement", {
   # file has already spent it.
   e <- ggfacto:::deprecated_args_warned
   rm(list = ls(envir = e), envir = e)
-  expect_warning(mean_sd_tab(mtcars, 1:3), "pca_interpret")
+  expect_warning(mean_sd_tab(mtcars, 1:3), "interpret\\(\\)")
 })

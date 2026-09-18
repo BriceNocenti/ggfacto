@@ -16,8 +16,8 @@
 \code{x} invisibly (or the rendered object, for html).
 }
 \description{
-\code{\link{mca_interpret}}, \code{\link{ca_interpret}}, \code{\link{pca_interpret}},
-\code{\link{clust_tab}} and \code{\link{mean_sd_tab}} all return \strong{one}
+\code{\link{interpret}} (for the three analyses), \code{\link{clust_tab}} and
+\code{\link{mean_sd_tab}} all return \strong{one}
 \code{tabxplor} table, so it can be piped, filtered and exported like any other. What differs is
 only how it is \emph{shown}:
 
@@ -62,7 +62,7 @@ they were written: \strong{build the table in the language you will print it in}
 share of the point's own variance the axis holds), plus the \emph{spread} between the two sides.
 Neither is coloured there: a coordinate in axis standard deviations has no conventional cut-off,
 and an MCA cloud has so many axes that every cos2 is small --- the 50 \% / 75 \% rule a
-\code{\link{pca_interpret}} table reads does not transfer. Both are read by comparing the points
+\code{\link{interpret}} table of a PCA reads does not transfer. Both are read by comparing the points
 shown; only the contribution carries an absolute threshold.
 }
 \section{The footer}{
@@ -71,7 +71,7 @@ The \strong{colour legend is tabxplor's, saying ggfacto's nouns} --- a factorial
 chi-squared, so \code{\link[tabxplor]{set_legend_words}} re-states what the ladder grades and
 nothing else. It is therefore built at render, in the language and the palette of the call that
 prints it, with its coloured swatches, in all five media. \strong{Nothing to suppress}: a call
-written by hand is just \code{mca_interpret(res.mca) |> tab_md(css = FALSE, print = FALSE)}.
+written by hand is just \code{interpret(res.mca) |> tab_md(css = FALSE, print = FALSE)}.
 Under it, one plain line names each statistic the colours do \emph{not} grade.
 }
 
@@ -84,5 +84,5 @@ either way. What is lost is only the hover policy and the margin names.
 }
 
 \seealso{
-[mca_interpret()], [ca_interpret()], [pca_interpret()], [clust_tab()], [mean_sd_tab()].
+[interpret()], [clust_tab()], [mean_sd_tab()].
 }

@@ -1,5 +1,5 @@
-# PURPOSE: Internal helpers shared across the package -- factor cleaning, weighted variance, and
-#   the base-R string functions that replaced stringr.
+# PURPOSE: Internal helpers shared across the package -- factor cleaning, the <tidy-select> reader
+#   of variable arguments, weighted variance, and the base-R string functions that replaced stringr.
 # ROLE: Leaf module. Depends on nothing in the package; every other file in R/ may call it.
 # KEY CONSTRAINTS:
 #   - The string helpers reproduce stringr's semantics, NOT base R's. See their section comment
@@ -156,6 +156,30 @@ str_squish <- function(string) gsub("\\s+", " ", trimws(string), perl = TRUE)
 # NOTE: stringr took locale = "en"; toupper() follows the session locale instead.
 #' @keywords internal
 str_to_upper <- function(string, locale = "en") toupper(string)
+
+
+# Is a captured argument given at all? Missing, NULL or empty (`c()`, `character()`) is not; a
+# selection is, never evaluated outside its data frame; a symbol is when it names a column or a
+# non-empty value.
+quo_given <- function(quo) {
+  if (rlang::quo_is_missing(quo) || rlang::quo_is_null(quo)) return(FALSE)
+  expr <- rlang::quo_get_expr(quo)
+  if (rlang::is_call(expr)) return(!(rlang::is_call(expr, c("c", "character")) && length(expr) == 1))
+  tryCatch(length(rlang::eval_tidy(quo)) != 0, error = function(e) TRUE)
+}
+
+# The column names a <tidy-select> argument names in `data`, as in tab(). A symbol holding a
+# character vector (`sup_vars = my_vars`) reads as all_of(), silently: it is how such arguments
+# took strings before they took bare names.
+select_vars <- function(quo, data) {
+  if (!quo_given(quo)) return(character())
+  expr <- rlang::quo_get_expr(quo)
+  if (is.symbol(expr) && !as.character(expr) %in% names(data)) {
+    value <- tryCatch(rlang::eval_tidy(quo), error = function(e) NULL)
+    if (is.character(value)) quo <- rlang::quo(tidyselect::all_of(!!value))
+  }
+  names(tidyselect::eval_select(quo, data))
+}
 
 
 #tidyselect:::where

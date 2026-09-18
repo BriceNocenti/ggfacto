@@ -21,7 +21,7 @@ clust_tab(
 \arguments{
 \item{res}{The analysis the clusters were made on, with
 \code{\link{multiple_correspondence_analysis}} or \code{\link{principal_component_analysis}}
-(or \code{FactoMineR::MCA()} or \code{FactoMineR::PCA()}). For a correspondence analysis, cross
+(or \code{FactoMineR::MCA()} or \code{PCA()}, or \code{GDAtools::speMCA()} or \code{csMCA()}). For a correspondence analysis, cross
 the clusters with the other variable of the table with \code{tabxplor::tab()} instead.}
 
 \item{data}{The data frame, with the clusters. The whole data frame will do when the analysis
@@ -92,5 +92,5 @@ cars <- mtcars |>
 clust_tab(res.pca, cars, clust)
 }
 \seealso{
-[ggfacto_summary], [hierarchical_clust()], [mca_interpret()].
+[ggfacto_summary], [hierarchical_clust()], [interpret()].
 }

@@ -15,8 +15,9 @@ theme_facto(
 )
 }
 \arguments{
-\item{res}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}},
-\code{\link[FactoMineR]{CA}}, etc.}
+\item{res}{An analysis, made with \code{\link{multiple_correspondence_analysis}},
+\code{\link{correspondence_analysis}}, \code{\link{principal_component_analysis}}, FactoMineR or
+GDAtools.}
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 
