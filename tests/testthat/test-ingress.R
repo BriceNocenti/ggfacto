@@ -73,6 +73,33 @@ test_that("PCA2 accepts wt and reaches row.w", {
   expect_equal(res$call$row.w / sum(res$call$row.w), d$w / sum(d$w))
 })
 
+test_that("a zero weight leaves its row out, and the whole data frame still aligns", {
+  # FactoMineR's MCA() crashes on a zero weight; in a survey it marks an out-of-scope row.
+  d <- fx_tea(); d$w <- c(0, 0, rep(1, nrow(d) - 2))
+  expect_message(res <- MCA2(d, 1:6, wt = "w"), "2 row")
+  expect_equal(nrow(res$call$X), nrow(d) - 2)
+  expect_identical(res$source$rows, 3:nrow(d))
+  clust <- dplyr::mutate(d, cl = hierarchical_clust(res, ncp = 2, nb_clust = 3, tree = FALSE))$cl
+  expect_true(all(is.na(clust[1:2])) && !anyNA(clust[-(1:2)]))
+  expect_no_error(quietly(ggmca(res, d, sup_vars = "SPC")))
+})
+
+test_that("a missing or negative weight is refused in words", {
+  d <- fx_tea(); d$w <- c(NA, rep(1, nrow(d) - 1))
+  expect_error(MCA2(d, 1:6, wt = "w"), "positive or zero")
+  d$w[1] <- -1
+  expect_error(MCA2(d, 1:6, wt = "w"), "positive or zero")
+})
+
+test_that("a PCA leaves a zero-weight row out, and keeps its supplementary rows", {
+  # FactoMineR's PCA() gives a zero-weight row infinite coordinates.
+  d <- mtcars[1:7]; d$w <- c(0, rep(1, 31))
+  res <- suppressMessages(PCA2(d, 1:7, wt = "w", ind.sup = 30:32))
+  expect_true(all(is.finite(res$ind$coord)))
+  expect_equal(nrow(res$ind$coord), 28)
+  expect_identical(rownames(res$ind.sup$coord), rownames(mtcars)[30:32])
+})
+
 # --- missing answers and excl: specific MCA -----------------------------------------------------
 
 excluded <- function(res) names(res$call$Xtot)[res$call$excl]

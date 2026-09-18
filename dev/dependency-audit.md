@@ -41,7 +41,7 @@ Figures are **ordered cumulative removals**, each row showing the tree after tha
 | magrittr       |      128 | 198.2 | -0 / -0.0           |
 | withr          |      128 | 198.2 | -0 / -0.0           |
 
-For reference, outside the plan: dropping `plotly` would save 5 packages / 10.9 MB, `FactoMineR` 39 packages / 46.8 MB.
+For reference, outside the plan: dropping `plotly` would save 5 packages / 10.9 MB. FactoMineR's share is measured by scenario in `dev/analysis_engine.md` section 2.1.
 
 ---
 
@@ -158,7 +158,7 @@ Recorded so the question is not reopened.
 - **vctrs, ggrepel, htmlwidgets, scales** --- 0 MB each, all reachable through ggplot2, FactoMineR or ggiraph.
 - **plotly** --- 5 packages / 10.9 MB, but 33 live sites implementing the 3D graphs the Description advertises. Keep; already guarded by `requireNamespace()`.
 - **ggiraph** --- the expensive `Import` that cannot go: it *is* the interactive-graph feature. Note for the record that roughly 41 MB of its tail is `htmlwidgets` pulling `knitr` and `rmarkdown` through `Imports` rather than `Suggests`. That is upstream's decision and outside ggfacto's control.
-- **FactoMineR** --- 39 packages / 46.8 MB, from its own `DT`, `car`/`emmeans`, `ggtext` and `showtext` imports, none of which ggfacto touches. Left alone by decision: it is in the package title and Description. The number still matters, because it means **about two thirds of what remains after Tiers 1 and 2 is FactoMineR's unused statistical tail**, and no ggfacto-side work will move it.
+- **FactoMineR** --- 49 packages / 67.3 MB on today's tree (2.16), almost all from imports serving functions ggfacto never calls: `car` alone brings 27 / 42.4. Asking upstream, feeding it the answer profiles, or computing the analyses ourselves are weighed and ruled in `dev/analysis_engine.md` sections 8 and 11.
 
 ---
 
@@ -167,8 +167,8 @@ Recorded so the question is not reopened.
 Applied in 0.4.0:
 
 - `Imports` --- dropped `gridExtra`, `ggforce`, `stringr`; added `stats`, `grDevices`, `graphics`, `scales`;
-  `ggplot2` raised to `>= 3.4.0` and `R` to `>= 4.1.0` (the package already used `|>`, which 4.0
-  does not have).
+  `ggplot2` raised to `>= 4.0.0` (weighted ellipses; ggiraph already requires it) and `R` to
+  `>= 4.3.0`, FactoMineR 2.16's own floor.
 - `Suggests` --- dropped `finalfit`, `stringi`, `kableExtra`; added `testthat`. `plotly`,
   `htmlwidgets` and `widgetframe` stay for good.
 - `data.table` --- dropped from `Imports` (see Tier 5).
@@ -183,5 +183,5 @@ Measured after the change: **164 packages / 243.7 MB to 129 / 198.3 MB** --- 35 
 45.4 MB less, about 19 %. Retiring the `%>%` re-export would remove the last declared dependency
 that no code uses.
 
-The honest ceiling: with FactoMineR and ggiraph both untouchable, ~198 MB is ggfacto's floor, and
-~47 MB of that is FactoMineR's unused statistical tail.
+The honest ceiling: ggiraph cannot go, and FactoMineR's exclusive share of today's tree (67.3 of
+218.6 MB) is its unused statistical tail; what can shed it is in `dev/analysis_engine.md` section 11.

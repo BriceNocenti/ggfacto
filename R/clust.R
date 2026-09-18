@@ -201,8 +201,9 @@ cached_ward_tree <- function(coord, w, answers) {
   trees[[key]]
 }
 
-# Ward's tree of FactoMineR::HCPC() -- its point order, by its authors (F. Husson, J. Josse,
-# J. Pages) -- built on the distinct points. A plain list, so it can be stored as it is.
+# Ward's tree of FactoMineR::HCPC() -- its point order, from its code by F. Husson, G. Le Ray and
+# Q. Molto (credited in DESCRIPTION) -- built on the distinct points. A plain list, so it can be
+# stored as it is.
 ward_tree <- function(coord, w, answers) {
   # DESIGN: the points in HCPC()'s order, sorted along the first axis: it decides which pair merges
   #   on a tie and where the k-means starts, so the clusters are HCPC()'s own and not a variant.

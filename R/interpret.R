@@ -588,22 +588,18 @@ gda_poles_glossary <- function(contrib = TRUE, complete = FALSE, color = TRUE) {
 #' @keywords internal
 #' @noRd
 mca_interpret_data <- function(res.mca, axes) {
-  data      <- res.mca$call$X[res.mca$call$quali]
-  var_names <- purrr::map(purrr::set_names(names(data)),
-                          ~ levels(dplyr::pull(data, .x))) |>
-    purrr::imap(~ purrr::set_names(rep(.y, length(.x)), .x)) |>
-    purrr::flatten_chr()
-
-  lv  <- rownames(res.mca$var$contrib)
+  # WARNING: FactoMineR's rows are read by POSITION (mca_levels()): it renames levels.
+  lv <- mca_levels(res.mca)
+  lv <- lv[lv$kept, ]
   purrr::map_dfr(axes, function(a) tibble::tibble(
     axis  = as.character(a),
     set   = factor("levels"),
-    group = unname(var_names[lv]),
-    level = lv,
+    group = lv$vars,
+    level = lv$lvs,
     coord = res.mca$var$coord[, a],
     ctr   = res.mca$var$contrib[, a],
     cos2  = res.mca$var$cos2[, a],
-    fk    = unname(res.mca$call$marge.col[lv]),
+    fk    = lv$freq,
     eig   = res.mca$eig[a, 1],
     pct   = round(res.mca$eig[a, 2], 1)
   ))

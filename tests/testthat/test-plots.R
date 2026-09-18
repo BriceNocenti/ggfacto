@@ -30,6 +30,17 @@ test_that("the teaching graphs build, including on all-binary variables", {
   expect_no_error(ggplot2::ggplot_build(quietly(ggmca_with_base_ref(fx_mca()))))
 })
 
+test_that("the teaching graphs build when FactoMineR renames levels (y/n, shared)", {
+  local_null_device()
+  d <- fx_tea()[1:6]
+  d$always    <- factor(ifelse(d$always == "always", "y", "n"))
+  d$breakfast <- factor(ifelse(d$breakfast == "breakfast", "yes", "no"))
+  d$lunch     <- factor(ifelse(d$lunch == "lunch", "yes", "no"))
+  res <- MCA2(d, 1:6)
+  expect_no_error(ggplot2::ggplot_build(quietly(ggmca_initial_dims(res, d))))
+  expect_no_error(ggplot2::ggplot_build(quietly(ggmca_with_base_ref(res, d))))
+})
+
 test_that("keep = selects a few variables on both teaching graphs", {
   # `keep` on ggmca_initial_dims() called purrr::keep() unqualified and died with
   # "could not find function keep" -- a hard error on a documented argument.
@@ -114,6 +125,32 @@ test_that("ellipses cover every individual, and need no profiles", {
   coord <- quietly(ggmca_plot(pd, ellipses = 0.5, get_data = TRUE))$ellipses_coord
   expect_equal(nrow(coord), sum(!is.na(fx_tea()$SPC)))
   expect_lte(nrow(pd$ind_data), 5L)
+})
+
+# The ellipse a layer draws, as ggplot2 builds it.
+ellipse_of <- function(p) {
+  i <- which(vapply(p$layers, function(l) inherits(l$stat, "StatEllipse"), logical(1)))
+  ggplot2::ggplot_build(p)$data[[i]][c("x", "y", "group")]
+}
+
+test_that("the ellipses are weighted by the survey weights, and unchanged without", {
+  local_null_device()
+  by_hand <- function(res, data, weighted) {
+    pd    <- md(res, data, sup_vars = "SPC")
+    coord <- quietly(ggmca_plot(pd, ellipses = 0.5, get_data = TRUE))$ellipses_coord
+    aes   <- if (weighted) {
+      ggplot2::aes(.data$`Dim 1`, .data$`Dim 2`, group = .data$lvs, weight = .data$row.w)
+    } else {
+      ggplot2::aes(.data$`Dim 1`, .data$`Dim 2`, group = .data$lvs)
+    }
+    ellipse_of(ggplot2::ggplot(coord, aes) +
+                 ggplot2::stat_ellipse(type = "t", level = 0.5, segments = 360))
+  }
+  pw <- quietly(ggmca(fx_mca_wt(), fx_tea_wt(), sup_vars = "SPC", ellipses = 0.5))
+  expect_equal(ellipse_of(pw), by_hand(fx_mca_wt(), fx_tea_wt(), weighted = TRUE))
+  expect_false(isTRUE(all.equal(ellipse_of(pw), by_hand(fx_mca_wt(), fx_tea_wt(), FALSE))))
+  pu <- quietly(ggmca(fx_mca(), fx_tea(), sup_vars = "SPC", ellipses = 0.5))
+  expect_equal(ellipse_of(pu), by_hand(fx_mca(), fx_tea(), weighted = FALSE))
 })
 
 test_that("facets draw the profiles of each level, with or without profiles = TRUE", {
@@ -221,4 +258,12 @@ test_that("the 3D graphs build when plotly is available", {
   local_null_device()
   expect_s3_class(quietly(ggmca_3d(fx_mca(), fx_tea())), "plotly")
   expect_s3_class(quietly(ggpca_3d(fx_pca())), "plotly")
+})
+
+test_that("ggmca_3d draws in two dimensions too, with no 3D attribute left over", {
+  skip_if_not_installed("plotly")
+  local_null_device()
+  p <- quietly(ggmca_3d(fx_mca(), fx_tea(), axes = 1:2))
+  expect_s3_class(p, "plotly")
+  expect_no_warning(plotly::plotly_build(p))
 })

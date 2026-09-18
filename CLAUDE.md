@@ -44,14 +44,14 @@ Fifteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / #
 **Tables, rendering and plumbing.**
 
 - `interpret.R` — the interpretation tables of a factorial analysis: `mca_interpret()`, `ca_interpret()`, `pca_interpret()`, `benzecri_mrv()`, and the output contract the summary family shares (`?ggfacto_summary`, its two print methods).
-- `ingress.R` — what an analysis remembers of its input: the `<VAR>.NA` levels, the one `excl` rule, and the rows it was fitted on (`source_rows()`, `align_to_fit()`).
+- `ingress.R` — what an analysis remembers of its input: the `<VAR>.NA` levels, the one `excl` rule, the weight rule, the rows it was fitted on (`source_rows()`, `align_to_fit()`), and an MCA's levels read by position (`mca_levels()`).
 - `render.R` — `theme_facto()`, the material palettes, `ggi()`, `ggsave2()`, `plot_path()`, `outlims()`.
 - `utils.R` — factor helpers, the base-R string shim that replaced stringr, `weighted.var()`, vendored `where()`, and the two soft-deprecation notices (`renamed_arg()`, `deprecated_fn()`).
 - `i18n.R` — the gettext plumbing: the `R-ggfacto` text domain, its own cache flush, the language resolver, and `with_gda_lang()`, which makes `lang =` an argument rather than an accident of the session.
 - `knit.R` — the knitr seam: tags every widget the package returns, and writes it to its own file with an `<iframe>` in its place when `options(ggfacto.widget_dir)` asks.
 - `ggfacto-package.R` — imports, global bindings, `.onLoad()`, the deprecated `%>%` re-export.
 
-**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `po/` (the message catalogues, `R-ggfacto.pot` and `R-fr.po`) · `inst/po/fr/LC_MESSAGES/` (the compiled `.mo`, committed, since `R CMD build` does not compile it) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md`, `hierarchical_clustering.md`, `update_translations.R` and `hclust_chunked.R`).
+**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `po/` (the message catalogues, `R-ggfacto.pot` and `R-fr.po`) · `inst/po/fr/LC_MESSAGES/` (the compiled `.mo`, committed, since `R CMD build` does not compile it) · `dev/` (`.Rbuildignore`'d; holds `dependency-audit.md`, `hierarchical_clustering.md`, `analysis_engine.md` with its prototype `analysis_engine.R`, `update_translations.R` and `hclust_chunked.R`).
 
 ---
 
@@ -91,15 +91,15 @@ Fifteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / #
 
 ### The FactoMineR contract
 
-The package computes no analysis of its own, the clustering apart (below). `multiple_correspondence_analysis()`, `principal_component_analysis()` and `correspondence_analysis()` are the **ingress normalisers** (short names `MCA2()`, `PCA2()`, not deprecated) — tidyselect for `active_vars`/`wt`, a missing answer turned into a level `<VAR>.NA`, and one `excl` rule, **exact level names**, `NA` (the default) standing for every missing level, sent to FactoMineR as positions because it renames a level two variables share — while `correspondence_analysis()` reads a `tab()`'s weighted counts, whatever it displays. Everything downstream reads the fitted object directly: `$call$X` / `$quali` / `$Xtot` / `$excl` / `$marge.col` / `$row.w`, `$var$coord` / `$contrib` / `$cos2`, `$ind$coord`, `$eig`, `$svd$V` and `$vs`.
+The package computes no analysis of its own, the clustering apart (below). `multiple_correspondence_analysis()`, `principal_component_analysis()` and `correspondence_analysis()` are the **ingress normalisers** (short names `MCA2()`, `PCA2()`, not deprecated) — tidyselect for `active_vars`/`wt`, a zero weight leaving its row out (FactoMineR crashes on it) and a missing one refused, a missing answer turned into a level `<VAR>.NA`, and one `excl` rule, **exact level names**, `NA` (the default) standing for every missing level, sent to FactoMineR as positions because it renames a level two variables share — while `correspondence_analysis()` reads a `tab()`'s weighted counts, whatever it displays. Everything downstream reads the fitted object directly: `$call$X` / `$quali` / `$Xtot` / `$excl` / `$marge.col` / `$row.w`, `$var$coord` / `$contrib` / `$cos2`, `$ind$coord`, `$eig`, `$svd$V` and `$vs`.
 
-`varsup()`, vendored from GDAtools 1.7.2, is the only extractor that dispatches on the object's class (`MCA` / `speMCA` / `csMCA` / `stMCA` / `multiMCA`) and it covers supplementary variables only. ggfacto adds two slots of its own: **`res$axes_names`**, the user's, read defensively and used by `theme_facto()` for the axis titles; and **`res$source`**, the ingress's, `list(n, rows, wt, name)` — which rows of the data frame the user named were analysed, under which weight column, and that frame's name, for a refusal to cite. It is read off the call itself: `pc_AGD |> filter(...) |> multiple_correspondence_analysis(...)` is re-run with a hidden row id, and kept only if it gives back exactly the analysed data (a `%>%`, a `select()` or a `slice_sample()` record nothing). Every function that takes the microdata back — `ggmca()`, `ggmca_3d()`, `hierarchical_clust()` inside `mutate()` — goes through `align_to_fit()`, which picks those rows and **re-checks the active answers**, so a subset needs no second filter and a reordered data frame is refused rather than misaligned. `correspondence_analysis()` writes the margin names back on `call$X`, which `FactoMineR::CA()` strips. ⚠ There is no shared extractor for the *active* side: `active_vars` is re-derived from `res.mca$call$X` and `$call$quali` in `mca-data.R`, twice in `mca-teach.R`, and by `active_names()` in `ingress.R`.
+`varsup()`, vendored from GDAtools 1.7.2, is the only extractor that dispatches on the object's class (`MCA` / `speMCA` / `csMCA` / `stMCA` / `multiMCA`) and it covers supplementary variables only. ggfacto adds two slots of its own: **`res$axes_names`**, the user's, read defensively and used by `theme_facto()` for the axis titles; and **`res$source`**, the ingress's, `list(n, rows, wt, name)` — which rows of the data frame the user named were analysed, under which weight column, and that frame's name, for a refusal to cite. It is read off the call itself: `pc_AGD |> filter(...) |> multiple_correspondence_analysis(...)` is re-run with a hidden row id, and kept only if it gives back exactly the analysed data (a `%>%`, a `select()` or a `slice_sample()` record nothing). Every function that takes the microdata back — `ggmca()`, `ggmca_3d()`, `hierarchical_clust()` inside `mutate()` — goes through `align_to_fit()`, which picks those rows and **re-checks the active answers**, so a subset needs no second filter and a reordered data frame is refused rather than misaligned. `correspondence_analysis()` writes the margin names back on `call$X`, which `FactoMineR::CA()` strips. FactoMineR renames an MCA's levels in its results (`var_lv` for a level two variables share, `var.y` for a level named y/n), so **its rows are read by position**, through `mca_levels()` alone, never matched by name. ⚠ There is no shared extractor for the rest of the *active* side: `active_vars` is re-derived from `res.mca$call$X` and `$call$quali` in `mca-data.R`, twice in `mca-teach.R`, and by `active_names()` in `ingress.R`.
 
 **The clusters are `HCPC()`'s, computed here.** `FactoMineR::HCPC()` builds its Ward tree from a `dist()` and an n × n `outer()` of weights — +3.3 GB for the course's 9 234 rows, so a 32 GB machine runs out near 30 000. Ward merges identical points first, at no cost, so `hierarchical_clust()` builds the same tree on the **distinct points** of the cloud (an MCA's answer profiles, weighted by the sum of their individuals) with `fastcluster::hclust.vector()`, which keeps no dissimilarity matrix: memory linear in the points, time still quadratic (~25 s at 40 000 distinct points). The rest is `HCPC()`'s and must stay so: the points sorted along axis 1 (it decides the ties and where the k-means starts), the cut rule, the **unweighted** k-means consolidation, the clusters numbered along axis 1. `test-clust.R` pins the equality for the three analyses. `consol = "weighted"` opts in to a Lloyd k-means counting each individual by its weight, run on the distinct points; by default the clusters stay FactoMineR's, weighted analysis or not. A CA clusters the levels of one `margin`, weighted by their counts, and in `mutate()` each individual takes its level's cluster, matched by name. **The tree is built once per session**: it is memoised on the content it is built from, so another `nb_clust` or `names` costs only the cut — the design, the options weighed and the course workflow are in `dev/hierarchical_clustering.md`. A tree built by parts, for larger clouds, was measured and kept out of `R/`: `dev/hclust_chunked.R`.
 
 ### Weights ride one channel
 
-The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fitted object** (`res.mca$call$row.w`), never from `data`, and re-attached as a `row.w` column → `tabxplor::tab(wt = "row.w")`, beside the rows of `data` that `align_to_fit()` picked. So a tooltip always describes the population the analysis was fitted on, even when the user passes the whole data frame after analysing a subset of it; `clust_tab(res, data, clust)` weights its table the same way, under the name of the user's column (`res$source$wt`). Consequently `count` (unweighted `n`) and `wcount` (`sum(row.w)`) travel as a pair everywhere: `wcount` is the point-size aesthetic and the sort key for `max_profiles` truncation, and a tooltip prints the weighted `n` only when it differs from the unweighted one.
+The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fitted object** (`res.mca$call$row.w`), never from `data`, and re-attached as a `row.w` column → `tabxplor::tab(wt = "row.w")`, beside the rows of `data` that `align_to_fit()` picked. So a tooltip always describes the population the analysis was fitted on, even when the user passes the whole data frame after analysing a subset of it; `clust_tab(res, data, clust)` weights its table the same way, under the name of the user's column (`res$source$wt`). Consequently `count` (unweighted `n`) and `wcount` (`sum(row.w)`) travel as a pair everywhere: `wcount` is the point-size aesthetic and the sort key for `max_profiles` truncation, and a tooltip prints the weighted `n` only when it differs from the unweighted one. The ellipses weight each individual by `row.w` too (`stat_ellipse()`'s `weight`, ggplot2 ≥ 4.0.0).
 
 ### The plot-object seam
 
@@ -158,7 +158,7 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 - **Inline `# DESIGN:` / `# WARNING:` tags** — the non-obvious "why" at the exact line, caveats to avoid, etc.
 - **Vignettes** — usage and teaching, for users. ⚠ **None exist yet**: there is no `vignettes/`, no `VignetteBuilder` and no `knitr` in `Suggests`. Until there is, a `@param` that needs more than a sentence carries it itself; do not link to a vignette that is not there.
 - **Roxygen man pages** (`?ggmca`, `?ggca`) — user-facing reference: *usage* and the main use cases, never build/internals/history. A `@param` states what the argument is, its values, and at most one sentence of when to change it; the rest is a link to the vignette that owns it. ⚠ The manual is LaTeX, so an Rd file is ASCII but for the few glyphs it can set (`— … × ÷`); `test-non-ascii.R` locks it.
-- **`dev/*.md`** (`.Rbuildignore`'d) — transversal or expert technical guides only; there are two, `dependency-audit.md` (what each dependency costs to install, and the ruling on each) and `hierarchical_clustering.md` (the clustering workflow: its design, the options weighed, the course code, the jamovi seam). Each holds what an `R/` header is too short to derive — a foreign system, a cross-file policy, a statistical derivation — and the header that needs it points at it by section.
+- **`dev/*.md`** (`.Rbuildignore`'d) — transversal or expert technical guides only; there are three, `dependency-audit.md` (what each dependency costs to install, and the ruling on each), `hierarchical_clustering.md` (the clustering workflow: its design, the options weighed, the course code, the jamovi seam) and `analysis_engine.md` (what computes the analyses: FactoMineR's cost, the answer profile as the unit, parity, upstream and the community, the ruling). Each holds what an `R/` header is too short to derive — a foreign system, a cross-file policy, a statistical derivation — and the header that needs it points at it by section.
 - **Roadmap "DONE" summaries are appended to the section below** (this file) — the **ONLY** place dev history lives. The maintainer then manualy moves them to `dev/ggfacto_roadmap_DONE_PHASES.md` for archiving.
 
 ---
@@ -191,7 +191,7 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 **Fixtures are `tea[1:6]`, never `tea[1:18]`.** Tooltip crosstabs are quadratic in the number of active variables: `active_tables = "active"` costs 1.2 s on six and 10.4 s on eighteen. Six reaches every code path. The models the suite reuses are memoised in `helper-fixtures.R`, among them `fx_tea_na()` (missing answers for the `excl` rule) and `fx_mca_young()` (an analysis of a piped subset, which records its rows). The one exception is `fx_mca_multi()`, local to `test-interpret.R`: `tea[1:6]` is all binary, so `mca_interpret()`'s row packing collapses every question to one line there and its display blanking has nothing to hide — that needs multi-level variables and a third axis.
 
-The suite is **small and serial**: 609 assertions, about 40 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
+The suite is **small and serial**: 632 assertions, about 40 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
 
 **Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text (as `ggmca_plot()` joins it) and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(tabxplor.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
 
@@ -415,12 +415,106 @@ La feuille de route annonçait 1 Go : c'était 3,3 Go, le `dist()` et surtout l'
 
 
 
-#### Phase 1q — research : abandon FactoMineR dependency ?
+#### Phase 1q — garder FactoMineR, mais le nourrir de profils de réponses (DONE)
 
-I’m thinking about a radical move : to copy everything we need from FactoMineR and thank them in the code and description, drop everything that is not needed, do our own API and workflows, and do parity tests with the last version of FactoMineR to still get exactly the same results. I want you to make a full research about that possibility in a new file in `dev/`. Would it be possible ? What would be the gains : dependencies size, speed, readability, new more readable API and more straight-to-the-point user-friendly readable geometrical data analysis workflows, etc ? What would be the caveats ? Its research only, and one teaching of the research may be that it’s a stupid idea or that it’s useless : implement nothing.
+**Recherche seule : rien dans `R/`, les tests, `man/`, `DESCRIPTION` ni `NEWS.md`.** Deux fichiers dans `dev/` : `analysis_engine.md`, la référence, et `analysis_engine.R`, le prototype — moteurs, harnais de parité, mesures —, une section par processus froid sous plafond mémoire, pour que chaque chiffre du document se rejoue d'une commande (son annexe B).
+
+**Le verdict : ne pas vendoriser FactoMineR maintenant.** Passer au profil de réponses comme unité de l'ACM, FactoMineR restant le moteur ; demander d'abord en amont ce qui allégerait la dépendance ; garder prêt dans `dev/` un moteur natif d'environ 130 lignes, seul capable des très grands nuages. Critères GO/NO-GO du moteur natif dans le document (section 11) : deux tenus, un pas encore (à 10 questions, FactoMineR nourri de profils suffit), deux en attente — la réponse de l'amont, et le contact avec son mainteneur.
+
+| Enquête Emploi, actifs occupés, EXTRI    | FactoMineR, individus          | FactoMineR, profils | moteur « lean » |
+|------------------------------------------|--------------------------------|---------------------|-----------------|
+| 1 million de lignes, 10 questions        | 36 s · 5,5 Go · objet 2,4 Go   | 4,0 s · 0,75 Go     | 0,25 s · 0,2 Go |
+| 1,87 million, 15 questions (608 089 profils) | ~106 s · ~18 Go (extrapolé) | 32 s · 6,1 Go      | 2,1 s · 0,8 Go  |
+
+**Ce que coûte la dépendance.** 49 paquets / 67,3 Mo (25 compilés) de l'arbre de ggfacto, et 1,0 s au premier appel d'une session — `library(ggfacto)` ne le charge pas. `car` seul en apporte 27 / 42,4, pour des fonctions que ggfacto n'appelle jamais ; un FactoMineR réduit à son cœur n'en coûterait que 2 / 4,4, mais garderait 0,5 s de chargement par `irlba` → `Matrix`. ⚠ Passer FactoMineR en `Suggests` ne sauve rien : le cours installe avec `dependencies = TRUE`.
+
+**Le profil est exact.** Des individus aux mêmes réponses ont la même ligne du tableau disjonctif : fusionnés, ils laissent X′X inchangé. Mesuré contre `FactoMineR::MCA()` passé par l'ingress de ggfacto, sur `tea`, `pc_AGD` pondéré et l'Enquête Emploi, avec et sans `excl` : 1e-13 au pire, 1,1e-11 par la voie de Burt ; seules divergences, les signes instables de FactoMineR lui-même. Sur l'Enquête Emploi, les profils font 3 % des lignes à 8 questions sur dix ans, 8 % à 10, 32 % à 15 (65 % une fois retirés les passages répétés du panel). Le lien individu → profil coûte 0,1 s à un million de lignes. **La clé manquante à grande échelle est un découplage** : ggfacto demande tous les axes pour le tableau des valeurs propres, et FactoMineR calcule alors trois matrices n × (K − Q) que personne ne lit. Le tableau de Burt (K × K) donne toutes les valeurs propres, et les coordonnées des seuls axes demandés.
+
+**Les bulles se calculent sur le tableau de Burt** (idée du mainteneur, en cours de phase) : les tableaux croisés de `active_tables = "active"` en sont les blocs. Construits depuis les tableaux de Burt pondéré et non pondéré des profils, puis confiés à `tabxplor::fmt()` pour la couleur et le format, ils reproduisent les 1 482 cellules de `pc_AGD` à l'identique — effectifs, pourcentages, écarts, codes couleur et texte — dix fois plus vite (0,81 → 0,08 s), 4,4 fois à un million de lignes. C'est le plus gros gain à portée d'un·e étudiant·e : le moteur, lui, ne pèse que 0,13 s d'une session de cours d'environ 6 s. data.table, même sur 12 fils, n'accélère rien : ces briques sont déjà en C.
+
+**La compatibilité est concrète.** Un objet à la forme de FactoMineR passe factoextra, explor et GDAtools sans FactoMineR chargé, pourvu que `"MCA"` reste la première classe (GDAtools teste `class(x)[1]`). Sans FactoMineR installé, `print()` du même objet déroule 11 767 lignes, et les deux `plot()` du cours échouent. ⚠ ggfacto refuse aujourd'hui un `GDAtools::speMCA()` (`ggmca()`, `mca_interpret()`, `benzecri_mrv()`) : les branches GDAtools de `varsup()` ne servent à rien.
+
+**Neuf bogues de FactoMineR 2.16 reproduits**, rédigés en brouillons d'issues à déposer par le mainteneur (annexe A) : `level.ventil` bouclant sans fin sur un facteur ordonné, l'avertissement des NA jamais émis, `na.method = "Average"` cassé, le repli `eigen()` défectueux, le signe laissé à LAPACK à un seul axe, les `v.test` gonflés par l'échelle des poids, `irlba` dépendant de la graine, `CA()` sur une ligne nulle avec `col.sup`, et un poids nul qui fait planter `MCA()` — cas ordinaire en enquête (EXTRI = 0), donc `MCA2(wt =)` aussi. L'amont répond vite : l'issue #41 a été corrigée le lendemain, et la 2.17 abandonne `ggtext`.
+
+**Trois bogues latents de ggfacto trouvés, non corrigés** : `ggmca_3d(axes = 1:2)` échoue toujours (`select(-"Dim.3")` sur des colonnes `"Dim 3"`) ; une question aux modalités `y`/`n`, que FactoMineR renomme `var.y`, disparaît du modèle de `ggmca_data()` ; les ellipses d'une analyse pondérée ignorent les poids (`stat_ellipse(type = "t")`).
+
+**Un manque d'attribution, quel que soit le verdict.** `varsup()` est copié de GDAtools et `R/clust.R` dérive de `HCPC()`, mais `Authors@R` ne nomme que le mainteneur, et il n'y a pas d'`inst/CITATION`. La politique du CRAN demande des rôles `ctb` (et `cph`) : à régler avant la 0.4.0, avec une citation qui renvoie à FactoMineR (JSS 2008), à Le Roux et Rouanet et à Benzécri.
+
+**Au passage**, les lignes FactoMineR de `dev/dependency-audit.md` (39 paquets / 46,8 Mo, et « laissé tel quel : il est dans le titre ») renvoient désormais au nouveau document, avec les chiffres de l'arbre d'aujourd'hui.
+
+**Ce que la phase n'a pas fait.** Aucune ligne de code du paquet, donc aucune suite relancée (609 assertions, inchangées). La phase suivante naturelle est un lecteur unique de l'analyse, centré sur les profils, avec FactoMineR pour moteur (section 11 du document).
 
 
 
+#### Phase 1q-ii — les crédits, et quatre bogues latents (DONE)
+
+**Le premier point du verdict de 1q, appliqué** : les crédits, les bogues latents de ggfacto, les textes pour l'amont. Suite : **632 assertions** (609), 0 échec, 0 avertissement, ~39 s ; `check` 0/0/0. **Le mainteneur a tranché** : FactoMineR reste le moteur, nourri des profils de réponses, et le moteur natif n'est pas poursuivi. La section 11 du document le dit désormais ; ses critères GO/NO-GO ont disparu avec la question.
+
+**Les crédits.** `Authors@R` nomme en `ctb` et `cph` Nicolas Robette, pour `varsup()`, copié de GDAtools, et François Husson, Guillaume Le Ray et Quentin Molto, auteurs du code de `HCPC()` dont `R/clust.R` dérive la règle de coupe et le dessin de l'arbre. Le commentaire de `R/clust.R` nommait à tort les auteur·ices de la méthode. `inst/CITATION` cite ggfacto, puis FactoMineR (JSS 2008, sous son vrai titre : celui du `bibentry` de FactoMineR est fautif), Le Roux et Rouanet (2004, 2010), Benzécri (1979), Husson, Josse et Pagès (2010) et GDAtools. La règle du CRAN est citée dans le document, section 9.
+
+**`mca_levels()` : les modalités d'une ACM lues par leur position** (`R/ingress.R`). FactoMineR renomme une modalité partagée par deux variables en `var_lv` (jusque dans `call$X`) et une modalité `y`/`n`/`Y`/`N` en `var.y` (dans `var` et `marge.col` seulement). Toutes les jointures par nom perdaient donc une question y/n :
+
+- dans `ggmca()`, où elle disparaissait (G2) ;
+- dans `mca_interpret()`, où son groupe valait `NA` ;
+- dans `ggmca_initial_dims()`, qui échouait ;
+- dans `ggmca_with_base_ref()`, qui perdait aussi la fréquence des modalités partagées.
+
+Un seul lecteur positionnel sert désormais les quatre, et `mca_interpret()` affiche le nom de la donnée plutôt que celui de FactoMineR.
+
+**Les poids nuls ou manquants.** FactoMineR plante sur un poids nul en ACM (B9), donne une coordonnée infinie en ACP et plante sur un poids manquant. `usable_weights()` laisse hors de l'ajustement une ligne de poids nul, avec un message, et `res$source` enregistre les lignes restantes : `mutate(hierarchical_clust())` met donc `NA` sur elles, et `ggmca()` reprend la base entière. Un poids manquant ou négatif est refusé en clair. Les individus supplémentaires d'une ACP sont renumérotés.
+
+**`ggmca_3d(axes = 1:2)` échouait toujours** (G1) : `select(-"Dim.3")` portait sur des colonnes nommées `"Dim 3"`. La ligne était morte, puisque le mode 2D n'utilise pas ce tableau, et elle disparaît ; `scene =` n'est plus passé aux traces 2D, qui avertissaient. Le mode 2D n'avait jamais fonctionné au-delà de cette erreur.
+
+**Les ellipses d'une analyse pondérée ignoraient les poids** (G3). Les deux couches portent désormais `weight = row.w` : `stat_ellipse()` pondère `cov.trob()` depuis ggplot2 4.0.0, minimum relevé en conséquence (ggiraph 0.9.6 l'exige déjà). Sans poids, l'ellipse est identique, et c'est épinglé.
+
+**R ≥ 4.3 déclaré**, le plancher de FactoMineR 2.16 : l'ancien `R (>= 4.1.0)` n'était vrai qu'avec un FactoMineR plus ancien.
+
+**L'amont.** Trois textes prêts à déposer par le mainteneur, dans `~/Documents/ggfacto_upstream/` : les neuf bogues de FactoMineR en une issue, deux propositions (`Suggests` ; profils et valeurs propres complètes) à déposer après la réponse, et une note à Nicolas Robette. Rien n'est déposé.
+
+**La recherche pour la phase suivante**, versée au document (sections 5.1 et 7.1) :
+
+- `FactoMineR::svd.triplet()`, exporté, décompose le tableau de Burt de ggfacto à 9e-14 de `MCA()`, en 3,5 s et 0,7 Go à 608 089 profils : c'est la voie légitime pour garder FactoMineR comme moteur à toute échelle.
+- FactoMineR nourri des profils égale son ajustement sur les individus à 5e-13.
+- Un objet ajusté sur les profils passe tout l'écosystème, sauf les fonctions de GDAtools qui reçoivent une variable par individu. `call$X` et `call$Xtot` restent, puisqu'explor les lit. Le seul amaigrissement simple garde `ind` et `svd$U` sur les premiers axes, comme le fait FactoMineR pour `excl` + `ncp`.
+- ⚠ Chargement : sans `car`, `emmeans` ni `multcompView`, les imports de FactoMineR prennent encore 0,96 s (`showtext`, `sysfonts`, `irlba` → `Matrix`). Le tableau de la section 8 du document, qui annonçait 0,6 s de gain, est corrigé.
+
+
+#### Phase 1q-iii — the answer profile as the unit: a profile-centric reader, FactoMineR as its engine
+
+**The aim.** Build one internal model of an MCA around its distinct answer profiles, once per fit, and have every consumer read it. FactoMineR stays the engine, the fitted object keeps FactoMineR's exact form, and the workflows become as simple and readable as they can be. All the evidence is in `dev/analysis_engine.md` (sections 4, 5.1 and 7.1) and its prototype `dev/analysis_engine.R` (`profile_table()`, `burt_table_base()`, `mca_fm_burt()`, `burt_crosstab()`, `sup_coord_xtab()`). Only the MCA is concerned: a CA's and a PCA's tables are small.
+
+**Start with `AskUserQuestion` on the open decisions below, then plan.**
+
+1. **The model.**
+   - **Contents:** the P × Q profiles, as the fit saw them. The individual-to-profile map: stored `key`, or re-derived by `vctrs::vec_match()`, 0.14 s at a million rows. The individual weights: stored, or read back from `data` under `res$source$wt`. The source rows. The weighted and unweighted Burt tables (K × K, base `rowsum()`, so no 0.5 s `Matrix` load). `mca_levels()`.
+   - **Where:** a list slot beside `source` is the simplest.
+   - **What it removes:** the active-side re-derivations and the 45 reads of `call$X` and `call$quali`.
+2. **The engine: decide A or B.**
+   - **A. `FactoMineR::MCA()` fed the profiles** (`row.w` = summed weights). It is exact to 5e-13 and FactoMineR's own object, 9 times faster at a million rows. Its peak memory stays FactoMineR's: 6 GB at 608 089 profiles.
+   - **B. `FactoMineR::svd.triplet()` fed the Burt-derived K × K matrix.** It is exact to 9e-14, and takes 0.3 s at 1.87 million rows with 10 questions, 3.5 s and 0.7 GB at 608 089 profiles. ggfacto then writes the object's slots in closed form, in FactoMineR's exact shape: about 60 lines, pinned by a parity test against `MCA()`.
+   - **To settle:** A always; A below a size threshold and B above; or B always, as one path.
+3. **The object.** FactoMineR's MCA fitted on the profiles, `"MCA"` first in its class, plus ggfacto's slots.
+   - **The contract:** the ecosystem reads profiles as individuals. Only a function given one value per individual breaks (GDAtools `supvar()`, `ggadd_ellipses()`).
+   - **Slimming**, the maintainer's rule: *only if it is simple and breaks nearly nothing*. Profiles already shrink every slot. The one simple extra is `ind` and `svd$U` on the first k axes while `eig`, `var` and `svd$V` keep them all, FactoMineR's own shape for `excl` + `ncp` (113 MB instead of 334 at a million rows). `call$X` and `call$Xtot` are not touched, since explor reads them.
+   - ⚠ **What users will see change:** `acm$ind$coord` has one row per profile, and `acm$call$X` and `acm$call$row.w` are the profiles'. An accessor for individual coordinates in `mutate()` replaces them. The maintainer's notebook `pc08_*` (`acm$ind$coord[ok, axe]`) and the `socio_public_services` helpers move to it.
+4. **The consumers.**
+   - **Tooltips:** the Burt route replaces `stacked_crosstab()` for `active_tables = "active"`. It was cell-identical on `pc_AGD`, colours and text included, and 10 times faster. `tabxplor::fmt()` / `fmt_get_color_code()` still colour and format. It carries over `tooltip_vars_1lv`, `Remove_levels` and the two-level cut. `"sup"` tables are the crosstab of the supplementary levels with the active ones: one `rowsum()` per active variable. If a constructor from counts is missing in tabxplor's public API, it belongs in tabxplor.
+   - **Supplementary levels:** the crosstab route (`sup_coord_xtab()`, 1e-15 from `MCA(quali.sup =)`) replaces `varsup()`, 95 lines whose GDAtools branches are dead. Unless `speMCA()` / `csMCA()` input is implemented, in which case `varsup()` becomes that adapter.
+   - **Profiles and individuals:** the model's map replaces `answer_profiles()`'s own grouping.
+   - **Clustering:** the Ward tree's leaves are the profiles. Consolidation stays at the individual level, through the map.
+   - **Teaching plots:** `ggmca_initial_dims()` reads `call$Xtot` as the n × K indicator table, and should rebuild it from the profiles and weights.
+5. **The API**, to settle with the maintainer:
+   - the name of the coordinates accessor (`mutate(axe1 = …(acm, 1))`);
+   - GDAtools fits as input (`speMCA()`, `csMCA()`), which the compatibility contract promises;
+   - `print(acm)`, which stays FactoMineR's while FactoMineR is imported (class order O2′).
+   - Otherwise a student's code does not change.
+6. **The tests.**
+   - Parity of the profile fit against the individual fit, on a weighted fixture with `excl`.
+   - Tooltip cells by the Burt route against a direct `tabxplor::tab()` cell.
+   - The accessor, aligned by `align_to_fit()`.
+   - Keep the fixtures on `tea[1:6]`.
+7. **The targets.** On `pc_AGD`, `ggmca(active_tables = "active")` drops from 1.6 s to about 0.9 s. At a million rows and 10 questions, `MCA2()` drops from 36 s to 4 s or less.
+8. **The documentation.** The architecture sections of this file change with it: the plot model, the tooltip, the FactoMineR contract. The maintainer asks for that rewrite with this phase, by targeted replacements. `dev/analysis_engine.md` section 11 keeps the ruling.
 
 
 #### Phase 1r — vignette and pkgdown site
@@ -441,9 +535,12 @@ In the pkgdown site, organise the functions in the "Reference" page in a user-fr
 
 #### Phase 1s — teach the new usage in `formations_stat`
 
-`clust_tab()`, and the new aliases and API.
+
+`clust_tab()`, and the new aliases and API : look at `dev/hierarchical_clustering.md`
 
 **Sous-populations : le cadre existait, il manquait qu'on s'en serve.** La règle — filtrer dans le pipe de l'analyse, puis toujours donner la base entière — est celle de la phase 1m ; aucun document du cours ne l'employait. `res$source` garde désormais le nom de la base, et le refus le cite (« fitted on the 3 246 rows of `sub` »). Les pièges des carnets (`drop_na()` devant une ACM spécifique, `select()` qui efface l'identifiant, variables créées sur le sous-ensemble) sont au document ; l'extension des classes aux individus hors sous-population, par le centre pondéré le plus proche, y est proposée, pas implémentée.
+
+
 
 
 #### Phase 1t — 0.4.0 release

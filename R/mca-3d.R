@@ -279,7 +279,6 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
                   dplyr::across(axes[2], ~ . * aspectratio[[2]]),
                   dplyr::across(if (D2) {NULL} else {axes[3]}, ~ . * aspectratio[[3]]),
     )
-  if (D2) aspectratio_range <- aspectratio_range |> dplyr::select(-"Dim.3")
 
   #     se calcule ensuite, pour chaque axe, par rapport a son propre range ?
 
@@ -302,12 +301,12 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
   dual_plots <- vector("list", length(scene_name))
   for (i in 1:length(scene_name)) {
 
-    dual_plots[[i]] <- plotly::plot_ly(scene = scene_name[i])
+    dual_plots[[i]] <- plotly::plot_ly(scene = if (!D2) scene_name[i])
 
     # Individus colores selon CAH
     dual_plots[[i]] <- dual_plots[[i]] |>
       plotly::add_trace(
-        data = acm_profiles, scene = scene_name[i],
+        data = acm_profiles, scene = if (!D2) scene_name[i],
         x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
         text = ~interactive_text,
         #textfont = list(color = "#00600f", size = ind_name.size),  # "#0077c2"
@@ -329,7 +328,7 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
     # variables actives
     dual_plots[[i]] <- dual_plots[[i]] |>
       plotly::add_trace(
-        data = acm_vars, scene = scene_name[i],
+        data = acm_vars, scene = if (!D2) scene_name[i],
         x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
         text = ~lvs,
         textfont = list(color = "black", size = ind_name.size),  # "#0077c2"
@@ -342,7 +341,7 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
     if (length(clust_name) > 0) {
       dual_plots[[i]] <- dual_plots[[i]] |>
         plotly::add_trace(
-          data = acm_clust, scene = scene_name[i],
+          data = acm_clust, scene = if (!D2) scene_name[i],
           x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
           text = ~lvs,
           textfont = list(color = ~color_group, size = ind_name.size),  # "#0077c2"
@@ -361,7 +360,7 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
           dplyr::slice(-dplyr::n()) |> dplyr::ungroup(),
         # dplyr::mutate(remove_last_if_not_1 = dplyr::row_number() == dplyr::n() & base_coord != 1) |>
         # dplyr::filter(!remove_last_if_not_1) |> dplyr::ungroup(),
-        scene = scene_name[i],
+        scene = if (!D2) scene_name[i],
         x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),
         marker = list(color  = "black",
                       symbol = "cross",
@@ -382,7 +381,7 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
             )
           ) |>
           dplyr::ungroup(),
-        scene = scene_name[i],
+        scene = if (!D2) scene_name[i],
         x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ pair_id,
         line = list(color  = "black", width = 5),
         text = ~name, textfont = list(color = "black", size = 15),
@@ -399,7 +398,7 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
             dplyr::group_by(.data$name) |>
             dplyr::slice(dplyr::n()) |>
             dplyr::ungroup(),
-          scene = scene_name[i],
+          scene = if (!D2) scene_name[i],
           x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3), split = ~ name,
           u = ~eval(dim1)*9/10, v = ~eval(dim2)*9/10, w = ~eval(dim3)*9/10,
           sizeref = cone_size, sizemode = "absolute",
@@ -416,7 +415,7 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
     if (!D2) { # Also in 2D ?
       dual_plots[[i]] <- dual_plots[[i]] |>
         plotly::add_trace(
-          data = aspectratio_range, scene = scene_name[i],
+          data = aspectratio_range, scene = if (!D2) scene_name[i],
           x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
           hoverinfo = "skip", opacity = 0, visible = TRUE,
           type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",

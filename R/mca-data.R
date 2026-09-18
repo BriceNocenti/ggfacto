@@ -78,12 +78,13 @@ multiple_correspondence_analysis <- function(data, active_vars, wt, excl = NA, n
 
   active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
   wt <- if (length(wt) != 0) data[[wt]] else NULL
+  w  <- usable_weights(data, wt, source)
 
-  data <- na_levels(as.data.frame(data[active_vars]), active_vars)
+  data <- na_levels(as.data.frame(w$data[active_vars]), active_vars)
 
-  res <- FactoMineR::MCA(data, ncp = ncp, row.w = wt, graph = graph,
+  res <- FactoMineR::MCA(data, ncp = ncp, row.w = w$wt, graph = graph,
                          excl = excl_index(data, active_vars, excl), ...)
-  res$source <- source
+  res$source <- w$source
   res
 }
 
@@ -370,7 +371,7 @@ ggmca_data <-
     stopifnot(length(max_profiles) < 2)
 
     active_vars <- str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
-    excl <- names(res.mca$call$Xtot)[res.mca$call$excl]
+    levels_fit  <- mca_levels(res.mca)
 
     if (length(sup_vars)    != 0 )      sup_vars <- sup_vars |>
       purrr::discard(\(x) x %in% active_vars)
@@ -383,41 +384,26 @@ ggmca_data <-
 
 
     # Active variables --------------------------------------------------------------------
-    active_var_levels <-
-      purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) |>
-                   as.factor() |> levels()) |>
-      purrr::set_names(active_vars) |>
-      purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs = .x))
-
-
-    freqs    <- tibble::enframe(res.mca$call$marge.col, "lvs", "freq")
-    coords   <- tibble::as_tibble(res.mca$var$coord, rownames = "lvs")
-    contribs <- tibble::as_tibble(res.mca$var$contrib, rownames = "lvs") |>
+    coords   <- tibble::as_tibble(res.mca$var$coord)
+    contribs <- tibble::as_tibble(res.mca$var$contrib) |>
       dplyr::rename_with(~ str_replace(., "^Dim ", "contrib"))
-
-    active_vars_data <- active_var_levels |>
-      dplyr::left_join(freqs, by = "lvs") |>
-      dplyr::left_join(coords, by = "lvs") |>
-      dplyr::left_join(contribs, by = "lvs")
 
     # DESIGN: wcount is computed here, from the raw margin, so it exists on EVERY path -- the
     # tooltip crosstabs supply it only for the variables they actually tabulate, but type =
     # "points" sizes by it unconditionally. marge.col is the column margin, so
     # marge.col * (n active variables) * population is the level's weighted count: the very number
-    # the crosstabs produce when they are built. Kept in its own mutate() because the next one
-    # overwrites `freq`.
-    active_vars_data <- active_vars_data |>
+    # the crosstabs produce when they are built. The percentages count the excluded levels too.
+    active_vars_data <- levels_fit |>
       dplyr::mutate(wcount = .data$freq * length(active_vars) *
-                      sum(res.mca$call$row.w, na.rm = TRUE))
-
-    active_vars_data <- active_vars_data |>
+                      sum(res.mca$call$row.w, na.rm = TRUE)) |>
       dplyr::group_by(.data$vars) |>
       dplyr::mutate(freq = round(.data$freq/sum(.data$freq) * 100, 0)) |>
-      dplyr::ungroup()
-
-    active_vars_data <- active_vars_data |>
-      dplyr::filter(!is.na(.data$`Dim 1`)) |>  #Remove excluded levels of active variables
-      dplyr::mutate(lvs = str_remove(.data$lvs, str_c("^", .data$vars, "_")))
+      dplyr::ungroup() |>
+      dplyr::filter(.data$kept)
+    # WARNING: FactoMineR's rows are bound by POSITION (mca_levels()): it renames levels.
+    active_vars_data <- dplyr::bind_cols(dplyr::select(active_vars_data, "vars", "lvs", "freq"),
+                                         coords, contribs,
+                                         dplyr::select(active_vars_data, "wcount"))
 
     if (cleannames == TRUE) active_vars_data <- active_vars_data |>
       dplyr::mutate(lvs = forcats::fct_relabel(.data$lvs, ~ str_remove_all(., cleannames_condition())))
@@ -526,37 +512,26 @@ ggmca_data <-
 
     # The microdata of tooltips and profiles ----------------------------------------------
     non_active_vars <- c(sup_vars, tooltip_vars_1lv, tooltip_vars)
+    # The fitted answers, named as in the data, their excluded levels merged into one
+    # "Remove_levels", which the tooltips and the profiles leave out.
+    fitted <- purrr::map(rlang::set_names(active_vars), function(v) {
+      x <- res.mca$call$X[[v]]
+      l <- levels_fit[levels_fit$vars == v, ]
+      levels(x) <- dplyr::if_else(l$kept, l$lvs, "Remove_levels")
+      if ("Remove_levels" %in% levels(x)) x <- forcats::fct_relevel(x, "Remove_levels", after = Inf)
+      x
+    })
     data <- if (length(non_active_vars) != 0) {
-      dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]),
+      dplyr::bind_cols(tibble::as_tibble(fitted),
                        dplyr::select(data, tidyselect::all_of(non_active_vars)))
     } else {
-      tibble::as_tibble(res.mca$call$X[active_vars])
+      tibble::as_tibble(fitted)
     }
 
     data <- data |>
       dplyr::mutate(dplyr::across(where(is.character), as.factor)) |>
       dplyr::mutate(dplyr::across(where(is.factor), forcats::fct_drop)) |>
       tibble::add_column(row.w = res.mca$call$row.w)
-
-    # The excluded levels are merged into one "Remove_levels", which the tooltips and the profiles
-    # leave out.
-    active_vars_excl <- purrr::map(data[active_vars], \(x) levels(x)[levels(x) %in% excl])
-    active_vars_excl <- active_vars_excl[lengths(active_vars_excl) != 0]
-
-    data <- data |>
-      dplyr::mutate(dplyr::across(
-        tidyselect::all_of(names(active_vars_excl)),
-        ~ forcats::fct_relevel(., active_vars_excl[[dplyr::cur_column()]], after = Inf) |>
-          forcats::fct_recode(rlang::splice(purrr::set_names(active_vars_excl[[dplyr::cur_column()]],
-                                                             "Remove_levels")))
-      ))
-
-    #When MCA() added variable name at the beginning of levels names, remove it
-    data <- data |>
-      dplyr::mutate(dplyr::across(
-        tidyselect::all_of(active_vars),
-        ~ forcats::fct_relabel(., ~ str_remove(., paste0("^", dplyr::cur_column(), "_")))
-      ))
 
     if (cleannames == TRUE) data <- data |>
       dplyr::mutate(dplyr::across(
@@ -754,7 +729,7 @@ answer_profiles <- function(answers, row.w, max_profiles) {
 
 
 
-#Code taken from function varsup() of package GDAtools 1.7.2 : thanks to Nicolas Robette
+# Code taken from varsup() of GDAtools 1.7.2, by Nicolas Robette (credited in DESCRIPTION).
 #' @keywords internal
 varsup <- function (resmca, var){
   dichotom <- function (data, out = "numeric") {

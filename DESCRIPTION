@@ -1,11 +1,27 @@
 Package: ggfacto
 Title: Graphs for Correspondence Analysis
 Version: 0.3.2.9001
-Authors@R: 
+Authors@R: c(
     person(given = "Brice",
            family = "Nocenti",
            role = c("aut", "cre"),
-           email = "brice.nocenti@gmail.com")
+           email = "brice.nocenti@gmail.com"),
+    person(given = "Nicolas",
+           family = "Robette",
+           role = c("ctb", "cph"),
+           comment = "varsup(), from the 'GDAtools' package"),
+    person(given = "Francois",
+           family = "Husson",
+           role = c("ctb", "cph"),
+           comment = "the cut rule and tree plot of hierarchical_clust(), after 'FactoMineR' HCPC()"),
+    person(given = "Guillaume",
+           family = "Le Ray",
+           role = c("ctb", "cph"),
+           comment = "the cut rule and tree plot of hierarchical_clust(), after 'FactoMineR' HCPC()"),
+    person(given = "Quentin",
+           family = "Molto",
+           role = c("ctb", "cph"),
+           comment = "the cut rule and tree plot of hierarchical_clust(), after 'FactoMineR' HCPC()"))
 Description: Readable, complete and pretty graphs for correspondence analysis made 
     with 'FactoMineR'. They can be rendered as interactive 'HTML' plots, showing useful
     informations at mouse hover. The interest is not mainly visual but statistical.
@@ -23,7 +39,7 @@ Imports:
     FactoMineR (>= 2.0.0),
     ggiraph (>= 0.8.2),
     htmltools (>= 0.5.0),
-    ggplot2 (>= 3.4.0),
+    ggplot2 (>= 4.0.0),
     dplyr (>= 1.0.0),
     forcats (>= 0.5.0),
     purrr (>= 0.3.0),
@@ -48,7 +64,7 @@ Suggests:
     plotly (>= 4.1.0),
     testthat (>= 3.0.0)
 Depends:
-    R (>= 4.1.0)
+    R (>= 4.3.0)
 Config/testthat/edition: 3
 Config/potools/style: explicit
 Config/roxygen2/version: 8.0.0

@@ -58,6 +58,9 @@ principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, in
   stopifnot(is.integer(ind.sup) | is.null(ind.sup))
 
   wt   <- if (length(wt) != 0) { data[[wt]] } else {NULL}
+  w    <- usable_weights(data, wt, source, keep = ind.sup)
+  data <- w$data; wt <- w$wt; source <- w$source
+  if (length(ind.sup) > 0) ind.sup <- match(ind.sup, w$kept)
 
   if (!missing(ind_name)) {
     ind_name <- as.character(rlang::ensym(ind_name))

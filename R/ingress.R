@@ -1,5 +1,5 @@
 # PURPOSE: What an analysis remembers of its input -- its missing levels, its excluded levels, its
-#   weights, and the rows of the data frame it was fitted on.
+#   weights, the rows of the data frame it was fitted on, and its levels as FactoMineR numbers them.
 # ROLE: Shared by the ingress normalisers (multiple_correspondence_analysis(),
 #   principal_component_analysis()) and by every function that takes the microdata back afterwards
 #   (ggmca_data(), ggmca_3d(), ggmca_initial_dims(), hierarchical_clust(), clust_tab()).
@@ -11,6 +11,10 @@
 #   - The fit stores `res$source = list(n, rows, wt, name)`: the size of the frame the user named,
 #     its rows analysed (`NULL`: all), the names of the weight column and of the frame. Rows are
 #     recorded only when PROVED; every alignment re-checks the answers, and refuses an edited frame.
+#   - A weight of 0 leaves its row out of the fit (recorded in `source`); a missing or negative one
+#     is refused. FactoMineR crashes on both, or gives an infinite coordinate.
+#   - FactoMineR renames an MCA's levels in its results: mca_levels() reads them by POSITION, and
+#     every consumer goes through it rather than matching names.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract, and
 #   dev/hierarchical_clustering.md section 8 for subpopulations.
 
@@ -85,6 +89,43 @@ source_rows <- function(expr, env, data, wt = NULL) {
   if (!proved) return(fitted)
 
   list(n = nrow(full), rows = if (!identical(ids, seq_len(nrow(full)))) ids, wt = wt, name = name)
+}
+
+# Why this exists: FactoMineR crashes on a missing weight, crashes on a zero weight in an MCA and
+# gives that row an infinite coordinate in a PCA. A zero weight is an out-of-scope row in a survey:
+# it is left out of the fit, and `source` records the rows that remain, so a later alignment on the
+# whole data frame still finds them. `keep` protects the rows a PCA projects as supplementary.
+usable_weights <- function(data, wt, source, keep = integer()) {
+  if (is.null(wt)) return(list(data = data, wt = wt, source = source, kept = seq_len(nrow(data))))
+  bad <- is.na(wt) | wt < 0
+  bad[keep] <- FALSE
+  if (any(bad)) stop(
+    "The weights must be positive or zero: ", sum(bad), " row(s) have a missing or negative ",
+    "weight. Filter them out before the analysis.", call. = FALSE)
+  kept <- which(wt > 0 | seq_along(wt) %in% keep)
+  if (length(kept) == nrow(data)) return(list(data = data, wt = wt, source = source, kept = kept))
+  message(nrow(data) - length(kept), " row(s) with a weight of 0 are left out of the analysis.")
+  source$rows <- (if (is.null(source$rows)) seq_len(nrow(data)) else source$rows)[kept]
+  list(data = data[kept, , drop = FALSE], wt = wt[kept], source = source, kept = kept)
+}
+
+# Why this exists: FactoMineR renames an MCA's levels in its results -- a level two variables share
+# becomes `var_lv` (in `call$X` too), a level named y/n/Y/N becomes `var.y` (in `var` and
+# `marge.col` only) -- so its rows are matched by POSITION in the indicator table, never by name.
+# One row per active level, in the indicator table's order: its variable, its name in the data
+# (`lvs`), in `call$X` (`x`) and in FactoMineR's results (`fm`), its column margin, and whether
+# `excl` left it out of the axes.
+mca_levels <- function(res) {
+  X    <- res$call$X[res$call$quali]
+  x    <- lapply(X, function(x) levels(as.factor(x)))
+  vars <- rep(names(X), lengths(x))
+  # FactoMineR prefixes EVERY level of a variable that shares one; undone only then.
+  lvs  <- unlist(purrr::imap(x, function(l, v) {
+    if (all(startsWith(l, str_c(v, "_")))) str_sub(l, str_length(v) + 2L) else l
+  }), use.names = FALSE)
+  tibble::tibble(vars = vars, lvs = lvs, x = unlist(x, use.names = FALSE),
+                 fm = names(res$call$marge.col), freq = unname(res$call$marge.col),
+                 kept = !seq_along(lvs) %in% res$call$excl)
 }
 
 # The one reader of the weights a fit was made with, raw: a PCA keeps them so in `row.w.init` only.

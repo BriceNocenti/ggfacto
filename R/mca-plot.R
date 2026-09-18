@@ -352,6 +352,8 @@ ggmca_plot <- function(plot_data,
         dplyr::filter(!is.na(lv))
 
       if (!is.null(ellipses)) {
+        # DESIGN: stat_ellipse()'s robust t-ellipse (MASS::cov.trob), weighted by the survey weights
+        #   since ggplot2 4.0.0: an unweighted analysis draws the same ellipse as before.
         ellipses_coord <- dplyr::select(sup1_individuals, !!dim1, !!dim2, "row.w",
                                         tidyselect::all_of(sup1), "lvs", "color_group", "id")
 
@@ -359,7 +361,8 @@ ggmca_plot <- function(plot_data,
           if (type[1] == "facets") {
             ggiraph::geom_path_interactive(data = ellipses_coord,
                                            ggplot2::aes(x = !!dim1, y = !!dim2,
-                                                        group = .data$lvs, data_id = .data$id),
+                                                        group = .data$lvs, data_id = .data$id,
+                                                        weight = .data$row.w),
                                            color = "black",
                                            stat = "ellipse",
                                            type = "t", level = ellipses, linewidth = 1,
@@ -368,7 +371,8 @@ ggmca_plot <- function(plot_data,
             ggplot2::geom_path(data = ellipses_coord,
                                ggplot2::aes(x = !!dim1, y = !!dim2,
                                             group = .data$lvs,
-                                            color = .data$color_group),
+                                            color = .data$color_group,
+                                            weight = .data$row.w),
                                stat = "ellipse",
                                type = "t", level = ellipses, linewidth = 1,
                                segments = 360, alpha = 1, inherit.aes = FALSE)

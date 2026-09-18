@@ -47,7 +47,8 @@
 ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
                                cleannames = TRUE, keep = NULL) {
 
-  mca_excl_done <- names(res.mca$call$Xtot)[res.mca$call$excl]
+  levels_fit    <- mca_levels(res.mca)
+  mca_excl_done <- levels_fit$x[!levels_fit$kept]
 
   row.w <- res.mca$call$row.w
 
@@ -152,8 +153,9 @@ ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
   disj <-
     purrr::pmap(active_var_level_grouped |> purrr::transpose(),
          ~ {
-           disj <- res.mca$call$Xtot |>
-             dplyr::select(tidyselect::all_of(..3) ) |>
+           # WARNING: Xtot's columns are FactoMineR's names (`var.y`): selected by position.
+           disj <- res.mca$call$Xtot[match(..3, levels_fit$x)] |>
+             rlang::set_names(..3) |>
              tibble::as_tibble() |>
              tibble::add_column(row.w = row.w)
            # disj <- dplyr::select(disj, tidyselect::all_of(..3) )
@@ -414,18 +416,10 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
   active_vars <-
     str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
 
-
-  active_var_levels <-
-    purrr::map(active_vars, ~ dplyr::pull(res.mca$call$X, .) |>
-                 as.factor() |> levels()) |>
-    purrr::set_names(active_vars) |>
-    purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs = .x))
-
-  freqs <- tibble::enframe(res.mca$call$marge.col * length(active_vars),
-                           "lvs", "freq")
-  freqs <- active_var_levels |> dplyr::left_join(freqs, by = "lvs") |>
-    dplyr::mutate(lvs = str_remove_all(.data$lvs,
-                                                cleannames_condition()))
+  freqs <- mca_levels(res.mca) |>
+    dplyr::transmute(vars = .data$vars,
+                     lvs  = str_remove_all(.data$lvs, cleannames_condition()),
+                     freq = .data$freq * length(active_vars))
 
 
   vars_data <- (if (is.null(data)) ggmca_data(res.mca) else

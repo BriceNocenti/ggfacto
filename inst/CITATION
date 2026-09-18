@@ -1,0 +1,83 @@
+year <- if (is.null(meta$`Date/Publication`)) format(Sys.Date(), "%Y") else
+  substr(meta$`Date/Publication`, 1, 4)
+
+bibentry(bibtype = "Manual",
+  header      = "To cite ggfacto in publications use:",
+  title       = "{ggfacto}: Graphs for Correspondence Analysis",
+  author      = person(given = "Brice", family = "Nocenti"),
+  year        = year,
+  note        = paste("R package version", meta$Version),
+  url         = "https://github.com/BriceNocenti/ggfacto",
+  textVersion = paste0("Nocenti B. (", year, "). ggfacto: Graphs for Correspondence Analysis. ",
+                       "R package version ", meta$Version, ". https://github.com/BriceNocenti/ggfacto")
+)
+
+bibentry(bibtype = "Article",
+  header      = "ggfacto computes its analyses with FactoMineR, which should be cited too:",
+  title       = "{FactoMineR}: An {R} Package for Multivariate Analysis",
+  author      = c(person(given = "S\\'ebastien", family = "L\\^e"),
+                  person(given = "Julie", family = "Josse"),
+                  person(given = "Fran\\c{c}ois", family = "Husson")),
+  journal     = "Journal of Statistical Software",
+  year        = "2008",
+  volume      = "25",
+  number      = "1",
+  pages       = "1--18",
+  doi         = "10.18637/jss.v025.i01",
+  textVersion = paste("Sebastien Le, Julie Josse, Francois Husson (2008).",
+                      "FactoMineR: An R Package for Multivariate Analysis.",
+                      "Journal of Statistical Software, 25(1), 1-18. 10.18637/jss.v025.i01")
+)
+
+bibentry(bibtype = "Book",
+  header      = "Specific MCA and the reading of the axes (mca_interpret()) follow:",
+  title       = "Geometric Data Analysis: From Correspondence Analysis to Structured Data Analysis",
+  author      = c(person(given = "Brigitte", family = "Le Roux"),
+                  person(given = "Henry", family = "Rouanet")),
+  publisher   = "Kluwer Academic Publishers",
+  address     = "Dordrecht",
+  year        = "2004",
+  doi         = "10.1007/1-4020-2236-0"
+)
+
+bibentry(bibtype = "Book",
+  title       = "Multiple Correspondence Analysis",
+  author      = c(person(given = "Brigitte", family = "Le Roux"),
+                  person(given = "Henry", family = "Rouanet")),
+  publisher   = "SAGE",
+  series      = "Quantitative Applications in the Social Sciences",
+  number      = "163",
+  year        = "2010",
+  doi         = "10.4135/9781412993906"
+)
+
+bibentry(bibtype = "Article",
+  header      = "The modified rates of variance (benzecri_mrv()):",
+  title       = "Sur le calcul des taux d'inertie dans l'analyse d'un questionnaire",
+  author      = person(given = "Jean-Paul", family = "Benz\\'ecri"),
+  journal     = "Les Cahiers de l'Analyse des Donn\\'ees",
+  year        = "1979",
+  volume      = "4",
+  number      = "3",
+  pages       = "377--378"
+)
+
+bibentry(bibtype = "TechReport",
+  header      = "The hierarchical clustering on principal components (hierarchical_clust()):",
+  title       = paste("Principal component methods - hierarchical clustering - partitional",
+                      "clustering: why would we need to choose for visualizing data?"),
+  author      = c(person(given = "Fran\\c{c}ois", family = "Husson"),
+                  person(given = "Julie", family = "Josse"),
+                  person(given = "J\\'er\\^ome", family = "Pag\\`es")),
+  institution = "Agrocampus Ouest, Applied Mathematics Department",
+  year        = "2010",
+  url         = "http://factominer.free.fr/more/HCPC_husson_josse.pdf"
+)
+
+bibentry(bibtype = "Manual",
+  header      = "Supplementary variables are projected with code from GDAtools (varsup()):",
+  title       = "{GDAtools}: Geometric Data Analysis in {R}",
+  author      = person(given = "Nicolas", family = "Robette"),
+  year        = "2025",
+  url         = "https://nicolas-robette.frama.io/GDAtools/"
+)

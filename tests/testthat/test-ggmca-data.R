@@ -51,6 +51,24 @@ test_that("vars_data has one row per level, with coordinates on every extracted 
   expect_gte(nrow(vars_data), 12L)
 })
 
+test_that("the levels FactoMineR renames keep their data's names", {
+  # A level named y/n becomes `var.y` in FactoMineR's results, a level two questions share
+  # `var_lv`: both are read by position, never matched by name.
+  d <- fx_tea()[1:6]
+  d$always   <- factor(ifelse(d$always == "always", "y", "n"))
+  d$breakfast <- factor(ifelse(d$breakfast == "breakfast", "yes", "no"))
+  d$lunch     <- factor(ifelse(d$lunch == "lunch", "yes", "no"))
+  res <- MCA2(d, 1:6)
+  expect_true(all(c("always.n", "breakfast_no") %in% rownames(res$var$coord)))
+  vd <- md(res, d)$vars_data
+  expect_setequal(as.character(vd$lvs[vd$vars == "always"]), c("n", "y"))
+  expect_setequal(as.character(vd$lvs[vd$vars == "lunch"]), c("no", "yes"))
+  expect_false(anyNA(vd$`Dim 1`))
+  interp <- mca_interpret_data(res, 1)
+  expect_false(anyNA(interp$group))
+  expect_setequal(interp$level[interp$group == "always"], c("n", "y"))
+})
+
 test_that("lvs stays a FACTOR", {
   # It is the label a user renames or reorders between the halves, the forcats way.
   expect_s3_class(fx_pd_plain()$vars_data$lvs, "factor")
