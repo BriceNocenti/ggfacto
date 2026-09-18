@@ -67,8 +67,8 @@
 #' \code{eig = FALSE} leaves them out, for a document that shows them already or prints the summary
 #' several times to comment it column by column; \code{n_axes} says how many of them to print. When
 #' some axes are left out --- by \code{n_axes}, or because \code{ncp} truncated the analysis --- a
-#' final row states how many the cloud has (\code{... of 27}), and the \code{Total} row states the
-#' share of the variance the table can account for. A table showing every axis carries no such row.
+#' final row states how many the cloud has (\code{... of 27}). A table showing every axis carries no
+#' such row. The \code{Total} row is always the whole cloud: 100 \% and the total inertia.
 #'
 #' \code{min_contrib} moves the threshold: \code{NULL} (the default) keeps the points contributing
 #' more than the mean --- Le Roux and Rouanet's rule --- \code{0} keeps them all, and a number keeps
@@ -293,23 +293,25 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL, col
     out[["cumul. mod."]]              <- pctf(pick(cm), "Benzecri")
   }
 
-  # The Total row states what the axes add up to, and it is READ, never assumed: `res$eig` stops at
-  # `ncp`, so a fit that kept five axes of a 27-axis cloud totals 34.1 %, not 100 %. Writing 1 here
-  # claimed the whole cloud under any truncation -- the one thing this table must not do.
-  share <- sum(eig[, 2], na.rm = TRUE) / 100
+  # DESIGN: the Total row is the WHOLE CLOUD -- the axes shown plus those the ellipsis counts, which
+  #   `n_total` makes honest -- so it is 100 % and the total inertia, whatever `ncp` kept. The inertia
+  #   is read off one axis (eigenvalue / its share), which truncation cannot reach: `sum(eig[, 1])`
+  #   gave 6.875 of a PCA's 7 under FactoMineR's default `ncp = 5`.
+  inertia <- eig[1, 1] * 100 / eig[1, 2]
+  if (!is.finite(inertia) || inertia <= 0) inertia <- sum(eig[, 1])
   tot <- tibble::tibble(
     "Axe" = tabxplor::new_lvl(forcats::as_factor("Total"), role = "level"),
-    "eigenvalue" = tabxplor::fmt(n = n_ind, scale = "level_mean", var = sum(eig[, 1]),
+    "eigenvalue" = tabxplor::fmt(n = n_ind, scale = "level_mean", var = inertia,
                                  display = "var", row_kind = "total", col_var = "Variance",
                                  color = "no", digits = 3L),
-    "% variance" = tabxplor::fmt(n = n_ind, scale = "level_pct", pct_type = "col", pct = share,
+    "% variance" = tabxplor::fmt(n = n_ind, scale = "level_pct", pct_type = "col", pct = 1,
                                  row_kind = "total", col_var = "Variance", color = "no", digits = 1L),
     "cumul."     = tabxplor::fmt(n = n_ind, scale = "level_pct", pct_type = "col", pct = NA_real_,
                                  row_kind = "total", col_var = "Variance", color = "no", digits = 1L)
   )
   if (!is.null(mrv)) {
-    # 1 and not `share`: a modified rate is normalised over the axes above 1/Q that `eig` HOLDS, so
-    # its column sums to 1 whatever the truncation. What truncation moves is each RATE, not the total.
+    # 1 as well, but for its own reason: a modified rate is normalised over the axes above 1/Q that
+    # `eig` HOLDS, so its column sums to 1 whatever the truncation -- truncation moves each RATE.
     tot[["Benzecri's modified rate"]] <- tabxplor::fmt(
       n = n_ind, scale = "level_pct", pct_type = "col", pct = 1, row_kind = "total",
       col_var = "Benzecri", color = "no", digits = 1L)

@@ -139,7 +139,7 @@
       | Axe 4    |     0.158  |      2.3%  | 96.4%  |
       | Axe 5    |     0.129  |      1.8%  | 98.2%  |
       | ... of 7 |       ...  |       ...  |   ...  |
-      |**Total** |   **6.875**|   **98.2%**|        |
+      |**Total** |   **7.000**|    **100%**|        |
       
       # A tabxplor tab: 8 x 10
         variable mean_Variables sd_Variables `sd/mean_Variables` `coord_Axe 1`

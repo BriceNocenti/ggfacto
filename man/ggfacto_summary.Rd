@@ -39,8 +39,8 @@ numbers the rule for choosing how many axes to interpret is read on.
 \code{eig = FALSE} leaves them out, for a document that shows them already or prints the summary
 several times to comment it column by column; \code{n_axes} says how many of them to print. When
 some axes are left out --- by \code{n_axes}, or because \code{ncp} truncated the analysis --- a
-final row states how many the cloud has (\code{... of 27}), and the \code{Total} row states the
-share of the variance the table can account for. A table showing every axis carries no such row.
+final row states how many the cloud has (\code{... of 27}). A table showing every axis carries no
+such row. The \code{Total} row is always the whole cloud: 100 \% and the total inertia.
 
 \code{min_contrib} moves the threshold: \code{NULL} (the default) keeps the points contributing
 more than the mean --- Le Roux and Rouanet's rule --- \code{0} keeps them all, and a number keeps

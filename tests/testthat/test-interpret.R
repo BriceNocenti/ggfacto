@@ -409,15 +409,16 @@ test_that("the ellipsis counts the CLOUD's axes, not the ones the fit kept", {
   eig <- tabxplor::get_footer_tabs(mca_interpret(cut, axes = 1))[[1]]
   expect_identical(as.character(eig$Axe), c("Axe 1", "Axe 2", "... of 6", "Total"))
 
-  # and the Total then says the share those two axes actually hold
+  # and the Total still covers the whole cloud, the ellipsis standing for the axes not kept
   tot <- which(tabxplor::get_row_kind(eig[["% variance"]]) == "total")
-  expect_equal(unname(eig[["% variance"]]$pct[tot]), sum(cut$eig[, 2]) / 100)
+  expect_equal(unname(eig[["% variance"]]$pct[tot]), 1)
+  expect_equal(unname(eig$eigenvalue$var[tot]), sum(fx_mca()$eig[, 1]))
 })
 
 
-test_that("the eigenvalue table totals the share it actually holds, truncation included", {
-  # The Total is READ off `eig`, never assumed to be 1: a fit that kept a fraction of the axes must
-  # say so. Writing 1 claimed the whole cloud under any `ncp`, which is what this table must not do.
+test_that("the eigenvalue table totals the whole cloud, truncation included", {
+  # The Total is the axes shown plus those the ellipsis counts: 100 % and the total inertia, which
+  # is read off one axis because `ncp` truncates `res$eig` (FactoMineR's default keeps 5).
   eig <- tabxplor::get_footer_tabs(mca_interpret(fx_mca(), axes = 1))[[1]]
   tot <- which(tabxplor::get_row_kind(eig[["% variance"]]) == "total")
   expect_length(tot, 1L)
@@ -427,8 +428,15 @@ test_that("the eigenvalue table totals the share it actually holds, truncation i
   cut  <- MCA2(fx_tea(), 1:6, ncp = 3)
   eig2 <- tabxplor::get_footer_tabs(mca_interpret(cut, axes = 1))[[1]]
   tot2 <- which(tabxplor::get_row_kind(eig2[["% variance"]]) == "total")
-  expect_equal(unname(eig2[["% variance"]]$pct[tot2]), sum(cut$eig[, 2]) / 100)
-  expect_lt(unname(eig2[["% variance"]]$pct[tot2]), 1)
+  expect_equal(unname(eig2[["% variance"]]$pct[tot2]), 1)
+  expect_equal(unname(eig2$eigenvalue$var[tot2]), sum(fx_mca()$eig[, 1]))
+
+  # a raw FactoMineR fit, default `ncp = 5` on 7 scaled variables: 100 % of an inertia of 7
+  pca  <- FactoMineR::PCA(datasets::mtcars[1:7], graph = FALSE)
+  eig3 <- tabxplor::get_footer_tabs(pca_interpret(pca))[[1]]
+  tot3 <- which(tabxplor::get_row_kind(eig3[["% variance"]]) == "total")
+  expect_equal(unname(eig3[["% variance"]]$pct[tot3]), 1)
+  expect_equal(unname(eig3$eigenvalue$var[tot3]), 7)
 
   # `% variance` carries a data bar, scaled on the column's own largest axis: NA is `set_bars()`'s
   # word for "no ceiling stated". A ceiling of 100 % would flatten every MCA scree into stubs.
