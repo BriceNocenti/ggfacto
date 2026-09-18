@@ -19,7 +19,7 @@
 #   - A cluster's hover id is matched by its NAME, for its label and its profiles alike.
 #   - Several arguments are inert on their own and only act alongside an enabling one --
 #     keep_levels/discard_levels need sup_vars, tooltip_vars/tooltip_vars_1lv need a table to be
-#     built at all, clust needs profiles. tests/testthat/test-ggmca-data.R pins both halves.
+#     built at all. tests/testthat/test-ggmca-data.R pins both halves.
 #   - varsup() is vendored from GDAtools 1.7.2 (credited in place) and is the only extractor that
 #     dispatches on the analysis object's class.
 # See: CLAUDE.md section ggfacto architecture > The plot model.
@@ -72,11 +72,11 @@ multiple_correspondence_analysis <- function(data, active_vars, wt, excl = NA, n
   #   evaluated lazily inside source_rows() would name the wrong frame.
   expr   <- rlang::enexpr(data)
   env    <- rlang::caller_env()
-  source <- source_rows(expr, env, data)
+  wt     <- tidyselect::eval_select(rlang::enquo(wt), data)
+  stopifnot(length(wt) < 2)
+  source <- source_rows(expr, env, data, wt = if (length(wt) != 0) names(wt))
 
   active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
-  wt          <- tidyselect::eval_select(rlang::enquo(wt), data)
-  stopifnot(length(wt) < 2)
   wt <- if (length(wt) != 0) data[[wt]] else NULL
 
   data <- na_levels(as.data.frame(data[active_vars]), active_vars)
@@ -168,15 +168,15 @@ MCA2 <- multiple_correspondence_analysis
 #' @param profiles When set to \code{TRUE}, profiles of answers are drawn in the back
 #' of the graph with light-grey points. When hovering with mouse in the interactive
 #' version (passed in \code{\link{ggi}}), the answers of individuals to active variables
-#' will appears. If \code{clust} is provided, to hover near one point will color all the
-#' points of the same \code{\link[FactoMineR]{HCPC}} class.
+#' will appears. By default, they are drawn when \code{clust} is given: each profile takes the
+#' colour of its cluster, and to hover near one point lights all the points of its cluster.
 #' @param profiles_tooltip_discard A regex pattern to remove useless levels
 #' among interactive tooltips for profiles of answers (ex. : levels expressing
 #' "no" answers).
 #' @param clust The variable of `data` holding the clusters, typically made with
 #' \code{\link{hierarchical_clust}}, as a bare name (`clust = cah_culture`) or a string. The
-#' clusters are drawn as a supplementary variable and, with `profiles = TRUE`, the answer profiles
-#' of one cluster are coloured alike and linked at mouse hover.
+#' clusters are drawn as a supplementary variable, and the answer profiles of one cluster are
+#' coloured alike and linked at mouse hover (unless `profiles = FALSE`).
 #' @param cah,cah_color_groups Deprecated former names of `clust` and `clust_color_groups`.
 #' @param max_profiles The maximum number of profiles points to print. Default to 5000.
 #' @param dat Deprecated former name of `data`. Still accepted, with a warning;
@@ -248,7 +248,7 @@ MCA2 <- multiple_correspondence_analysis
 #' # Graph with colored clusters (hierarchical clustering on the first three axes)
 #' tea <- tea |>
 #'   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
-#' ggmca(res.mca, tea, clust = clust, profiles = TRUE)
+#' ggmca(res.mca, tea, clust = clust)
 #'
 #' # Concentration ellipses for each levels of a supplementary variable :
 #' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
@@ -266,7 +266,7 @@ ggmca <-
            color_groups = "^.{0}", clust_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
 
-           profiles = FALSE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+           profiles = NULL, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
            clust, max_profiles = 5000,
            alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#aaaaaa",
 
@@ -333,7 +333,7 @@ ggmca_data <-
            color_groups = "^.{0}", clust_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
 
-           profiles = FALSE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+           profiles = NULL, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
            clust, max_profiles = 5000,
            dat, cah, cah_color_groups
   ) {
@@ -365,6 +365,7 @@ ggmca_data <-
     } else {
       clust <- character()
     }
+    if (is.null(profiles)) profiles <- length(clust) != 0
     if (length(clust) != 0 && !clust %in% sup_vars) sup_vars <- c(sup_vars, clust)
     stopifnot(length(max_profiles) < 2)
 

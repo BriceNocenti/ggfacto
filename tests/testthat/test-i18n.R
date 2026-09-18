@@ -67,3 +67,21 @@ test_that("the language switch is scoped: it leaves LANGUAGE as it found it", {
   new <- Sys.getenv("LANGUAGE", unset = NA_character_)
   expect_identical(old, new)
 })
+
+
+test_that("the clustering tree states its cut in English", {
+  words <- ggfacto:::clust_tree_caption(6, 0.686, 3, lang = "en")
+  expect_identical(words[["caption"]],
+                   "6 clusters: the between-cluster inertia is 68.6% of the inertia of axes 1 to 3")
+  expect_identical(words[["title"]], "Hierarchical clustering")
+  expect_match(ggfacto:::clust_tree_caption(4, 0.5, 1, lang = "en")[["caption"]], "of axis 1$")
+})
+
+test_that("... and in French, with the course's words", {
+  skip_if_no_gettext()
+  words <- ggfacto:::clust_tree_caption(6, 0.686, 3, lang = "fr")
+  expect_identical(words[["caption"]], paste0(
+    "6 classes\u202f: la variance inter repr\u00e9sente 68,6\u202f% de la variance des ",
+    "axes 1 \u00e0 3"))
+  expect_identical(words[["title"]], "Classification ascendante hi\u00e9rarchique")
+})

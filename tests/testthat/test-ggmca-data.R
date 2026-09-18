@@ -10,7 +10,7 @@
 #       * keep_levels / discard_levels only act inside `if (length(sup_vars) != 0)`;
 #       * tooltip_vars / tooltip_vars_1lv only act when a tooltip is built at all, i.e. alongside
 #         sup_vars or active_tables -- on their own the result is byte-identical to a plain call;
-#       * clust only colours anything alongside profiles = TRUE.
+#       * clust draws the profiles by default, and colours nothing under profiles = FALSE.
 #     Every case below therefore supplies the enabling argument too, and the vacuous paths are
 #     pinned explicitly so a future reader does not "simplify" them back into nothing.
 # See: CLAUDE.md section ggfacto architecture > The plot model.
@@ -59,6 +59,13 @@ test_that("lvs stays a FACTOR", {
 test_that("ind_data is NULL unless profiles are asked for", {
   expect_null(fx_pd_plain()$ind_data)
   expect_s3_class(fx_pd_profiles()$ind_data, "data.frame")
+})
+
+test_that("clust draws the answer profiles by default, and profiles = FALSE still wins", {
+  pd <- md(fx_mca(), fx_tea_clust(), clust = "clust")
+  expect_s3_class(pd$ind_data, "data.frame")
+  expect_false(anyNA(pd$ind_data$clust))
+  expect_null(md(fx_mca(), fx_tea_clust(), clust = "clust", profiles = FALSE)$ind_data)
 })
 
 test_that("clust is character() when unused", {

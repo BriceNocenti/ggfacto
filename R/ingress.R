@@ -1,5 +1,5 @@
-# PURPOSE: What an analysis remembers of its input -- its missing levels, its excluded levels, and
-#   the rows of the data frame it was fitted on.
+# PURPOSE: What an analysis remembers of its input -- its missing levels, its excluded levels, its
+#   weights, and the rows of the data frame it was fitted on.
 # ROLE: Shared by the ingress normalisers (multiple_correspondence_analysis(),
 #   principal_component_analysis()) and by every function that takes the microdata back afterwards
 #   (ggmca_data(), ggmca_3d(), ggmca_initial_dims(), hierarchical_clust(), clust_tab()).
@@ -8,11 +8,11 @@
 #     renames it `var_lv`, and it is the name a user writes in `excl` to drop that one alone.
 #   - `excl` names levels EXACTLY, never as a regex: level names hold "+", "?" and "(". `NA` (or
 #     "NA") stands for every missing level -- `<VAR>.NA`, or a level literally named "NA".
-#   - The fit stores `res$source = list(n, rows)`: the row count of the data frame the user named, and
-#     which of its rows were analysed (`NULL`: all of them, in order). Rows are recorded only when
-#     they are PROVED, and every later alignment re-checks the active answers, so a data frame
-#     filtered, reordered or edited after the fit is refused rather than misaligned.
-# See: CLAUDE.md section ggfacto architecture > The FactoMineR contract.
+#   - The fit stores `res$source = list(n, rows, wt, name)`: the size of the frame the user named,
+#     its rows analysed (`NULL`: all), the names of the weight column and of the frame. Rows are
+#     recorded only when PROVED; every alignment re-checks the answers, and refuses an edited frame.
+# See: CLAUDE.md section ggfacto architecture > The FactoMineR contract, and
+#   dev/hierarchical_clustering.md section 8 for subpopulations.
 
 # Why this exists: FactoMineR reads a missing answer its own way; one named level per variable lets
 # `excl` and the tooltips speak of it like any other level.
@@ -56,16 +56,17 @@ excl_index <- function(data, vars, excl) {
 
 # The rows of the data frame the user NAMED that `data` holds: `data` may be that frame itself, or a
 # pipe that starts from it (`pc_AGD |> filter(AGE >= 18)`, `pc_AGD[pc_AGD$AGE >= 18, ]`). The pipe is
-# re-run with a hidden row-id column bound to the root.
+# re-run with a hidden row-id column bound to the root. `name` is kept only where `n` counts it.
 # WARNING: never record rows that cannot be proved. The re-run must give back exactly `data`, with
 #   unique ids -- which drops a `select()` that loses the id, a random `slice_sample()`, a `%>%` pipe
 #   (its expression is only `.`). Those fall back to "the fitted rows only", and a later alignment on
 #   a longer data frame then stops with an explanation instead of guessing.
-source_rows <- function(expr, env, data) {
-  fitted <- list(n = nrow(data), rows = NULL)
-  root   <- expr
+source_rows <- function(expr, env, data, wt = NULL) {
+  root <- expr
   while (is.call(root) && length(root) >= 2) root <- root[[2]]
-  if (!is.symbol(root) || identical(expr, root)) return(fitted)
+  name   <- if (is.symbol(root) && !identical(root, quote(.))) as.character(root)
+  fitted <- list(n = nrow(data), rows = NULL, wt = wt, name = if (identical(expr, root)) name)
+  if (is.null(name) || identical(expr, root)) return(fitted)
 
   full <- tryCatch(get(as.character(root), envir = env), error = function(e) NULL)
   if (!is.data.frame(full)) return(fitted)
@@ -83,7 +84,12 @@ source_rows <- function(expr, env, data) {
     isTRUE(all.equal(as.data.frame(res), as.data.frame(data), check.attributes = FALSE))
   if (!proved) return(fitted)
 
-  list(n = nrow(full), rows = if (!identical(ids, seq_len(nrow(full)))) ids)
+  list(n = nrow(full), rows = if (!identical(ids, seq_len(nrow(full)))) ids, wt = wt, name = name)
+}
+
+# The one reader of the weights a fit was made with, raw: a PCA keeps them so in `row.w.init` only.
+fit_weights <- function(res) {
+  if (is.null(res$call$row.w.init)) res$call$row.w else res$call$row.w.init
 }
 
 # The names of an analysis's active variables, for an MCA or a PCA.
@@ -114,8 +120,7 @@ same_answers <- function(res, data, idx) {
 }
 
 # The one gate for microdata handed back after the fit: the positions, in `data`, of the fitted rows.
-# `data` is either the data frame the analysis started from (its rows are then picked out) or the
-# fitted rows themselves; either way the active answers must match.
+# `data` is the frame the analysis started from, or the fitted rows; either way, answers must match.
 fit_rows <- function(res, data) {
   n_fit <- nrow(res$call$X)
   src   <- res$source
@@ -124,7 +129,8 @@ fit_rows <- function(res, data) {
   if (nrow(data) == n_fit)                        cand <- c(cand, list(seq_len(n_fit)))
 
   if (length(cand) == 0) stop(
-    "The analysis was fitted on ", n_fit, " rows, and `data` has ", nrow(data), ". ",
+    "The analysis was fitted on ", n_fit, " rows",
+    if (!is.null(src$name)) str_c(" of `", src$name, "`"), ", and `data` has ", nrow(data), ". ",
     if (is.null(src$rows)) str_c(
       "Pass the same rows as the analysis. To analyse a subset and still use the whole data frame, ",
       "filter it inside the call with the native pipe: ",

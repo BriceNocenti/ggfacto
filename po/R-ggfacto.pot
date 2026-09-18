@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: ggfacto 0.3.2.9001\n"
-"POT-Creation-Date: 2026-09-05 10:12+0200\n"
+"POT-Creation-Date: 2026-09-18 20:12+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -10,130 +10,151 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: interpret.R:259
+#: clust.R:353
+msgid "Hierarchical clustering"
+msgstr ""
+
+#: clust.R:354
+msgid "inertia gain"
+msgstr ""
+
+#: clust.R:356
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axis 1"
+msgstr ""
+
+#: clust.R:359
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axes 1 to "
+"%d"
+msgstr ""
+
+#: interpret.R:280
 #, c-format
 msgid "... of %s"
 msgstr ""
 
-#: interpret.R:381
+#: interpret.R:406
 msgid "Above mean ctr"
 msgstr ""
 
-#: interpret.R:382
+#: interpret.R:407
 msgid "All levels"
 msgstr ""
 
-#: interpret.R:383
+#: interpret.R:408
 #, c-format
 msgid "Above %s%%"
 msgstr ""
 
-#: interpret.R:385
+#: interpret.R:410
 #, c-format
 msgid "%s: above mean ctr"
 msgstr ""
 
-#: interpret.R:386
+#: interpret.R:411
 #, c-format
 msgid "%s: all levels"
 msgstr ""
 
-#: interpret.R:387
+#: interpret.R:412
 #, c-format
 msgid "%s: above %s%%"
 msgstr ""
 
-#: interpret.R:509
+#: interpret.R:534
 msgid "contribution to the variance of the axis"
 msgstr ""
 
-#: interpret.R:510
+#: interpret.R:535
 msgid "a level"
 msgstr ""
 
-#: interpret.R:511
+#: interpret.R:536
 msgid "%1$s on the positive side, contributing"
 msgstr ""
 
-#: interpret.R:512
+#: interpret.R:537
 msgid "%1$s on the negative side, contributing"
 msgstr ""
 
-#: interpret.R:513 interpret.R:514
+#: interpret.R:538 interpret.R:539
 msgid "the mean contribution"
 msgstr ""
 
-#: interpret.R:526
+#: interpret.R:551
 msgid "coordinate on the axis"
 msgstr ""
 
-#: interpret.R:527
+#: interpret.R:552
 msgid "coordinate on the axis, i.e. its correlation with it"
 msgstr ""
 
-#: interpret.R:528
+#: interpret.R:553
 msgid "a variable"
 msgstr ""
 
-#: interpret.R:529
+#: interpret.R:554
 msgid "%1$s above, by"
 msgstr ""
 
-#: interpret.R:530
+#: interpret.R:555
 msgid "%1$s below, by"
 msgstr ""
 
-#: interpret.R:537
+#: interpret.R:562
 msgid ""
 "sd/mean: coefficient of variation -- the standard deviation as a percentage "
 "of the mean, comparable between variables measured in different units"
 msgstr ""
 
-#: interpret.R:549
+#: interpret.R:574
 msgid "ctr: the level's contribution to the variance of the axis"
 msgstr ""
 
-#: interpret.R:550
+#: interpret.R:575
 msgid "contrib: the whole question's contribution to the axis"
 msgstr ""
 
-#: interpret.R:552
+#: interpret.R:577
 msgid "coord: coordinate on the axis"
 msgstr ""
 
-#: interpret.R:553 interpret.R:878
+#: interpret.R:578 interpret.R:910
 msgid "cos2: quality of representation"
 msgstr ""
 
-#: interpret.R:554
+#: interpret.R:579
 msgid ""
 "spread: share of the group's contribution the gap between its two sides "
 "accounts for"
 msgstr ""
 
-#: interpret.R:659 interpret.R:752
+#: interpret.R:687 interpret.R:782
 #, c-format
 msgid "Axe %s: %s%% of variance"
 msgstr ""
 
-#: interpret.R:660
+#: interpret.R:688
 #, c-format
 msgid "Axe %s: %s%% of variance (mod. %s%%)"
 msgstr ""
 
-#: interpret.R:742
+#: interpret.R:772
 msgid "Rows"
 msgstr ""
 
-#: interpret.R:742
+#: interpret.R:772
 msgid "Columns"
 msgstr ""
 
-#: interpret.R:807
+#: interpret.R:839
 msgid "Total"
 msgstr ""
 
-#: interpret.R:877
+#: interpret.R:909
 msgid ""
 "contrib: its contribution to the variance of the axis; an axis sums to 100 %"
 msgstr ""

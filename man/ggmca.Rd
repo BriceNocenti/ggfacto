@@ -22,7 +22,7 @@ ggmca(
   keep_levels,
   discard_levels,
   cleannames = TRUE,
-  profiles = FALSE,
+  profiles = NULL,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   clust,
   max_profiles = 5000,
@@ -64,7 +64,7 @@ ggmca_data(
   keep_levels,
   discard_levels,
   cleannames = TRUE,
-  profiles = FALSE,
+  profiles = NULL,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   clust,
   max_profiles = 5000,
@@ -174,8 +174,8 @@ prefix numbers like \code{"1-"}, and text in parentheses.}
 \item{profiles}{When set to \code{TRUE}, profiles of answers are drawn in the back
 of the graph with light-grey points. When hovering with mouse in the interactive
 version (passed in \code{\link{ggi}}), the answers of individuals to active variables
-will appears. If \code{clust} is provided, to hover near one point will color all the
-points of the same \code{\link[FactoMineR]{HCPC}} class.}
+will appears. By default, they are drawn when \code{clust} is given: each profile takes the
+colour of its cluster, and to hover near one point lights all the points of its cluster.}
 
 \item{profiles_tooltip_discard}{A regex pattern to remove useless levels
 among interactive tooltips for profiles of answers (ex. : levels expressing
@@ -183,8 +183,8 @@ among interactive tooltips for profiles of answers (ex. : levels expressing
 
 \item{clust}{The variable of `data` holding the clusters, typically made with
 \code{\link{hierarchical_clust}}, as a bare name (`clust = cah_culture`) or a string. The
-clusters are drawn as a supplementary variable and, with `profiles = TRUE`, the answer profiles
-of one cluster are coloured alike and linked at mouse hover.}
+clusters are drawn as a supplementary variable, and the answer profiles of one cluster are
+coloured alike and linked at mouse hover (unless `profiles = FALSE`).}
 
 \item{max_profiles}{The maximum number of profiles points to print. Default to 5000.}
 
@@ -308,7 +308,7 @@ ggmca(res.mca, ylim = c(NA, 1.2), active_tables = "active") |>
 # Graph with colored clusters (hierarchical clustering on the first three axes)
 tea <- tea |>
   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
-ggmca(res.mca, tea, clust = clust, profiles = TRUE)
+ggmca(res.mca, tea, clust = clust)
 
 # Concentration ellipses for each levels of a supplementary variable :
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),

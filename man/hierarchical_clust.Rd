@@ -10,7 +10,8 @@ hierarchical_clust(
   nb_clust = -1,
   tree = nb_clust == -1,
   consol = TRUE,
-  margin = "rows"
+  margin = "rows",
+  names = NULL
 )
 }
 \arguments{
@@ -23,11 +24,13 @@ eigenvalues under \code{\link{mca_interpret}}). There is no default: on every ax
 clustering would follow noise.}
 
 \item{nb_clust}{The number of clusters. With `-1`, the default, the tree is cut where the gain in
-between-cluster inertia drops the most.}
+between-cluster inertia drops the most. Given `names`, it is the number of names.}
 
 \item{tree}{Should the clustering tree be drawn, to choose the number of clusters? By default,
 only when `nb_clust = -1`. Its leaves are the distinct points of the cloud: the answer profiles
-of a multiple correspondence analysis, the levels of a correspondence analysis.}
+of a multiple correspondence analysis, the levels of a correspondence analysis. Each bar of the
+inertia gains carries the number of clusters it makes, and the title the share of the inertia of
+the `ncp` axes that lies between the clusters drawn.}
 
 \item{consol}{The k-means consolidation, which moves each individual to its nearest cluster once
 the tree is cut. `TRUE`, the default, is \code{FactoMineR::\link[FactoMineR]{HCPC}}'s k-means,
@@ -38,15 +41,20 @@ the tree cuts them.}
 
 \item{margin}{For a correspondence analysis, the levels to cluster: `"rows"`, the default, or
 `"columns"`.}
+
+\item{names}{The names of the clusters, in the order the levels should take: either
+`c("Name 1", "Name 2", ...)`, for clusters 1, 2, etc., or `c("Name" = 2, "Other name" = 1, ...)`,
+as in \code{forcats::fct_recode()}. Clusters are numbered along the first axis, so the names
+belong to one cut of one tree: write them after looking at that cut.}
 }
 \value{
-A factor with the clusters, `"1"`, `"2"`, etc., numbered along the first axis and
-returned invisibly: a bare call only draws the tree. Inside \code{dplyr::mutate()}, it has one
-value per row of that data frame, and `NA` on the rows the analysis did not use (when it was made
-on a subset of the population). Outside \code{mutate()}, it has one value per row of the data
-frame the analysis started from. For a correspondence analysis, each row of the data frame gets
-the cluster of its level (`NA` for a level outside the table); outside \code{mutate()}, there is
-one value per level, named after it.
+A factor with the clusters, `"1"`, `"2"`, etc. or their `names`, numbered along the first
+axis and returned invisibly: a bare call only draws the tree. Inside \code{dplyr::mutate()}, it
+has one value per row of that data frame, and `NA` on the rows the analysis did not use (when it
+was made on a subset of the population). Outside \code{mutate()}, it has one value per row of the
+data frame the analysis started from. For a correspondence analysis, each row of the data frame
+gets the cluster of its level (`NA` for a level outside the table); outside \code{mutate()},
+there is one value per level, named after it.
 }
 \description{
 Clusters the individuals of a principal component analysis or of a multiple correspondence
@@ -58,21 +66,34 @@ clustering, cut into `nb_clust` clusters, then consolidated by k-means. Use it i
 `data <- data |> mutate(clust = hierarchical_clust(res, ncp = 3, nb_clust = 6))`
 
 To choose the number of clusters, look at the tree first: `hierarchical_clust(res, ncp = 3)`.
-The clusters can then be renamed with \code{forcats::fct_recode()}, described with
-\code{\link{clust_tab}} and drawn with \code{\link{ggmca}(clust = )}.
-
-Individuals giving the same answers share one point, and the tree is built on these distinct
-points: the memory it needs grows with their number, not with its square.
+The tree is built once: cutting it again, into another number of clusters or with names, is
+instant. Name the clusters with `names`, then describe them with \code{\link{clust_tab}} and
+draw them with \code{\link{ggmca}(clust = )}.
+}
+\details{
+The tree is kept in memory for the session, under a key made of everything it is built from ---
+the coordinates on the `ncp` axes, the weights, the answers --- so a tree made from other data is
+never reused. The last 20 trees are kept; `options(ggfacto.clust_cache = 50)` keeps more, and
+`options(ggfacto.clust_cache = 0)` none.
 }
 \examples{
 data(tea, package = "FactoMineR")
 res.mca <- multiple_correspondence_analysis(tea, 1:18)
 
+# The tree, to choose the number of clusters, then the clusters, written into the data frame
+hierarchical_clust(res.mca, ncp = 3)
 tea <- tea |>
   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 
-clust_tab(tea, tidyselect::all_of(names(tea)[1:18]), clust)
-ggmca(res.mca, tea, clust = clust, profiles = TRUE)
+clust_tab(res.mca, tea, clust)
+ggmca(res.mca, tea, clust = clust)
+
+# Named, in the order of your choice (the tree is not built again)
+tea <- tea |>
+  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, names = c(
+    "Cluster A" = 1, "Cluster B" = 2, "Cluster C" = 3, "Cluster E" = 5, "Cluster D" = 4,
+    "Cluster F" = 6
+  )))
 
 # On a subset of the population: the other rows get NA
 res.mca_young <- tea |>

@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: ggfacto 0.3.2.9001\n"
-"POT-Creation-Date: 2026-09-05 10:11+0200\n"
+"POT-Creation-Date: 2026-09-18 20:12+0200\n"
 "PO-Revision-Date: 2026-09-04 18:32+0200\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -11,80 +11,101 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: interpret.R:259
+#: clust.R:353
+msgid "Hierarchical clustering"
+msgstr "Classification ascendante hiérarchique"
+
+#: clust.R:354
+msgid "inertia gain"
+msgstr "gain de variance inter"
+
+#: clust.R:356
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axis 1"
+msgstr "%d classes : la variance inter représente %s %% de la variance de l'axe 1"
+
+#: clust.R:359
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axes 1 to "
+"%d"
+msgstr "%d classes : la variance inter représente %s %% de la variance des axes 1 à %d"
+
+#: interpret.R:280
 #, c-format
 msgid "... of %s"
 msgstr "... sur %s"
 
-#: interpret.R:381
+#: interpret.R:406
 msgid "Above mean ctr"
 msgstr "Contrib. > moyenne"
 
-#: interpret.R:382
+#: interpret.R:407
 msgid "All levels"
 msgstr "Toutes modalités"
 
-#: interpret.R:383
+#: interpret.R:408
 #, c-format
 msgid "Above %s%%"
 msgstr "Contrib. > %s %%"
 
-#: interpret.R:385
+#: interpret.R:410
 #, c-format
 msgid "%s: above mean ctr"
 msgstr "%s : contrib. > moyenne"
 
-#: interpret.R:386
+#: interpret.R:411
 #, c-format
 msgid "%s: all levels"
 msgstr "%s : toutes modalités"
 
-#: interpret.R:387
+#: interpret.R:412
 #, c-format
 msgid "%s: above %s%%"
 msgstr "%s : contrib. > %s %%"
 
-#: interpret.R:509
+#: interpret.R:534
 msgid "contribution to the variance of the axis"
 msgstr "contribution à la variance de l'axe"
 
-#: interpret.R:510
+#: interpret.R:535
 msgid "a level"
 msgstr "une modalité"
 
-#: interpret.R:511
+#: interpret.R:536
 msgid "%1$s on the positive side, contributing"
 msgstr "%1$s du côté positif, contribuant"
 
-#: interpret.R:512
+#: interpret.R:537
 msgid "%1$s on the negative side, contributing"
 msgstr "%1$s du côté négatif, contribuant"
 
-#: interpret.R:513 interpret.R:514
+#: interpret.R:538 interpret.R:539
 msgid "the mean contribution"
 msgstr "la contribution moyenne"
 
-#: interpret.R:526
+#: interpret.R:551
 msgid "coordinate on the axis"
 msgstr "coordonnée sur l'axe"
 
-#: interpret.R:527
+#: interpret.R:552
 msgid "coordinate on the axis, i.e. its correlation with it"
 msgstr "coordonnée sur l'axe, c'est-à-dire sa corrélation avec lui"
 
-#: interpret.R:528
+#: interpret.R:553
 msgid "a variable"
 msgstr "une variable"
 
-#: interpret.R:529
+#: interpret.R:554
 msgid "%1$s above, by"
 msgstr "%1$s au-dessus, de"
 
-#: interpret.R:530
+#: interpret.R:555
 msgid "%1$s below, by"
 msgstr "%1$s en-dessous, de"
 
-#: interpret.R:537
+#: interpret.R:562
 msgid ""
 "sd/mean: coefficient of variation -- the standard deviation as a percentage "
 "of the mean, comparable between variables measured in different units"
@@ -92,23 +113,23 @@ msgstr ""
 "sd/mean : coefficient de variation -- l'écart-type en pourcentage de la "
 "moyenne, comparable entre variables mesurées dans des unités différentes"
 
-#: interpret.R:549
+#: interpret.R:574
 msgid "ctr: the level's contribution to the variance of the axis"
 msgstr "ctr : la contribution de la modalité à la variance de l'axe"
 
-#: interpret.R:550
+#: interpret.R:575
 msgid "contrib: the whole question's contribution to the axis"
 msgstr "contrib : la contribution de la question entière à l'axe"
 
-#: interpret.R:552
+#: interpret.R:577
 msgid "coord: coordinate on the axis"
 msgstr "coord : coordonnée sur l'axe"
 
-#: interpret.R:553 interpret.R:878
+#: interpret.R:578 interpret.R:910
 msgid "cos2: quality of representation"
 msgstr "cos2 : qualité de représentation"
 
-#: interpret.R:554
+#: interpret.R:579
 msgid ""
 "spread: share of the group's contribution the gap between its two sides "
 "accounts for"
@@ -116,29 +137,29 @@ msgstr ""
 "spread : part de la contribution de la question qu'explique l'écart entre "
 "ses deux côtés"
 
-#: interpret.R:659 interpret.R:752
+#: interpret.R:687 interpret.R:782
 #, c-format
 msgid "Axe %s: %s%% of variance"
 msgstr "Axe %s : %s %% de variance"
 
-#: interpret.R:660
+#: interpret.R:688
 #, c-format
 msgid "Axe %s: %s%% of variance (mod. %s%%)"
 msgstr "Axe %s : %s %% de variance (mod. %s %%)"
 
-#: interpret.R:742
+#: interpret.R:772
 msgid "Rows"
 msgstr "Lignes"
 
-#: interpret.R:742
+#: interpret.R:772
 msgid "Columns"
 msgstr "Colonnes"
 
-#: interpret.R:807
+#: interpret.R:839
 msgid "Total"
 msgstr "Total"
 
-#: interpret.R:877
+#: interpret.R:909
 msgid ""
 "contrib: its contribution to the variance of the axis; an axis sums to 100 %"
 msgstr "contrib : sa contribution à la variance de l'axe ; un axe fait 100 %"

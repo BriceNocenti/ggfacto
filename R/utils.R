@@ -192,34 +192,38 @@ weighted.var <- function(x, wt, na.rm = FALSE) {
 } #Same results as sqrt(Hmisc::wtd.var(!!num_var, !!wt, na.rm = TRUE, method = "ML")
 
 
-# Soft-deprecated argument names ------------------------------------
+# Soft-deprecated names and forms ------------------------------------
 
-# One warning per session per (function, argument), the way lifecycle::deprecate_soft() behaves,
-# without taking lifecycle as a dependency.
+# One warning per session per former name, the way lifecycle::deprecate_soft() behaves, without
+# taking lifecycle as a dependency. Each notice is one line, pointing to the guide for the new usage.
 deprecated_args_warned <- new.env(parent = emptyenv())
 
-# Route a renamed argument to its new name. Callers pass the OLD argument's value and get it back,
-# having warned once; the caller does the missing() test, since missing() only works in its own frame.
-#' @keywords internal
-# The FUNCTION twin of renamed_arg(): one warning per session, naming what to use instead.
+GGFACTO_GUIDE <- "https://bricenocenti.github.io/ggfacto/articles/ggfacto.html"
+
 #' @keywords internal
 #' @noRd
-deprecated_fn <- function(old, new) {
-  key <- str_c("fn::", old)
+deprecated_notice <- function(key, msg) {
   if (!isTRUE(deprecated_args_warned[[key]])) {
     assign(key, TRUE, envir = deprecated_args_warned)
-    warning(old, "() is deprecated; use ", new, "() instead.", call. = FALSE)
+    warning(msg, " See ", GGFACTO_GUIDE, call. = FALSE)
   }
   invisible(NULL)
 }
 
+# A former function name, or with `msg` a former calling form.
+#' @keywords internal
+#' @noRd
+deprecated_fn <- function(old, new, msg = str_c(old, "() is deprecated: use ", new, "().")) {
+  deprecated_notice(str_c("fn::", old), msg)
+}
+
+# A renamed argument: callers pass the OLD argument's value and get it back; the caller does the
+# missing() test, since missing() only works in its own frame.
+#' @keywords internal
+#' @noRd
 renamed_arg <- function(value, old, new, fn) {
-  key <- str_c(fn, "::", old)
-  if (!isTRUE(deprecated_args_warned[[key]])) {
-    assign(key, TRUE, envir = deprecated_args_warned)
-    warning("The `", old, "` argument of ", fn, "() is deprecated; use `", new, "` instead.",
-            call. = FALSE)
-  }
+  deprecated_notice(str_c(fn, "::", old),
+                    str_c(fn, "(", old, " =) is deprecated: use `", new, "`."))
   value
 }
 

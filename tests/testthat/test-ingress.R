@@ -15,7 +15,6 @@
 test_that("the short names are the same functions as the long ones", {
   expect_identical(MCA2, multiple_correspondence_analysis)
   expect_identical(PCA2, principal_component_analysis)
-  expect_identical(HCPC_tab, clust_tab)
 })
 
 # --- active_vars accepts what tidyselect accepts ------------------------------------------------
@@ -134,13 +133,15 @@ src <- function(expr, data) {
 }
 
 test_that("a bare data frame records every row", {
-  expect_identical(fx_mca()$source, list(n = nrow(fx_tea()), rows = NULL))
+  expect_identical(fx_mca()$source, list(n = nrow(fx_tea()), rows = NULL, wt = NULL, name = NULL))
+  tea <- fx_tea()
+  expect_identical(MCA2(tea, 1:6)$source$name, "tea")
 })
 
 test_that("every provable pipe shape records the rows it kept", {
   d <- fx_tea()
   young <- which(d$age < 30)
-  expect_identical(fx_mca_young()$source, list(n = nrow(d), rows = young))
+  expect_identical(fx_mca_young()$source, list(n = nrow(d), rows = young, wt = NULL, name = "d"))
 
   expect_identical(MCA2(d[which(d$age < 30), ], 1:6)$source$rows, young)
   expect_identical(MCA2(d[d$age < 30 & !is.na(d$age), ], 1:6)$source$rows, young)
@@ -168,7 +169,9 @@ test_that("tidyr::drop_na() records the complete rows", {
 test_that("a pipe that cannot be proved records nothing beyond the fitted rows", {
   d <- fx_tea()
   n_young <- sum(d$age < 30)
-  fitted_only <- function(res, n) expect_identical(res$source, list(n = n, rows = NULL))
+  fitted_only <- function(res, n) {
+    expect_identical(res$source[c("n", "rows", "name")], list(n = n, rows = NULL, name = NULL))
+  }
 
   # the id column is lost
   fitted_only(d |> dplyr::select(1:6, age) |> dplyr::filter(age < 30) |> MCA2(1:6), n_young)
@@ -186,6 +189,16 @@ test_that("a pipe that cannot be proved records nothing beyond the fitted rows",
   expect_null(src(x[x$a > 2, ], x[x$a > 2, ])$rows)
 })
 
+test_that("the fit records the name of its weight column", {
+  d <- fx_tea_wt()
+  expect_identical(MCA2(d, 1:6, wt = w)$source$wt, "w")
+  expect_identical(MCA2(d, 1:6, wt = "w")$source$wt, "w")
+  cars <- mtcars
+  cars$w <- rep(1:2, 16)
+  expect_identical(PCA2(cars, 1:7, wt = w)$source$wt, "w")
+  expect_null(fx_mca()$source$wt)
+})
+
 # --- taking the data back: the one gate -------------------------------------------------------
 
 test_that("ggmca takes the whole data frame back after an analysis of a subset", {
@@ -198,6 +211,9 @@ test_that("ggmca takes the whole data frame back after an analysis of a subset",
 test_that("ggmca refuses data that is not the analysed data, and says why", {
   d <- fx_tea()
   expect_error(md(fx_mca(), d[1:100, ], sup_vars = "SPC"), "fitted on 300 rows")
+  # an analysis of a subset kept apart names the data frame it was made on
+  young <- dplyr::filter(d, age < 30)
+  expect_error(md(MCA2(young, 1:6), d, sup_vars = "SPC"), "rows of `young`")
   expect_error(md(fx_mca(), dplyr::arrange(d, age), sup_vars = "SPC"), "reordered or modified")
   expect_error(md(fx_mca(), sup_vars = "SPC"), "pass it second")
 })

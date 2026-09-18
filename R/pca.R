@@ -50,11 +50,11 @@ principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, in
   #   evaluated lazily inside source_rows() would name the wrong frame.
   expr   <- rlang::enexpr(data)
   env    <- rlang::caller_env()
-  source <- source_rows(expr, env, data)
+  wt     <- if (missing(wt)) {character()} else {as.character(rlang::ensym(wt))}
+  stopifnot(length(wt) <= 1)
+  source <- source_rows(expr, env, data, wt = if (length(wt) != 0) wt)
   active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
 
-  wt <- if (missing(wt)) {character()} else {as.character(rlang::ensym(wt))}
-  stopifnot(length(wt) <= 1)
   stopifnot(is.integer(ind.sup) | is.null(ind.sup))
 
   wt   <- if (length(wt) != 0) { data[[wt]] } else {NULL}

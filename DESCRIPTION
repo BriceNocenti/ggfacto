@@ -27,7 +27,7 @@ Imports:
     dplyr (>= 1.0.0),
     forcats (>= 0.5.0),
     purrr (>= 0.3.0),
-    rlang (>= 0.4.0),
+    rlang (>= 0.4.10),
     tibble (>= 3.0.0),
     tidyr (>= 1.0.0),
     tidyselect (>= 1.1.0),

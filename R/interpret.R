@@ -113,7 +113,7 @@ NULL
 
 
 # Tag a finished table as a ggfacto summary: the legend's words, the glossary lines, the
-# eigenvalues under it, the exporter options only ggfacto knows, and the subclass its print methods
+# table under it, the exporter options only ggfacto knows, and the subclass its print methods
 # dispatch on.
 # DESIGN: the render options ride a PLAIN attribute, not `meta`. dplyr drops both it and the class
 #   together, so the options can never outlive the methods that read them.
@@ -122,11 +122,13 @@ NULL
 #   from tab(), where the caller may have put its own `subtext =` notes through the `...`.
 #' @keywords internal
 #' @noRd
-gda_summary <- function(tabs, eig = NULL, glossary = character(), var_names = NULL,
+gda_summary <- function(tabs, footer = NULL, glossary = character(), var_names = NULL,
                         words = NULL, tooltips = FALSE) {
   if (!is.null(words))  tabs <- do.call(tabxplor::set_legend_words, c(list(tabs), words))
   if (length(glossary)) tabs <- tabxplor::set_subtext(tabs, glossary)
-  if (!is.null(eig))    tabs <- tabxplor::set_footer_tabs(tabs, list(eig))
+  # DESIGN: the one setter of a summary's footer -- the eigenvalues of an axes summary, the
+  #   population of an all-mean cluster table -- since set_footer_tabs() replaces what is there.
+  if (!is.null(footer)) tabs <- tabxplor::set_footer_tabs(tabs, list(footer))
   attr(tabs, "ggfacto_render") <- list(var_names = var_names, tooltips = tooltips)
   class(tabs) <- unique(c("ggfacto_summary", class(tabs)))
   tabs
@@ -511,7 +513,7 @@ gda_poles_tab <- function(packed, axis_label, group_name, n_ind, eig_tab,
   tabs <- tabxplor::new_tab(out, meta = list(render_extras = list(n = "no")))
   # The words are set even under `color = FALSE`: a table can be coloured afterwards with
   # `set_color()`, and a legend the builder never named is one nothing brings back.
-  gda_summary(tabs, eig = eig_tab, words = gda_contrib_words(), var_names = "rows",
+  gda_summary(tabs, footer = eig_tab, words = gda_contrib_words(), var_names = "rows",
               glossary = gda_poles_glossary(contrib, complete, color))
 }
 
@@ -909,6 +911,6 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
     gda_cv_line())
 
   gda_summary(tabxplor::new_tab(out, meta = list(render_extras = list(n = "no"))),
-              eig = if (eig) eig_tab, words = gda_pca_words(), glossary = glossary)
+              footer = if (eig) eig_tab, words = gda_pca_words(), glossary = glossary)
   })
 }

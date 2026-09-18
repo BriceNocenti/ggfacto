@@ -2,57 +2,50 @@
 % Please edit documentation in R/clust.R
 \name{clust_tab}
 \alias{clust_tab}
-\alias{HCPC_tab}
 \title{Describe Clusters with One Table}
 \usage{
 clust_tab(
+  res,
   data,
-  row_vars = character(),
   clust,
-  wt,
+  row_vars,
+  pct = "col",
   excl = NA,
   color = "difference",
-  pct = "col",
   row_tot = "\% of population",
   cleannames = TRUE,
-  ...
-)
-
-HCPC_tab(
-  data,
-  row_vars = character(),
-  clust,
-  wt,
-  excl = NA,
-  color = "difference",
-  pct = "col",
-  row_tot = "\% of population",
-  cleannames = TRUE,
-  ...
+  ...,
+  wt
 )
 }
 \arguments{
-\item{data}{A data frame.}
+\item{res}{The analysis the clusters were made on, with
+\code{\link{multiple_correspondence_analysis}} or \code{\link{principal_component_analysis}}
+(or \code{FactoMineR::MCA()} or \code{FactoMineR::PCA()}). For a correspondence analysis, cross
+the clusters with the other variable of the table with \code{tabxplor::tab()} instead.}
 
-\item{row_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The variables to describe the
-clusters with, typically the active variables of the MCA. Numeric ones become mean rows.}
+\item{data}{The data frame, with the clusters. The whole data frame will do when the analysis
+was made on a subset of it: only the rows the analysis used are described.}
 
 \item{clust}{The variable with the clusters, typically made with \code{\link{hierarchical_clust}},
-as a bare name or a string. Rows without a cluster (outside the analysed population) are left
-out.}
+as a bare name or a string.}
 
-\item{wt}{The weight variable. Leave empty for unweighted results.}
+\item{row_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The variables to describe the
+clusters with: by default, the active variables of the analysis. Numeric ones become mean rows,
+unless `shape` (passed on to \code{tabxplor::tab()}) cuts them into levels, e.g.
+`shape = "sd_bands"`, or `shape = c(AGE = "quintiles")` for that one.}
+
+\item{pct}{`"col"` (default) reads each cluster as a distribution: of the people in this cluster,
+what percentage are in this level. `"row"` reads each level as a distribution across clusters.}
 
 \item{excl}{The levels not to show, matched exactly by name; their individuals still count in the
 percentages. `NA`, the default, hides the missing values (and the levels named `<VAR>.NA`);
 `excl = NULL` shows every level.}
 
 \item{color}{The colour measure, see \code{\link[tabxplor]{tab}}. With `"difference"` (the
-default) the mean rows stay uncoloured: a difference of means and a difference of percentages
-have no ladder in common. Use `"ratio"` to colour every row, means included.}
-
-\item{pct}{`"col"` (default) reads each cluster as a distribution: of the people in this cluster,
-what percentage are in this level. `"row"` reads each level as a distribution across clusters.}
+default), percentages are coloured by their difference with the whole population, and means by
+their difference in standard deviations --- but not both in one table, which a single ladder
+cannot grade: there, means stay uncoloured, and `"ratio"` colours every row.}
 
 \item{row_tot}{The name of the row giving each cluster's share of the population.}
 
@@ -60,15 +53,21 @@ what percentage are in this level. `"row"` reads each level as a distribution ac
 numbers like \code{"1-"} and text in parentheses included.}
 
 \item{...}{Additional arguments to pass to \code{\link[tabxplor]{tab}}.}
+
+\item{wt}{Not used: the table is weighted with the weights of the analysis. It is there for the
+former form, `clust_tab(data, row_vars, clust, wt)`, still read as \code{\link{HCPC_tab}}.}
 }
 \value{
 A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
 }
 \description{
 One table describing every cluster: each variable's levels down the page, the clusters across it,
-and a colour saying at a glance which levels a cluster is made of. Numeric variables come in as
-mean rows, and the last two rows give each cluster's share of the population and its size.
-`HCPC_tab()` is an older name for the same function.
+and a colour saying at a glance which levels a cluster is made of. Give it the analysis, the data
+frame and the clusters, in the order of \code{\link{ggmca}}: the active variables, the weights
+and the rows the analysis was made on are its own. Numeric variables come in as mean rows,
+coloured by their difference to the mean in standard deviations; the last two rows give each
+cluster's share of the population and its size (under the table when every row is a mean, as in
+a principal component analysis).
 }
 \examples{
 data(tea, package = "FactoMineR")
@@ -79,7 +78,18 @@ tea <- tea |>
 # ONE option decides how every tabxplor table prints, an interpretation table included.
 # In a script it goes once, at the top, beside the library() calls.
 options(tabxplor.print = "html")
-clust_tab(tea, tidyselect::all_of(names(tea)[1:18]), clust)
+
+# The clusters, by the active variables
+clust_tab(res.mca, tea, clust)
+
+# ... and by other variables
+clust_tab(res.mca, tea, clust, row_vars = c(sex, SPC, age), pct = "row")
+
+# A principal component analysis: the means of each cluster
+res.pca <- principal_component_analysis(mtcars, 1:7)
+cars <- mtcars |>
+  dplyr::mutate(clust = hierarchical_clust(res.pca, ncp = 2, nb_clust = 3))
+clust_tab(res.pca, cars, clust)
 }
 \seealso{
 [ggfacto_summary], [hierarchical_clust()], [mca_interpret()].

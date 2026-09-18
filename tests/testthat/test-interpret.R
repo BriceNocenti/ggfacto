@@ -54,8 +54,7 @@ test_that("every summary is one tagged tabxplor table, never a list", {
                  ca_interpret(fx_ca()),
                  pca_interpret(fx_pca(), axes = 1:2),
                  suppressWarnings(mean_sd_tab(mtcars, 1:7)),
-                 HCPC_tab(fx_tea_clust(), row_vars = tidyselect::all_of(fx_active()),
-                          clust = "clust"))) {
+                 clust_tab(fx_mca(), fx_tea_clust(), clust))) {
     expect_s3_class(x, "ggfacto_summary")
     expect_true(tabxplor::is_tab(x))
     expect_true(any(vapply(x, tabxplor::is_fmt, logical(1))))
@@ -76,8 +75,7 @@ test_that("an axes summary carries the eigenvalues as a subordinate table", {
   expect_true("Benzecri's modified rate" %in% names(tabxplor::get_footer_tabs(mca_interpret(fx_mca()))[[1]]))
   expect_false("Benzecri's modified rate" %in% names(tabxplor::get_footer_tabs(ca_interpret(fx_ca()))[[1]]))
   # a cluster description describes no axes
-  expect_null(tabxplor::get_footer_tabs(
-    HCPC_tab(fx_tea_clust(), row_vars = tidyselect::all_of(fx_active()), clust = "clust")))
+  expect_null(tabxplor::get_footer_tabs(clust_tab(fx_mca(), fx_tea_clust(), clust)))
 })
 
 test_that("eig = FALSE leaves the eigenvalues out", {

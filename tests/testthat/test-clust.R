@@ -1,13 +1,15 @@
 # PURPOSE: Lock the clustering step -- hierarchical_clust() and the table that describes its
-#   clusters, clust_tab().
+#   clusters, clust_tab() (and HCPC_tab(), its former form).
 # ROLE: The last step of the workflow. The clusters are a column of the data frame, written with
-#   mutate(); these tests pin that they are FactoMineR::HCPC()'s, and that the column lines up with
-#   the rows it describes, whatever subset the analysis was made on.
+#   mutate(); these tests pin that they are FactoMineR::HCPC()'s, that one tree serves every cut,
+#   and that the column lines up with the rows it describes, whatever subset the analysis was made on.
 # KEY CONSTRAINTS:
 #   - Tables are tabxplor's job: clust_tab() builds tabxplor::fmt() columns and lets tabxplor render
 #     them. Numbers are asserted as facts rather than as digits wherever possible.
 #   - hierarchical_clust() computes HCPC()'s clusters itself: every analysis is compared with HCPC()
 #     run on the same analysis, fitted with `ncp` axes.
+#   - The tree cache is shared by the whole run (the fixtures fill it): a test counting trees
+#     empties it first.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract.
 
 hc <- function(...) hierarchical_clust(..., tree = FALSE)
@@ -147,49 +149,178 @@ test_that("hierarchical_clust refuses rows it cannot line up, and says why", {
                "ungroup")
 })
 
+# --- one tree, many cuts ------------------------------------------------------------------------
+
+trees <- function() ggfacto:::clust_cache$trees
+no_trees <- function() assign("trees", NULL, envir = ggfacto:::clust_cache)
+
+test_that("a tree is built once, then cut as many times as asked", {
+  no_trees()
+  hc(fx_mca(), ncp = 3, nb_clust = 4)
+  six <- hc(fx_mca(), ncp = 3, nb_clust = 6)
+  expect_length(trees(), 1L)
+  # a cut of the kept tree is the cut of a fresh one
+  no_trees()
+  expect_identical(hc(fx_mca(), ncp = 3, nb_clust = 6), six)
+  # another number of axes is another tree
+  hc(fx_mca(), ncp = 2, nb_clust = 4)
+  expect_length(trees(), 2L)
+})
+
+test_that("options(ggfacto.clust_cache) bounds the trees kept, and 0 keeps none", {
+  no_trees()
+  withr::local_options(ggfacto.clust_cache = 2)
+  for (ncp in 2:4) hc(fx_mca(), ncp = ncp, nb_clust = 4)
+  expect_length(trees(), 2L)
+  no_trees()
+  withr::local_options(ggfacto.clust_cache = 0)
+  hc(fx_mca(), ncp = 3, nb_clust = 4)
+  expect_length(trees(), 0L)
+})
+
+test_that("names name the clusters, in the order they are given", {
+  base     <- hc(fx_mca(), ncp = 3, nb_clust = 4)
+  in_order <- hc(fx_mca(), ncp = 3, names = c("A", "B", "C", "D"))
+  expect_identical(levels(in_order), c("A", "B", "C", "D"))
+  expect_identical(as.integer(in_order), as.integer(base))
+
+  # as in fct_recode(), "new name" = old number, the order of the vector being the order of levels
+  recoded <- hc(fx_mca(), ncp = 3, names = c("D" = 4, "A" = 1, "B" = 2, "C" = 3))
+  expect_identical(levels(recoded), c("D", "A", "B", "C"))
+  expect_identical(as.character(recoded), as.character(in_order))
+  # ... or the other way round, which reads as well
+  expect_identical(hc(fx_mca(), ncp = 3, names = c("4" = "D", "1" = "A", "2" = "B", "3" = "C")),
+                   recoded)
+  expect_identical(levels(hc(fx_mca(), ncp = 3, names = c("Petit \u00e9cran" = 1, "B" = 2,
+                                                          "C" = 3, "D" = 4)))[1],
+                   "Petit \u00e9cran")
+  # a correspondence analysis names its clusters of levels the same way
+  ca <- hc(fx_ca_relig(), ncp = 2, names = c("a", "b", "c", "d"))
+  expect_identical(levels(ca), c("a", "b", "c", "d"))
+  expect_identical(names(ca), rownames(fx_ca_relig()$row$coord))
+})
+
+test_that("names are refused unless they name each cluster once", {
+  expect_error(hc(fx_mca(), ncp = 3, nb_clust = -1, names = c("A", "B")), "nb_clust")
+  expect_error(hc(fx_mca(), ncp = 3, nb_clust = 4, names = c("A", "B")), "4 clusters")
+  expect_error(hc(fx_mca(), ncp = 3, names = c("A", "A", "B")), "own name")
+  expect_error(hc(fx_mca(), ncp = 3, names = c("A" = 1, "B" = 1, "C" = 3)), "fct_recode")
+})
+
+test_that("the tree states the share of the inertia its clusters keep", {
+  pts <- ggfacto:::clust_points(fx_mca_wt(), 3, "rows")
+  t   <- ggfacto:::ward_tree(pts$coord, pts$w, pts$answers)
+  h   <- rev(t$tree$height)
+  # the gains add up to the inertia of the ncp axes
+  expect_equal(sum(h), sum(fx_mca_wt()$eig[1:3, 1]))
+  # uncut by a k-means, the share is the gains of the splits kept
+  cut <- ggfacto:::cut_ward_tree(t, pts$coord, pts$w, 4, FALSE)
+  expect_equal(cut$between, sum(h[seq_len(cut$nb_clust - 1)]) / sum(h))
+  # consolidated, it is still 1 - within / total, with weighted centres
+  cut <- ggfacto:::cut_ward_tree(t, pts$coord, pts$w, 4, TRUE)
+  X <- pts$coord; w <- pts$w; cl <- as.integer(cut$clust)
+  centres <- rowsum(X * w, cl) / as.vector(rowsum(w, cl))
+  within  <- sum(w * rowSums((X - centres[cl, ])^2))
+  total   <- sum(w * rowSums(sweep(X, 2, colSums(X * w) / sum(w))^2))
+  expect_equal(cut$between, 1 - within / total)
+})
+
 # --- clust_tab ---------------------------------------------------------------------------------
 
 rows <- function() tidyselect::all_of(fx_active())
 
+test_that("clust_tab takes the variables, the weights and the rows from the analysis", {
+  d <- fx_tea_wt()
+  d$clust <- hc(fx_mca_wt(), ncp = 3, nb_clust = 4)
+  new <- clust_tab(fx_mca_wt(), d, clust)
+  old <- suppressWarnings(HCPC_tab(d, rows(), clust, wt = w))
+  expect_s3_class(new, "ggfacto_summary")
+  expect_identical(as.character(new), as.character(old))
+  # the weights are the analysis's: unweighted, the table differs
+  expect_false(identical(as.character(new),
+                         as.character(suppressWarnings(HCPC_tab(d, rows(), clust)))))
+  expect_error(clust_tab(fx_mca_wt(), d, clust, wt = w), "weights of the analysis")
+})
+
 test_that("clust_tab accepts the clusters as a bare name, a string and a vector", {
   d <- fx_tea_clust()
-  by_symbol <- clust_tab(d, rows(), clust)
-  by_string <- clust_tab(d, rows(), "clust")
-  by_vector <- clust_tab(d, rows(), d$clust)
-
-  expect_s3_class(by_symbol, "tbl_df")
-  expect_identical(as.character(by_symbol), as.character(by_string))
-  expect_identical(as.character(by_symbol), as.character(by_vector))
+  by_symbol <- clust_tab(fx_mca(), d, clust)
+  expect_identical(as.character(by_symbol), as.character(clust_tab(fx_mca(), d, "clust")))
+  expect_identical(as.character(by_symbol), as.character(clust_tab(fx_mca(), d, d$clust)))
 })
 
-test_that("clust_tab has one column per cluster plus the population total", {
-  tab <- clust_tab(fx_tea_clust(), rows(), clust)
-  expect_gte(ncol(tab), nlevels(fx_tea_clust()$clust))
-  expect_true(any(vapply(tab, inherits, logical(1), "tabxplor_fmt")))
-})
-
-test_that("clust_tab weights its percentages", {
-  d <- fx_tea_clust()
-  d$w <- rep(c(0.5, 1.5), length.out = nrow(d))
-  expect_false(identical(as.character(clust_tab(d, rows(), clust)),
-                         as.character(clust_tab(d, rows(), clust, wt = w))))
-})
-
-test_that("clust_tab leaves out the rows without a cluster", {
+test_that("clust_tab describes the rows of an analysed subset, given the whole data frame", {
   d <- fx_tea() |> dplyr::mutate(cl = hc(fx_mca_young(), ncp = 3, nb_clust = 4))
-  tab <- clust_tab(d, rows(), cl)
+  tab <- clust_tab(fx_mca_young(), d, cl)
   expect_false(any(grepl("^NA$", names(tab))))
   expect_identical(as.character(tab),
-                   as.character(clust_tab(dplyr::filter(d, !is.na(cl)), rows(), cl)))
+                   as.character(clust_tab(fx_mca_young(), dplyr::filter(d, age < 30), cl)))
+})
+
+test_that("clust_tab of a PCA grades its means, and puts the population under them", {
+  d <- mtcars[1:7]
+  names(d)[names(d) == "wt"] <- "weight"
+  d$clust <- hc(fx_pca(), ncp = 2, nb_clust = 3)
+  tab <- clust_tab(fx_pca(), d, clust)
+  expect_setequal(as.character(tab$variables), names(d)[1:7])
+  expect_true(any(!is.na(tabxplor::fmt_get_color_code(tab$`1`))))
+  expect_true("% of population" %in% as.character(tabxplor::get_footer_tabs(tab)[[1]]$lvs))
+})
+
+test_that("clust_tab sends a correspondence analysis to tab()", {
+  expect_error(clust_tab(fx_ca_relig(), forcats::gss_cat, relig), "tab\\(data, clust")
+})
+
+test_that("a binary variable is one row read down the clusters, two read across them", {
+  lvs <- function(tab) as.character(tab$lvs)
+  expect_false("Not.breakfast" %in% lvs(clust_tab(fx_mca(), fx_tea_clust(), clust)))
+  expect_true(all(c("breakfast", "Not.breakfast") %in%
+                    lvs(clust_tab(fx_mca(), fx_tea_clust(), clust, pct = "row"))))
+})
+
+test_that("a number is a mean row, unless `shape` cuts it into levels", {
+  d <- fx_tea_clust()
+  n_rows <- function(...) sum(clust_tab(fx_mca(), d, clust, row_vars = c(sex, age), ...)$variables
+                              == "age")
+  expect_identical(n_rows(), 1L)
+  expect_identical(n_rows(shape = "sd_bands"), 4L)
+  expect_identical(n_rows(shape = c(age = "quintiles")), 5L)
 })
 
 test_that("clust_tab hides excluded levels, the missing answers first", {
-  d <- fx_tea_na()
-  d$clust <- fx_tea_clust()$clust
+  res <- MCA2(fx_tea_na(), 1:6)
+  d   <- fx_tea_na()
+  d$clust <- hc(res, ncp = 3, nb_clust = 4)
   lvs <- function(tab) as.character(tab$lvs)
-  expect_false(any(grepl("\\.NA$", lvs(clust_tab(d, rows(), clust)))))
-  expect_true("breakfast.NA" %in% lvs(clust_tab(d, rows(), clust, excl = NULL)))
-  expect_false("Not.lunch" %in% lvs(clust_tab(d, rows(), clust, excl = c(NA, "Not.lunch"))))
+  expect_false(any(grepl("\\.NA$", lvs(clust_tab(res, d, clust)))))
+  expect_true("breakfast.NA" %in% lvs(clust_tab(res, d, clust, excl = NULL)))
+  expect_false("Not.lunch" %in% lvs(clust_tab(res, d, clust, excl = c(NA, "Not.lunch"))))
+})
+
+test_that("clust_tab cleans the cluster names once, for the level rows and the population rows", {
+  d <- fx_tea_clust()
+  d$clust <- forcats::fct_relabel(d$clust, ~ paste0(.x, "-Cluster ", .x))
+  tab <- clust_tab(fx_mca(), d, clust)
+  expect_false(any(grepl("^[0-9]-", names(tab))))
+  expect_true(all(paste0("Cluster ", levels(fx_tea_clust()$clust)) %in% names(tab)))
+  expect_true(any(grepl("^1-", names(clust_tab(fx_mca(), d, clust, cleannames = FALSE)))))
+})
+
+test_that("the former form -- HCPC_tab(), or a data frame first -- still works, saying so once", {
+  e <- ggfacto:::deprecated_args_warned
+  rm(list = ls(envir = e), envir = e)
+  d   <- fx_tea_clust()
+  new <- as.character(clust_tab(fx_mca(), d, clust))
+  expect_warning(old <- HCPC_tab(d, rows(), clust), "clust_tab\\(res, data, clust\\)")
+  expect_identical(as.character(old), new)
+  expect_no_warning(by_position <- clust_tab(d, rows(), clust))
+  expect_identical(as.character(by_position), new)
+  expect_identical(as.character(clust_tab(data = d, row_vars = rows(), clust = "clust")), new)
+  expect_identical(as.character(d |> clust_tab(rows(), clust)), new)
+  # rows without a cluster are left out
+  d$clust[1:10] <- NA
+  expect_identical(as.character(HCPC_tab(d, rows(), clust)),
+                   as.character(HCPC_tab(d[-(1:10), ], rows(), clust)))
 })
 
 # --- the former `cah` name --------------------------------------------------------------------
@@ -199,13 +330,4 @@ test_that("`cah =` still works, and says it is now `clust =`", {
   rm(list = ls(envir = e), envir = e)
   expect_warning(pd <- md(fx_mca(), fx_tea_clust(), cah = "clust", profiles = TRUE), "clust")
   expect_identical(pd$clust, "clust")
-})
-
-test_that("clust_tab cleans the cluster names once, for the level rows and the population rows", {
-  d <- fx_tea_clust()
-  d$clust <- forcats::fct_relabel(d$clust, ~ paste0(.x, "-Cluster ", .x))
-  tab <- clust_tab(d, rows(), clust)
-  expect_false(any(grepl("^[0-9]-", names(tab))))
-  expect_true(all(paste0("Cluster ", levels(fx_tea_clust()$clust)) %in% names(tab)))
-  expect_true(any(grepl("^1-", names(clust_tab(d, rows(), clust, cleannames = FALSE)))))
 })
