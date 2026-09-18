@@ -28,7 +28,7 @@ Fifteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / #
 
 **The MCA pipeline** — the package's main path, and the only one that is staged.
 
-- `mca-data.R` — `multiple_correspondence_analysis()` (alias `MCA2()`), `ggmca()`, `ggmca_data()`: the entry points and the data half; plus `complete_clust()` and the vendored `varsup()`.
+- `mca-data.R` — `multiple_correspondence_analysis()` (alias `MCA2()`), `ggmca()`, `ggmca_data()`: the entry points and the data half; plus `answer_profiles()` and the vendored `varsup()`.
 - `mca-plot.R` — `ggmca_plot()`: the rendering half. ⚠ must keep sorting after `mca-data.R` (see its header).
 - `tooltips.R` — `interactive_tooltips()`: the crosstabs behind the hover, built with tabxplor.
 
@@ -71,22 +71,23 @@ Fifteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / #
 
 ### The plot model
 
-`ggmca_data()` returns a plain `list`, not a class:
+`ggmca_data()` returns a plain `list`, not a class, of **flat** tables — no list-column, so a user can read and edit them:
 
-- **`vars_data`** — one row per level of every active and supplementary variable: its coordinates on every axis, its frequency, its colour group, its `data_id`, and a nested `interactive_text` tibble of tooltip fragments.
-- **`ind_data`** — one row per **answer profile**, with `count` / `wcount` and its own nested tooltip; `NULL` when `profiles = FALSE`.
+- **`vars_data`** — one row per level of every active and supplementary variable: its coordinates and contributions on every axis (`Dim k`, `contrib<k>`), its frequency, its colour group, its `id`, and its tooltip as two strings, `begin_text` (the header) and `interactive_text` (the body).
+- **`ind_data`** — one row per drawn **answer profile**: `count` / `wcount`, its cluster, its `id`, its tooltip string; `NULL` when `profiles = FALSE`. A profile's cluster is the **weighted plurality** of its individuals, missing ones left out: clusters made on the analysis are pure within a profile, whose individuals share one point, so the rule only decides for clusters made elsewhere.
+- **`individuals`** — one row per fitted individual: the rank `nb` of its profile (`NA` beyond `max_profiles`), its weight, its coordinates, its supplementary answers; `NULL` without `sup_vars`. Ellipses and facets group it, so an ellipse covers every individual of its level, with or without `profiles = TRUE`.
 - **`res.mca`** — a stripped `list(eig, axes_names)`, deliberately not the FactoMineR object: the rendering half must not be able to recompute anything.
 - **`clust`** — the cluster variable's name, or `character()`.
 
-`ggmca_plot()` appends the per-axis contributions to the nested tooltip, then `tidyr::unite()`s it into the single `interactive_text` character column that every geom's `tooltip =` aesthetic reads.
+`ggmca_plot()` inserts the contribution lines of the two axes it draws between a level's header and body — the one part of a tooltip the data half cannot know — into the single `interactive_text` column every geom's `tooltip =` aesthetic reads.
 
 ### The tooltip is the package
 
-`interactive_tooltips()` builds **one `tabxplor::tab()` per variable** (`output_list = TRUE`, `wt = "row.w"`, `na = "drop"`; `pct = "row"` with `color = "difference"` for the `active_tables` variables, `pct = "col"` for the rest), then `format_pct()` renders each cell as `<font color>` HTML, reading the colour through `tabxplor::fmt_get_color_code()` — never through tabxplor internals, as an earlier version did.
+`interactive_tooltips()` crosses the `active_tables` variables with the active and tooltip variables in **one** `tabxplor::tab()` (`wt = "row.w"`, `na = "drop"`, `pct = "row"`, `color = "difference"`), then `format_pct()` renders each cell as `<font color>` HTML, reading the colour through `tabxplor::fmt_get_color_code()`, never through tabxplor internals. tabxplor's cost is per (row variable × column variable) pair, ~30 ms whatever the rows, so `stacked_crosstab()` **stacks** the crossed variables into one row variable — each individual once per variable, each level a code mapped back by lookup, never a label parsed — and `tab_vars` splits the table back into one block per variable: 15 pairs where one `tab()` per variable made 225, for byte-identical cells. A variable without crosstab feeds only its header line, so `level_counts()` counts it instead of tabulating it. `options(tabxplor.parallel =)` reaches every `tab()` ggfacto makes; the stacked call is a single unit, which tabxplor runs serially.
 
-- **WARNING** — the "Frequency" denominator is `pop_wcount`, the population. It is *not* the last row of the bound tables, which is whatever the last variable's last level happens to be and gave some levels a frequency above 100 %.
+- **WARNING** — `tab_vars` is what keeps the stack exact: each block is compared to its **own** Total (`comp = "tab"`). One stacked Total would measure a variable with missing values against the wrong reference.
+- **WARNING** — the "Frequency" denominator is `pop_wcount`, the population, never a table's Total row, which gave some levels a frequency above 100 %.
 - **WARNING** — the numbers are aligned with `str_pad()` under a monospace font, so the shim's exact stringr semantics (a *vector* `width`, a non-space fill) are load-bearing, not stylistic.
-- `unlv()` undoes tabxplor's `"_lv"` suffix on a level whose name collides with a column name, via `fct_relabel` so `lvs` stays a factor.
 
 ### The FactoMineR contract
 
@@ -102,7 +103,7 @@ The user's weight column → `FactoMineR`'s `row.w` → recovered from the **fit
 
 `theme_facto()` returns a **list** of ggplot objects, not a theme — axis titles carrying the eigenvalue percentages, scales, `coord_fixed()` — so it is `+`-ed as a whole; `ggmca_plot()` always calls it with `no_color_scale = TRUE` so the manual palette wins.
 
-`ggmca_plot()` and `ggca()` then carry render hints on the returned object as **attributes** — `css_hover`, `css_tooltip`, `height_width_ratio` — which `ggi()` and `ggsave2()` read back; both must tolerate their absence, since a plain ggplot has none. `ggi()` passes the ratio on to the widget as `ggfacto_ratio`, which is the only geometry a knitted `<iframe>` has to go on (see `R/knit.R`). Attributes rather than list slots because the object must stay a real ggplot: `append()` flattens the S7 object into a plain list wearing `c("gg", "ggplot")`, and then `ggplot_build()`, `grid.draw()` and so `ggsave2()` stop dispatching, while `print()` draws only as a side effect of `print.default()` recursing into the nested plot. The hints survive `+`, so a user can keep extending the graph. Hover linking rests on a `data_id` convention: the ids are offset into disjoint bands — active variables from `1000`, HCPC clusters and answer profiles from `10000` — so that every point of one cluster shares an id and hovering any of them lights them all.
+`ggmca_plot()` and `ggca()` then carry render hints on the returned object as **attributes** — `css_hover`, `css_tooltip`, `height_width_ratio` — which `ggi()` and `ggsave2()` read back; both must tolerate their absence, since a plain ggplot has none. `ggi()` passes the ratio on to the widget as `ggfacto_ratio`, which is the only geometry a knitted `<iframe>` has to go on (see `R/knit.R`). Attributes rather than list slots because the object must stay a real ggplot: `append()` flattens the S7 object into a plain list wearing `c("gg", "ggplot")`, and then `ggplot_build()`, `grid.draw()` and so `ggsave2()` stop dispatching, while `print()` draws only as a side effect of `print.default()` recursing into the nested plot. The hints survive `+`, so a user can keep extending the graph. Hover linking rests on a `data_id` convention: the ids are offset into disjoint bands — active variables from `1000`, HCPC clusters and answer profiles from `10000` — so that every point of one cluster shares an id and hovering any of them lights them all. A cluster's id is matched **by its name**, for its label and its profiles alike: `cleannames` re-sorts a factor alphabetically, so its codes cannot link them.
 
 ### Tables are tabxplor's
 
@@ -140,7 +141,7 @@ Every table here is built out of `tabxplor::fmt()` columns — scale, `col_var`,
 - **The plot object carries render hints as attributes.** Never move them back into list slots, and never rebuild the object with `append()`: either turns it from a ggplot into a list and silently breaks `ggsave2()`.
 - **Tables are tabxplor's job** — no kableExtra, DT or gt.
 - **One name per thing across the MCA family.** The microdata is `data` everywhere, second as in `tab()`; the plot model is `plot_data`; the clusters are `clust`, a bare column name. The old `dat`, `cah`, `cah_color_groups` (and `ggmca_plot(data =)`) are soft-deprecated aliases routed through `renamed_arg()`, warning once per session.
-- **`data.table` is used in exactly one function**, `complete_clust()`, where a grouped `.N` over many columns runs on the full individual-level data. The benchmark comment beside the adjacent `tidyr::nest()` records that data.table was *slower* there; do not generalise it.
+- **An answer profile is aggregated, never nested.** Its membership is one integer vector (`answer_profiles()`, `vctrs::vec_group_id()` over the answers its tooltip shows), and every per-profile number is one vectorised aggregation over it — no tibble per profile, no `purrr::map()` over profiles.
 - **plotly and widgetframe are `Suggests`** and every entry point guards with `requireNamespace()`.
 
 ---
@@ -180,9 +181,9 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 **Fixtures are `tea[1:6]`, never `tea[1:18]`.** Tooltip crosstabs are quadratic in the number of active variables: `active_tables = "active"` costs 1.2 s on six and 10.4 s on eighteen. Six reaches every code path. The models the suite reuses are memoised in `helper-fixtures.R`, among them `fx_tea_na()` (missing answers for the `excl` rule) and `fx_mca_young()` (an analysis of a piped subset, which records its rows). The one exception is `fx_mca_multi()`, local to `test-interpret.R`: `tea[1:6]` is all binary, so `mca_interpret()`'s row packing collapses every question to one line there and its display blanking has nothing to hide — that needs multi-level variables and a third axis.
 
-The suite is **small and serial**: 488 assertions, about 40 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
+The suite is **small and serial**: 542 assertions, about 35 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
 
-**Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(tabxplor.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
+**Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text (as `ggmca_plot()` joins it) and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(tabxplor.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
 
 ```bash
 #In a temp .R file (outside tests/), then: OMP_NUM_THREADS=1 Rscript that_file.R
@@ -319,15 +320,55 @@ Tests : les deux cas tronqués (`ncp = 2`, `ncp = 3`) attendent 100 % et l'inert
 
 **Suite** : 488 assertions (377 avant), 0 échec, 0 avertissement, ~40 s ; `check` 0/0/0. **Le cours** : le livre du M2S1, ses examens et 13 carnets d'exploration réécrits dans ce geste unique, puis rendus un à un.
 
-#### Phase 1n — plots performance improvements
+#### Phase 1n — un profil est un groupe, un tableau croisé est un appel (DONE)
 
-Improve ggfacto main plot functions performance, specially `ggmca()` with profiles points with or without hierarchical clustering colors. (I remember having done things with nest/unnest, that are usually inefficient, so there is certainly a better way. Check all points in the clusters have a color, etc.)
+**Deux clés, et plus aucun `nest()` / `map()` / `unnest()` dans le chemin de l'ACM.** Mesuré sur `pc_AGD` (9 234 × 41, 15 variables actives, 5 312 profils) :
 
-#### Phase 1o — vignette and pkgdown site
+| Appel                                         | Avant       | Après       |
+|-----------------------------------------------|-------------|-------------|
+| `ggmca_data(profiles = TRUE)`                 | 1,1 s       | 0,17 s      |
+| `ggmca_data(clust =, profiles = TRUE)`        | 2,5 s       | 0,35 s      |
+| `ggmca(ellipses = 0.5)` / `type = "facets"`   | 5,4 / 5,7 s | 0,8 / 0,6 s |
+| `ggmca_data(active_tables = "active")`        | 7,7 s       | 1,3 s       |
 
-Look at `/home/dev1/github/tabxplor/` vignettes and pkgdown site : I want the same kind of pkgdown site for ggfacto, except it will be much more concise.
+**Un profil de réponse est un groupe d'individus.** Son appartenance est un vecteur d'entiers (`answer_profiles()`, `vctrs::vec_group_id()` sur les réponses que la bulle affiche), et chaque nombre d'un profil — effectifs, classe, coordonnées — est une agrégation vectorisée sur ce vecteur, là où 5 312 tibbles imbriqués étaient parcourus un à un. Le modèle devient **plat** : `vars_data` porte sa bulle en deux chaînes (`begin_text`, `interactive_text`) et ses contributions en colonnes `contrib<k>`, `ind_data` une chaîne et un `id`, et un cinquième élément, **`individuals`** (une ligne par individu : rang de son profil, poids, coordonnées, variables supplémentaires), nourrit les ellipses et les facettes, que `ggmca_plot()` dépliait jusqu'ici profil par profil (4,2 s). Mesuré : les coordonnées sont identiques au sein d'un tel groupe même sous `excl` (écart 1,6e-15). `data.table` quitte les `Imports` avec `complete_clust()`, et `fct_detect_replace()` disparaît.
 
-Vignette : only one vignette, with an english and a french versions, and it shall be shorter that tabxplor vignettes, straight to the point, showing the three analyses (PCA/CA/MCA) workflow briefly. Use the same polished workflows that in my AGD course at `/home/dev1/github/formations_stat/cours/M2S1/livre/` to teach the three main principal_component_analysis, correspondence_analysis, multiple_correspondence_analysis with clustering workflows, but with the data on ggfacto’s functions current examples. Show the specificity of the package, staying close to the data : having means and coefficient of variations in PCA, looking at the crosstables in CA, using interactive tables to look at the profiles and. - For the French version, look at what vocabulary and style I use in `/home/dev1/github/formations_stat/cours/M2S1/livre/`, except it’s not a course so you shall be straight-to-the point.
+**`tabxplor` coûte ~30 ms par paire (variable en ligne × variable en colonne), quelle que soit la taille** — 300 ou 9 234 lignes, mesuré — et la bulle `active_tables = "active"` en faisait 225. Un seul `tab()` sur les variables **empilées** (chaque individu une fois par variable, chaque modalité un code rendu par une table de correspondance) en fait 15, et `tab_vars` rend à chaque bloc son **propre** Total : les 585 colonnes (`pct`, `diff`, `n`, `wn`, couleur, `format()`) sont identiques à un `tab()` par variable, avec des NA en ligne et en colonne. ⚠ Un Total commun avait été mesuré : il décalait `diff` pour une variable à valeurs manquantes. Les variables sans tableau croisé, qui ne servent qu'à l'en-tête, sont comptées directement (`level_counts()`), et `unlv()` disparaît. Rien n'est à exporter de `tabxplor`. `options(tabxplor.parallel =)` traverse ggfacto telle quelle, et le résultat est identique, `clust_tab()` compris ; le `tab()` empilé est une seule unité, que `tabxplor` exécute en série, et un pool (1–2 s au démarrage) n'y gagnerait rien.
+
+**Cinq bogues trouvés et corrigés en chemin.**
+
+- **Les ids de survol reliaient la mauvaise classe.** Ils valaient `as.integer(lvs)`, sur un facteur que `cleannames` retrie par ordre alphabétique : avec 11 classes de `hierarchical_clust()`, 10 étiquettes allumaient les profils d'une autre. Ils sont désormais appariés par le nom, et `clust_id` disparaît au profit du seul `id`.
+- **`complete_clust()` supposait contiguës les lignes d'un profil** : 50 classes manquantes injectées déplaçaient 7 profils. Une classe manquante est remplacée par la **pluralité pondérée** des individus du profil, et tout profil ayant un individu classé est coloré.
+- **Les réponses exclues s'imprimaient** en `Remove_levels` dans les bulles de profils : 11 sur 46 sur `tea` avec des NA.
+- **Les ellipses étaient ignorées sans `profiles = TRUE`**, et ne couvraient que les individus des `max_profiles` profils les plus lourds (8 921 des 9 234 sur `pc_AGD`). Elles couvrent désormais tous les individus, sans `profiles`. Les facettes n'ont plus besoin de `profiles` non plus, s'arrêtent sans variable supplémentaire, et les ellipses sans variable supplémentaire avertissent.
+- **`axes_reverse = 1:2`, documenté, échouait** : `if()` sur une condition de longueur 2 (R ≥ 4.2).
+
+⚠ **Un bogue de `tabxplor` 2.0.1, contourné ici, à corriger là-bas** : `tab_vars` à un seul niveau avec `totaltab = "no"` échoue (« Join columns in `x` must be present in the data »). ggfacto ne passe pas de `tab_vars` pour un bloc unique.
+
+**Équivalence.** Un harnais compare `HEAD` et la phase sur 27 appels (`tea` à 18 variables et `pc_AGD` pondéré) : bulles des modalités et des profils, effectifs, classes, et chaque colonne de chaque couche construite. Tout est identique octet pour octet, hors les changements voulus (ids des classes, lignes `Remove_levels`, points des ellipses, et la colonne interne `group` de ggplot, renumérotée par l'ordre des niveaux de classe, couleurs inchangées).
+
+**Tests** : le contrat porte sur le **contenu** et non plus sur la forme imbriquée. L'instantané de la bulle est repris sur le texte final, celui que `ggmca_plot()` assemble : mêmes cellules, désormais séparées par des sauts de ligne, lignes de contribution comprises. Nouveaux tests : ids par le nom (noms non alphabétiques), classes manquantes, pluralité pondérée, `individuals`, réponses exclues, ellipses sans profils, facettes, `axes_reverse = 1:2`, et une cellule empilée égale à la même cellule d'un `tab()` direct. **542 assertions** (488), 0 échec, 0 avertissement, ~34 s ; `check` 0/0/0.
+
+**Ce que la phase n'a pas fait.** `hierarchical_clust()` reste à 7,4 s et en mémoire quadratique (phase 1o). `ggi()` reste à ~1 s, avec un widget de 3,6 Mo pour 5 000 profils. Le suffixe `_lv` de `tabxplor` apparaît encore côté colonnes dans les bulles (`breakfast_lv:`), et ce n'est pas nouveau.
+
+#### Phase 1o — HCPC performance improvements
+
+`hierarchical_clust()` takes 7.4 s on `pc_AGD` (9 234 individuals), and its memory is quadratic: `FactoMineR::HCPC()` builds a `dist()` and a full n × n `outer()` of Ward's weights, about 1 GB at 9 234 rows. Near 40 000 rows it would pass WSL's 32 GB and crash the whole distro. Only the tree is quadratic:
+
+- **The tree** — build it on the weighted unique answer profiles (5 312 on `pc_AGD`, `answer_profiles()` already computes them). With `flashClust::hclust(members = weights)` it is the same Ward tree, since identical points merge first, at height 0. Cut it there, then map the clusters back to the individuals.
+- **The consolidation** — keep FactoMineR's own k-means consolidation, unweighted and O(n·k), on the individuals as today. If it cannot be called on its own, vendor it with credit to FactoMineR's authors, as `varsup()` credits GDAtools, so the clusters are exactly `HCPC()`'s.
+- **The test** — a testthat test on `tea` pins the equality with `FactoMineR::HCPC()`. Then re-render the course's clusters to confirm them. The tree `nb.clust = -1` draws then has profiles, not individuals, as leaves.
+
+To avoid the crash above around 40 000 unique profiles, I want you to try another experimental solution: make web searches about fast hierarchical clustering, subsetted hierarchical clustering, etc., look if it’s possible to cut the database in several parts, do the tree on different parts, then rebind everything together (it may need a special preparation, and certainly a full tree over I don’t know how many rows as a reference). It should only be opt-in experimental stuff for now : we must test the differences with HCPC, test if there are lost lone individuals inside clusters of other colors, etc. (maybe the consolidation is a good idea after that).
+
+#### Phase 1p — vignette and pkgdown site
+
+Look at `/home/dev1/github/tabxplor/` vignettes and pkgdown site : I want the same kind of pkgdown site for ggfacto, except it will be **much more concise**.
+
+Vignette : only one vignette, with an english and a french versions (start with the french one), and it shall be shorter than tabxplor vignettes, straight to the point, showing the three analyses (PCA/CA/MCA) workflow briefly. 
+- Use the same polished workflows that in my AGD course at `/home/dev1/github/formations_stat/cours/M2S1/livre/` to teach the three main principal_component_analysis, correspondence_analysis, multiple_correspondence_analysis with clustering workflows, but with the data on ggfacto’s functions current examples. 
+- Show the specificity of the package, staying close to the data : having means and coefficient of variations in PCA ; looking at the crosstables in CA (`tabxplor::tab(color = "contrib")` + interactive tooltips) ; in MCA, using interactive tables to look at the profiles and at the burt table with colored deviations, then doing HCPC with HCPC table and colored clusters (this second one not interactive, because too much interactive tables will make the webpage too big).
+- For the French version, look at what vocabulary and style I use in `/home/dev1/github/formations_stat/cours/M2S1/livre/`, except it’s not a course so you shall be straight-to-the point. Then, translate to english, ensuring you use widespread geometrical data analysis vocabulary, and idiomatic english, never word-to-word translation from French.
 - Note : the CA example should have enough row levels and enough col levels, not marital × race, more relig × partyid (excluding missings, "No answer", etc. to get a consistent enough result) ?
 
 README and pkgdown site index should be very quick :
@@ -338,22 +379,23 @@ In the pkgdown site, organise the functions in the "Reference" page in a user-fr
 
 
 
-#### Phase 1p — 0.4.0 release
+#### Phase 1q — 0.4.0 release
 
 Help me do the new CRAN release, so I don’t have to check everything myself : I want you to plan for everything, and only let me accept the pull request on github.com and do the `devtools::submit_cran()` myself. You can commit (but you do not sign the commits), you can push : I’ll have a harness permission asked, that’s all.
 
-Look at `/home/dev1/github/tabxplor/dev/release_checklist.md` and create a release checklist for ggfacto : remove everything useless here because it is only useful in tabxplor.
+Look at `/home/dev1/github/tabxplor/dev/release_checklist.md` and create a release checklist for ggfacto : remove everything useless here because it is only useful in tabxplor (next time, simply giving a prompt like "help me release v 0.x.x" should be enough).
 
 On `dev/` branch, we’ll do R CMD CHECK, then github actions and rhub (use the same rhub platforms than tabxplor ?), and everything else needed for the new release. (No reverse dependency exists.)
 
 Look at dev history, and write a very extremely concise NEWS.md, presenting new functions and arguments very shortly ; only the two or three more important bug corrections and detail changed, nobody cares really.
 
-Then, release branch, pull resquest, new github actions.
+Then, release branch, pull request, new github actions.
 
-For my message to CRAN, reuse `/home/dev1/github/tabxplor/cran-comments.md` and modify it, and change the rhub and github actions links once you have them (I’ll add win-builder link before submitting).
+For my message to CRAN, reuse `/home/dev1/github/tabxplor/cran-comments.md` and modify it, and change the rhub and github actions links once you have them.
 
-At the end, when everything is ready, I’ll submit to CRAN myself.
+At the end, when everything is ready, I’ll I’ll add win-builder link in CRAN comments and submit to CRAN myself.
 
+github release when CRAN have accepted.
 
 
 

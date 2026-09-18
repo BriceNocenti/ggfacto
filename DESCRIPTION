@@ -36,7 +36,6 @@ Imports:
     tabxplor (>= 2.0.0.9000),
     withr (>= 2.0.0),
     magrittr (>= 1.5.0),
-    data.table (>= 1.12.0),
     grDevices (>= 4.0.0),
     stats (>= 4.0.0),
     scales (>= 1.1.0)

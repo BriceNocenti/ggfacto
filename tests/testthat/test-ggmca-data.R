@@ -17,10 +17,20 @@
 
 # --- the plot model -----------------------------------------------------------------------------
 
-test_that("ggmca_data returns the four-element plot model", {
+test_that("ggmca_data returns the five-element plot model", {
   plot_data <- md(fx_mca(), fx_tea())
   expect_type(plot_data, "list")
-  expect_named(plot_data, c("vars_data", "ind_data", "res.mca", "clust"))
+  expect_named(plot_data, c("vars_data", "ind_data", "individuals", "res.mca", "clust"))
+})
+
+test_that("the plot model is flat: no list-column in any of its tables", {
+  # A user edits these tables between the halves; a nested column is what made them unreadable
+  # and what every per-profile loop used to walk.
+  pd <- md(fx_mca(), fx_tea_clust(), sup_vars = "SPC", clust = "clust", profiles = TRUE,
+           active_tables = "active")
+  for (tbl in pd[c("vars_data", "ind_data", "individuals")]) {
+    expect_false(any(vapply(tbl, is.list, logical(1))))
+  }
 })
 
 test_that("the model carries a STRIPPED res.mca, not the FactoMineR object", {
@@ -33,16 +43,16 @@ test_that("the model carries a STRIPPED res.mca, not the FactoMineR object", {
 
 test_that("vars_data has one row per level, with coordinates on every extracted axis", {
   vars_data <- fx_pd_plain()$vars_data
-  expect_true(all(c("vars", "lvs", "color_group", "id", "contribs", "interactive_text")
+  expect_true(all(c("vars", "lvs", "color_group", "id", "begin_text", "interactive_text")
                   %in% names(vars_data)))
   expect_true(all(paste("Dim", 1:5) %in% names(vars_data)))
+  expect_true(all(paste0("contrib", 1:5) %in% names(vars_data)))
   # One row per level of the six binary active variables, plus the central point.
   expect_gte(nrow(vars_data), 12L)
 })
 
-test_that("lvs stays a FACTOR, which the tooltip join depends on", {
-  # interactive_tooltips() finds its crosstab columns by is.character(); if lvs were character it
-  # would be swept into them and the join would break.
+test_that("lvs stays a FACTOR", {
+  # It is the label a user renames or reorders between the halves, the forcats way.
   expect_s3_class(fx_pd_plain()$vars_data$lvs, "factor")
 })
 
@@ -72,13 +82,13 @@ test_that("sup_vars are read from `data`, so a column absent there is an error",
 
 # --- active_tables: the crosstabs that are the package's whole point ----------------------------
 
-test_that("active_tables widens the nested tooltip", {
+test_that("active_tables puts the crosstabs in the tooltip body", {
   # This is the bet: the Burt table travels inside the hover of each point.
   plain  <- md(fx_mca(), fx_tea())
   active <- fx_pd_active()
 
-  expect_equal(ncol(plain$vars_data$interactive_text[[1]]), 1L)
-  expect_gt(ncol(active$vars_data$interactive_text[[1]]), 1L)
+  expect_true(all(is.na(plain$vars_data$interactive_text)))
+  expect_match(active$vars_data$interactive_text[1], "Active variables")
 })
 
 test_that("wcount is present on every path, and agrees with the crosstabs where both exist", {
@@ -107,7 +117,8 @@ test_that("wcount sums to the population within each variable", {
 
 test_that("active_tables = 'sup' crosses against the supplementary variables instead", {
   sup <- md(fx_mca(), fx_tea(), sup_vars = "SPC", active_tables = "sup")
-  expect_gt(ncol(sup$vars_data$interactive_text[[1]]), 1L)
+  spc <- sup$vars_data$interactive_text[sup$vars_data$vars == "SPC"]
+  expect_true(all(grepl("<font color", spc, fixed = TRUE)))
   expect_true("wcount" %in% names(sup$vars_data))
 })
 
@@ -121,20 +132,19 @@ test_that("tooltip_vars only acts when a tooltip is built at all", {
   alone <- md(fx_mca(), fx_tea(), tooltip_vars = "SPC")
   expect_identical(plain, alone)
 
-  with_tables <- fx_pd_active()
-  widened     <- md(fx_mca(), fx_tea(), active_tables = "active", tooltip_vars = "SPC")
-  expect_gt(ncol(widened$vars_data$interactive_text[[1]]),
-            ncol(with_tables$vars_data$interactive_text[[1]]))
+  expect_false(grepl("Distribution by", fx_pd_active()$vars_data$interactive_text[1]))
+  widened <- md(fx_mca(), fx_tea(), active_tables = "active", tooltip_vars = "SPC")
+  expect_match(widened$vars_data$interactive_text[1], "Distribution by")
 })
 
 test_that("tooltip_vars_1lv adds one condensed line per variable", {
-  with_tables <- fx_pd_active()
-  condensed   <- md(fx_mca(), fx_tea(), active_tables = "active", tooltip_vars_1lv = "SPC")
+  condensed <- md(fx_mca(), fx_tea(), active_tables = "active", tooltip_vars_1lv = "SPC")
+  first_lv  <- levels(fx_tea()$SPC)[1]
+  body      <- condensed$vars_data$interactive_text[1]
 
-  expect_gt(ncol(condensed$vars_data$interactive_text[[1]]),
-            ncol(with_tables$vars_data$interactive_text[[1]]))
+  expect_false(grepl(paste0(first_lv, ":"), fx_pd_active()$vars_data$interactive_text[1]))
   # It is placed before the active-variable block, right after the header.
-  expect_equal(names(condensed$vars_data$interactive_text[[1]])[1], "begin_text")
+  expect_lt(regexpr(paste0(first_lv, ":"), body), regexpr("Active variables", body))
 })
 
 # --- keep_levels / discard_levels: nested inside sup_vars ---------------------------------------
@@ -186,15 +196,76 @@ test_that("max_profiles caps the profile cloud, keeping the largest", {
 
 # --- clust ----------------------------------------------------------------------------------------
 
-test_that("clust adds a clust_id offset into its own band, so hover links a whole cluster", {
+test_that("a cluster's label and its profiles share one hover id, whatever the level order", {
   # Ids are banded on purpose: active variables from 1000, clusters and profiles from 10000, so
-  # every point of one cluster shares an id and hovering any of them lights them all.
-  plot_data <- fx_pd_clust()
-  expect_true("clust_id" %in% names(plot_data$vars_data))
-  ids <- plot_data$vars_data$clust_id[!is.na(plot_data$vars_data$clust_id)]
-  expect_true(length(ids) > 0)
-  expect_true(all(ids >= 10000L))
+  # every point of one cluster shares an id and hovering any of them lights them all. They are
+  # matched by NAME: cleannames re-sorts a factor alphabetically, and ids taken from its codes
+  # linked a label to another cluster's profiles. Non-alphabetical names are the case that broke.
+  d <- fx_tea_clust()
+  d$clust <- factor(c("Zeta", "Alpha", "Mu", "Beta")[as.integer(d$clust)],
+                    levels = c("Zeta", "Alpha", "Mu", "Beta"))
+  plot_data <- md(fx_mca(), d, clust = "clust", profiles = TRUE)
+  labels <- plot_data$vars_data[plot_data$vars_data$vars == "clust", ]
+  expect_true(all(labels$id >= 10000L))
+  for (i in seq_len(nrow(labels))) {
+    profile_ids <- plot_data$ind_data$id[as.character(plot_data$ind_data$clust) ==
+                                           as.character(labels$lvs[i])]
+    expect_true(length(profile_ids) > 0)
+    expect_true(all(profile_ids == labels$id[i]))
+  }
   expect_identical(plot_data$clust, "clust")
+})
+
+test_that("a missing cluster moves no profile, and every profile keeps a colour", {
+  # A profile takes the weighted plurality of its individuals' clusters, missing ones left out:
+  # the clusters made on the analysis are pure within a profile, so blanking a few individuals
+  # must change nothing.
+  local_null_device()
+  d <- fx_tea_clust()
+  d$clust[c(2, 30, 31, 150, 299)] <- NA
+  full    <- fx_pd_clust()$ind_data
+  blanked <- md(fx_mca(), d, clust = "clust", profiles = TRUE)$ind_data
+  expect_identical(as.character(blanked$clust), as.character(full$clust))
+
+  built <- ggplot2::ggplot_build(quietly(ggmca_plot(md(fx_mca(), d, clust = "clust",
+                                                       profiles = TRUE))))
+  profile_layer <- built$data[[which(vapply(built$data, nrow, 1L) == nrow(blanked))[1]]]
+  expect_false(anyNA(profile_layer$colour))
+})
+
+test_that("a profile split between clusters takes the one weighing most", {
+  # Clusters made elsewhere need not follow the profiles: the heavier side wins, weights counted.
+  d <- fx_tea_wt()
+  key  <- interaction(d[fx_active()], drop = TRUE)
+  rows <- which(key == names(which(table(key) >= 3))[1])
+  d$split <- factor(ifelse(seq_len(nrow(d)) %in% rows[-1], "B", "A"), levels = c("A", "B"))
+  heavier <- names(which.max(tapply(d$w[rows], d$split[rows], sum)))
+
+  ind  <- md(fx_mca_wt(), d, clust = "split", profiles = TRUE)$ind_data
+  here <- abs(ind$`Dim 1` - fx_mca_wt()$ind$coord[rows[1], 1]) < 1e-9 &
+    abs(ind$`Dim 2` - fx_mca_wt()$ind$coord[rows[1], 2]) < 1e-9
+  expect_equal(sum(here), 1L)
+  expect_equal(as.character(ind$clust[here]), heavier)
+})
+
+test_that("individuals holds one row per fitted individual, with the rank of its profile", {
+  plot_data <- md(fx_mca(), fx_tea(), sup_vars = "SPC", max_profiles = 5)
+  ind <- plot_data$individuals
+  expect_null(plot_data$ind_data)
+  expect_equal(nrow(ind), nrow(fx_tea()))
+  expect_true(all(c("nb", "row.w", "Dim 1", "SPC") %in% names(ind)))
+  # nb is missing exactly for the individuals whose profile max_profiles left out.
+  expect_setequal(stats::na.omit(unique(ind$nb)), 1:5)
+  expect_true(anyNA(ind$nb))
+  expect_null(fx_pd_plain()$individuals)
+})
+
+test_that("an excluded answer is not listed in a profile's tooltip", {
+  # excl = NA (the default) excludes the `<VAR>.NA` levels: a missing answer has no line of its own.
+  res <- MCA2(fx_tea_na(), 1:6)
+  txt <- md(res, fx_tea_na(), profiles = TRUE)$ind_data$interactive_text
+  expect_false(any(grepl("Remove_levels", txt, fixed = TRUE)))
+  expect_false(any(grepl("\\.NA", txt)))
 })
 
 test_that("clust is added to the supplementary variables automatically", {

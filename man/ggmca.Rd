@@ -148,7 +148,8 @@ a numeric vector : `1` to invert left and right ; `2` to invert up and down ;
   \item \code{"labels"} : colored labels
   \item \code{"active_vars_only"} : no \code{sup_vars}
   \item \code{"facets"} : one graph of profiles of answer for each levels of the
-  first \code{sup_vars}. A different color is used for each.
+  first \code{sup_vars} (`profiles = TRUE` is not needed). A different color is used for
+  each.
 }}
 
 \item{color_groups}{By default, there is one color group for all the levels
@@ -212,8 +213,8 @@ exactly at its point, which is faster to draw.}
 \item{ellipses}{Set to a number between 0 and 1 to draw a concentration ellipse for
 each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
 individuals of each category. \code{0.5} draw median-ellipses, containing half
-the individuals of each category. Note that, if `max_profiles` is provided, ellipses
-won't be made with all individuals.}
+the individuals of each category. Every individual counts, whether or not
+`profiles = TRUE`.}
 
 \item{xlim, ylim}{Horizontal and vertical axes limits,
 as double vectors of length 2.}
@@ -260,7 +261,9 @@ A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 Sending the result through \code{\link{ggi}} will draw the
 interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 
-A list containing the data frames to pass to \link{ggmca_plot}.
+A list to pass to \link{ggmca_plot}: `vars_data` (one row per level), `ind_data`
+ (one row per answer profile, with `profiles = TRUE`), `individuals` (one row per individual,
+ with `sup_vars`), `res.mca` and `clust`.
 
 A \code{\link[ggplot2]{ggplot}} object.
 }

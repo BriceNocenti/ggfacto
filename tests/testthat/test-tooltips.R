@@ -12,16 +12,18 @@
 #     load-bearing. See tests/testthat/test-str-shim.R.
 # See: CLAUDE.md section ggfacto architecture > The tooltip is the package.
 
+# The tooltip as the reader sees it: ggmca_plot() joins the header, the contributions and the body.
 tips <- function(plot_data) {
-  txt <- plot_data$vars_data$interactive_text
-  vapply(txt, function(x) paste(unlist(x), collapse = ""), character(1))
+  vd <- suppressMessages(ggmca_plot(plot_data, get_data = TRUE))
+  vd <- dplyr::bind_rows(vd$vars_data, vd$mean_point_data)
+  stats::setNames(vd$interactive_text, paste(vd$vars, vd$lvs))
 }
 
 # --- the header every tooltip opens with --------------------------------------------------------
 
 test_that("each tooltip names its level, its variable and its frequency", {
   plot_data <- fx_pd_active()
-  first <- plot_data$vars_data$interactive_text[[1]]$begin_text
+  first <- plot_data$vars_data$begin_text[1]
 
   expect_match(first, "<b>.+</b>")
   expect_match(first, "Frequency")
@@ -34,8 +36,7 @@ test_that("no level is more frequent than the whole population", {
   # whatever the last variable's last level happens to be -- put some levels above 100 %.
   plot_data <- fx_pd_active()
   pct <- as.numeric(sub(".*Frequency[^:]*:\\s*([0-9.]+)\\s*%.*", "\\1",
-                        vapply(plot_data$vars_data$interactive_text,
-                               function(x) x$begin_text, character(1))))
+                        plot_data$vars_data$begin_text))
   pct <- pct[!is.na(pct)]
   expect_gt(length(pct), 0L)
   expect_true(all(pct <= 100))
@@ -44,21 +45,20 @@ test_that("no level is more frequent than the whole population", {
 test_that("the frequencies of one variable's levels sum to about 100 %", {
   plot_data <- fx_pd_active()
   vd  <- plot_data$vars_data
-  pct <- as.numeric(sub(".*Frequency[^:]*:\\s*([0-9.]+)\\s*%.*", "\\1",
-                        vapply(vd$interactive_text, function(x) x$begin_text, character(1))))
+  pct <- as.numeric(sub(".*Frequency[^:]*:\\s*([0-9.]+)\\s*%.*", "\\1", vd$begin_text))
   one <- pct[as.character(vd$vars) == fx_active()[1] & !is.na(pct)]
   expect_equal(sum(one), 100, tolerance = 2)
 })
 
 # --- the crosstabs ------------------------------------------------------------------------------
 
-test_that("active_tables puts one crosstab column per active variable in the tooltip", {
-  plot_data <- fx_pd_active()
-  nested <- plot_data$vars_data$interactive_text[[1]]
+test_that("active_tables puts one crosstab line per active variable in the tooltip", {
+  body <- fx_pd_active()$vars_data$interactive_text[1]
 
-  # begin_text + the "Active variables:" heading + one column per active variable.
-  expect_true("actives_text" %in% names(nested))
-  expect_gte(ncol(nested), length(fx_active()) + 1L)
+  # The "Active variables:" heading, then one percentage line per active variable.
+  expect_match(body, "Active variables:", fixed = TRUE)
+  lines <- strsplit(sub(".*Active variables:</b>", "", body), "\n")[[1]]
+  expect_equal(sum(grepl("%", lines)), length(fx_active()))
 })
 
 test_that("the crosstab cells are coloured HTML, which is how deviation from the mean is shown", {
@@ -73,13 +73,12 @@ test_that("a level's own crosstab cell against its own variable is 100 %", {
   plot_data <- fx_pd_active()
   vd <- plot_data$vars_data
   i  <- which(as.character(vd$vars) == fx_active()[1])[1]
-  own <- vd$interactive_text[[i]]
-  expect_true(any(grepl("100", unlist(own))))
+  expect_match(vd$interactive_text[i], "100%")
 })
 
-test_that("tooltip level names have tabxplor's _lv disambiguation suffix removed", {
-  # unlv() undoes the "_lv" tabxplor appends when a level name collides with a column name, and it
-  # does so through fct_relabel so lvs stays a factor.
+test_that("tooltip level names carry no tabxplor disambiguation suffix", {
+  # tea's "breakfast" is both a variable and a level, which tabxplor would rename "breakfast_lv".
+  # The crosstab's rows are mapped back to their levels by code, so no such name reaches lvs.
   plot_data <- fx_pd_active()
   expect_s3_class(plot_data$vars_data$lvs, "factor")
   expect_false(any(grepl("_lv$", as.character(plot_data$vars_data$lvs))))
@@ -93,11 +92,9 @@ test_that("a weighted PROFILE prints a weighted n, and an unweighted one does no
   # identical figure. It lives on the profile tooltips, which are the ones counting individuals.
   weighted   <- md(fx_mca_wt(), fx_tea_wt(), profiles = TRUE)$ind_data
   unweighted <- md(fx_mca(),    fx_tea(),    profiles = TRUE)$ind_data
-  flat <- function(ind) vapply(ind$interactive_text,
-                               function(x) paste(unlist(x), collapse = "\n"), character(1))
 
-  expect_true(any(grepl("weighted n", flat(weighted), fixed = TRUE)))
-  expect_false(any(grepl("weighted n", flat(unweighted), fixed = TRUE)))
+  expect_true(any(grepl("weighted n", weighted$interactive_text, fixed = TRUE)))
+  expect_false(any(grepl("weighted n", unweighted$interactive_text, fixed = TRUE)))
 })
 
 test_that("the tooltip describes the population the analysis was FITTED on", {
@@ -108,20 +105,45 @@ test_that("the tooltip describes the population the analysis was FITTED on", {
   expect_identical(a, b)
 })
 
+test_that("a crossed variable with missing values is compared to its own total", {
+  # The crosstabs are ONE tabxplor::tab() over the stacked variables, split back by tab_vars: each
+  # variable must keep its own Total as the reference of its differences, as one tab() per variable
+  # would. A variable with missing values is where one shared Total would go wrong.
+  d <- fx_tea()
+  d$SPC[1:40] <- NA
+  vd <- md(fx_mca(), d, sup_vars = "SPC", active_tables = "sup")$vars_data
+  direct <- tabxplor::tab(d, SPC, lunch, na = "drop", pct = "row", color = "difference")
+  cell <- direct[[which(vapply(direct, tabxplor::is_fmt, logical(1)))[1]]]
+  lvs  <- as.character(direct$SPC)
+
+  for (lv in setdiff(lvs, "Total")) {
+    body <- vd$interactive_text[vd$vars == "SPC" & as.character(vd$lvs) == lv]
+    line <- regmatches(body, regexpr("\nlunch(_lv)?: [^\n]*", body))
+    x <- cell[lvs == lv]
+    diff <- round(vctrs::field(x, "diff") * 100)
+    nums <- as.numeric(regmatches(line, gregexpr("[0-9]+(?=%)", line, perl = TRUE))[[1]])
+    expect_equal(nums[length(nums)], round(vctrs::field(x, "pct") * 100))
+    if (diff != 0) expect_equal(nums[1] * sign(diff), diff)
+    colour <- tabxplor::fmt_get_color_code(x)
+    expect_identical(grepl("<font color", line), !is.na(colour))
+  }
+})
+
 # --- profile tooltips ---------------------------------------------------------------------------
 
 test_that("a profile tooltip lists the answers the profile is made of", {
   ind <- fx_pd_profiles()$ind_data
-  nested <- ind$interactive_text[[1]]
-  expect_true(all(c("count", "wcount") %in% names(nested)))
-  # One column per active variable, so the reader can see which answers make the profile.
-  expect_gte(ncol(nested), length(fx_active()))
+  expect_match(ind$interactive_text[1], "^<b>Answer profile n.1</b>\nn: [0-9]+\n")
+  # One line per answer, those matching profiles_tooltip_discard left out: tea[1:6] answers are
+  # "Not.x" or "x", so every profile shows between none and six of them.
+  answers <- strsplit(sub(".*\n\n", "", ind$interactive_text), "\n")
+  expect_true(all(lengths(answers) <= length(fx_active())))
+  expect_true(any(lengths(answers) == length(fx_active())))
 })
 
 test_that("a clust profile tooltip names its cluster and its rank within it", {
   ind <- fx_pd_clust()$ind_data
-  txt <- paste(unlist(ind$interactive_text[[1]]), collapse = " ")
-  expect_match(txt, "Cluster")
+  expect_match(ind$interactive_text[1], "^<b>Cluster: .+</b>\n<b>Answer profile n.1/[0-9]+</b>")
 })
 
 # --- golden ------------------------------------------------------------------------------------
@@ -129,11 +151,9 @@ test_that("a clust profile tooltip names its cluster and its rank within it", {
 test_that("the rendered tooltip text is stable", {
   # Golden, because the tooltip IS the package: any change to the crosstab, the colouring or the
   # padding is a user-visible change and should have to be accepted deliberately.
-  plot_data <- fx_pd_active()
-  vd <- plot_data$vars_data
-  keep <- which(as.character(vd$lvs) %in% c("breakfast", "Not.breakfast"))[1:2]
+  txt <- tips(fx_pd_active())
   expect_snapshot(
-    for (i in keep) cat(as.character(vd$lvs)[i], "\n",
-                        paste(unlist(vd$interactive_text[[i]]), collapse = ""), "\n\n", sep = "")
+    for (lv in c("breakfast breakfast", "breakfast Not.breakfast")) cat(lv, "\n", txt[[lv]],
+                                                                         "\n\n", sep = "")
   )
 })

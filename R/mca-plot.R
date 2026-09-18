@@ -9,6 +9,10 @@
 #     microdata across the ggmca_* family and survives only as a soft-deprecated alias.
 #   - theme_facto() is always called with no_color_scale = TRUE, so the manual palette built here
 #     wins over the theme's fallback.
+#   - A level's tooltip arrives as a header and a body: the contribution lines of the two axes
+#     drawn are this half's, inserted between them.
+#   - Ellipses and facets read `individuals`, not the profiles: an ellipse covers every individual
+#     of its level, and neither needs profiles = TRUE.
 #   - This file must keep sorting AFTER mca-data.R in the C locale: `@describeIn ggmca` names
 #     the merged help topic after whichever block roxygen reads first, and that is file order.
 # See: CLAUDE.md section ggfacto architecture > The plot-object seam.
@@ -39,16 +43,14 @@ ggmca_plot <- function(plot_data,
     plot_data <- renamed_arg(data, "data", "plot_data", "ggmca_plot")
   }
 
-  vars_data        <- plot_data$vars_data
-  ind_data         <- plot_data$ind_data
-  #active_vars_data <- plot_data$active_vars_data
-  #sup_vars_data    <- plot_data$sup_vars_data
-  #mean_point_data  <- plot_data$mean_point_data
-  clust              <- plot_data$clust
-  sup_vars         <- vars_data |>
+  vars_data   <- plot_data$vars_data
+  ind_data    <- plot_data$ind_data
+  individuals <- plot_data$individuals
+  clust       <- plot_data$clust
+  sup_vars    <- vars_data |>
     dplyr::filter(!.data$color_group %in% c("active_vars", "Central point")) |>
     dplyr::pull("vars") |> unique()
-  res.mca          <- plot_data$res.mca
+  res.mca     <- plot_data$res.mca
 
   if (!is.null(axes_names)) res.mca$axes_names <- axes_names
   if (!is.null(ellipses)) stopifnot(ellipses > 0 & ellipses <= 1)
@@ -56,24 +58,12 @@ ggmca_plot <- function(plot_data,
   dim1 <- rlang::sym(str_c("Dim ", axes[1]))
   dim2 <- rlang::sym(str_c("Dim ", axes[2]))
 
-  contrib1 <- rlang::sym(str_c("contrib", axes[1]))
-  contrib2 <- rlang::sym(str_c("contrib", axes[2]))
-
-  # if (length(color_profiles) == 0) {
-  #   if (length(clust) != 0) {
-  #     color_profiles <- levels(as.factor(dplyr::pull(ind_data, clust)))
-  #   } else {
-  #     color_profiles <- character()
-  #   }
-  #
-  # } else {
   if (length(clust) > 0 & !is.null(ind_data)) {
     if (is.logical(color_profiles)) if (! color_profiles) {
       color_profiles <- character()
     } else {
       color_profiles <- levels(as.factor(dplyr::pull(ind_data, clust)))
     }
-    #}
   }
 
   if (missing(colornames_recode)) colornames_recode <- character()
@@ -81,7 +71,7 @@ ggmca_plot <- function(plot_data,
   if (length(actives_in_bold) == 0) actives_in_bold <- length(sup_vars) == 0
 
   if (!length(axes_reverse) == 0) {
-    if (!axes_reverse %in% 1:2) stop("axes_reverse must be 1, 2 or 1:2")
+    if (!all(axes_reverse %in% 1:2)) stop("axes_reverse must be 1, 2 or 1:2")
 
     dims_reverse <- unique(c(rlang::as_name(dim1), rlang::as_name(dim2))[axes_reverse])
 
@@ -90,46 +80,26 @@ ggmca_plot <- function(plot_data,
     }
 
     vars_data <- reverse_axe(vars_data)
-    if (!is.null(ind_data)) ind_data <- reverse_axe(ind_data)
+    if (!is.null(ind_data))    ind_data    <- reverse_axe(ind_data)
+    if (!is.null(individuals)) individuals <- reverse_axe(individuals)
   }
 
 
+  # The tooltip of a level: its header, the contributions to the two axes drawn, then its body.
+  contrib1 <- vars_data[[str_c("contrib", axes[1])]]
+  contrib2 <- vars_data[[str_c("contrib", axes[2])]]
+  contrib_text <- dplyr::if_else(
+    is.na(contrib1),
+    true  = "",
+    false = str_c("\nContrib axe ", axes[1], " : ", str_pad(round(contrib1, 0), 2), "%",
+                  "\nContrib axe ", axes[2], " : ", str_pad(round(contrib2, 0), 2), "%")
+  )
 
-  #Add contribs in tooltips for active_vars ----
-  vars_data <- vars_data |>
-    dplyr::mutate(
-      contribs = purrr::map_if(
-        .data$contribs, !purrr::map_lgl(.data$contribs, is.null),
-        ~ dplyr::mutate(., text = str_c(
-          "\nContrib axe ", axes[1], " : ", str_pad(round(!!contrib1, 0), 2), "%",
-          "\nContrib axe ", axes[2], " : ", str_pad(round(!!contrib2, 0), 2), "%"
-        )) |>
-          dplyr::pull("text"),
-
-        .else = ~ ""
-      ) |>
-        purrr::flatten_chr(),
-
-      interactive_text = purrr::map2(
-        .data$interactive_text, .data$contribs,
-        ~ dplyr::mutate(.x, begin_text = str_c(.data$begin_text, .y))
-      )
-    ) |>
-    dplyr::select(-"contribs") # ??????????????????
-
-
-
-  # Collapse the interactive tooltips dataframes
-  vars_data <-  vars_data |>
-    dplyr::mutate(interactive_text = dplyr::bind_rows(.data$interactive_text) |>
-                    tidyr::unite("interactive_text", sep = "\n", na.rm = TRUE) |>
-                    dplyr::pull("interactive_text"),
-    )
-  # vars_data <- vars_data %>%
-  #   dplyr::mutate(interactive_text = purrr::map_chr(
-  #     .data$interactive_text,
-  #     ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
-  #   ))
+  vars_data$interactive_text <-
+    tidyr::unite(tibble::tibble(head = str_c(vars_data$begin_text, contrib_text),
+                                body = vars_data$interactive_text),
+                 "text", tidyselect::everything(), sep = "\n", na.rm = TRUE)$text
+  vars_data <- dplyr::select(vars_data, -"begin_text", -tidyselect::starts_with("contrib"))
 
   #Add linebreak at end if text finish by html </font>, otherwise no line breaks
   vars_data <- vars_data |>
@@ -141,8 +111,7 @@ ggmca_plot <- function(plot_data,
     vars_data <- vars_data |>
       dplyr::mutate(color_group = forcats::as_factor(dplyr::if_else(
         condition = .data$vars == sup_vars[1],
-        true      = paste0(.data$color_group, "_", .data$lvs), #forcats::fct_expand(paste0(.data$color_group, "_", .data$lvs) |> as.factor(),
-        #                    levels(.data$color_group)),
+        true      = paste0(.data$color_group, "_", .data$lvs),
         false     = as.character(.data$color_group)
       )))
   }
@@ -203,11 +172,6 @@ ggmca_plot <- function(plot_data,
 
   if (type[1] == "points")  vars_data <- vars_data |>
     dplyr::mutate(colorvar_names = as.factor(str_c("names_", .data$color_group)))
-  #} else { sup_vars_data <- sup_vars_data %>% dplyr::mutate(colorvar_names =  color_group) }
-
-
-
-
 
 
   #Calculate limits of graph (arguments to be passed in ggi() to set htmlwidget size)
@@ -237,20 +201,20 @@ ggmca_plot <- function(plot_data,
     if (use_theme) {
       if (!missing(xlim) & !missing(ylim))  {
         theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
-                    size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    size_scale_max = size_scale_max,
                     xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
       } else if (!missing(xlim) ) {
         theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
-                    size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    size_scale_max = size_scale_max,
                     xlim = c(xlim[1], xlim[2]) )
       } else if (!missing(ylim) )  {
         theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
-                    size_scale_max = size_scale_max,  # legend.position = "bottom",
+                    size_scale_max = size_scale_max,
                     ylim = c(ylim[1], ylim[2]))
       } else {
         theme_facto(res = res.mca, axes = axes, no_color_scale = TRUE,
                     size_scale_max = size_scale_max)
-      } # legend.position = "bottom",
+      }
 
     } else {
       NULL
@@ -262,200 +226,136 @@ ggmca_plot <- function(plot_data,
   }
 
 
-
-
-
   #Profiles :
+  profiles <- NULL
   if (!is.null(ind_data)) {
-    ind_data <-  ind_data |>
-      dplyr::mutate(interactive_text = dplyr::bind_rows(.data$interactive_text) |>
-                      tidyr::unite("interactive_text", sep = "\n", na.rm = TRUE) |>
-                      dplyr::pull("interactive_text") |>
-                      str_remove_all("\n#"),
-      )
+    #Discard the points that are out of limits
+    profiles_coord <- ind_data
+    if (!missing(xlim)) profiles_coord <- profiles_coord |> outlims(xlim, !!dim1)
+    if (!missing(ylim)) profiles_coord <- profiles_coord |> outlims(ylim, !!dim2)
 
-    # ind_data <- ind_data %>%
-    #   dplyr::mutate(interactive_text = purrr::map_chr(
-    #     .data$interactive_text,
-    #     ~ tibble::deframe(tidyr::unite(., "interactive_text", sep = "\n", na.rm = TRUE))
-    #   ) %>%
-    #     str_remove_all("\n#")
-    #   )
+    if (length(clust) != 0 && length(color_profiles) != 0) {
+      ind_clust_levels <- unique(as.character(ind_data$clust))
+      ind_clust_levels <- ind_clust_levels[!is.na(ind_clust_levels) & ind_clust_levels != "NA"]
 
-    if (length(clust) != 0) { #& type[1] != "facets"
+      not_in_color_profiles <- ind_clust_levels |>
+        purrr::discard(\(x) x %in% color_profiles) |>
+        (\(v) purrr::set_names(v, rep("base_profiles_color", length(v))))()
 
-      if (length(color_profiles) == 0 ) {
-        if (!is.null(base_profiles_color) ) {
+      if (clust %in% sup_vars) {
+        sup_clust_colorvar <- vars_data |>
+          dplyr::select("lvs", "color_group") |>
+          dplyr::filter(str_detect(.data$color_group, paste0("^", clust))) |>
+          dplyr::mutate(color_group = .data$lvs |> purrr::set_names(.data$color_group)) |>
+          dplyr::pull("color_group") |>
+          forcats::fct_drop()
 
-          #Discard the points that are out of limits
-          profiles_coord <- ind_data
-          if (!missing(xlim)) profiles_coord <- profiles_coord |> outlims(xlim, !!dim1)
-          if (!missing(ylim)) profiles_coord <- profiles_coord |> outlims(ylim, !!dim2)
-
-          profiles <- ggiraph::geom_point_interactive(
-            data = profiles_coord,
-            ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
-                         tooltip = .data$interactive_text, data_id = .data$clust_id + 10000),
-            color = base_profiles_color, na.rm = TRUE, inherit.aes = FALSE,
-            show.legend = FALSE, alpha = alpha_profiles
-          )
-        } else {
-          profiles <- NULL
-        }
-
-
-      } else {
-        ind_clust_levels <- ind_data |> dplyr::pull(clust) |> unique() |>
-          purrr::discard(is.na) |> purrr::discard(\(x) x == "NA")
-
-        not_in_color_profiles <- ind_clust_levels |>
-          purrr::discard(\(x) x %in% color_profiles) |>
-          (\(v) purrr::set_names(v, rep("base_profiles_color", length(v))))()
-
-        if (clust %in% sup_vars) {
-          sup_clust_colorvar <- vars_data |>
-            dplyr::select("lvs", "color_group") |>
-            dplyr::filter(str_detect(.data$color_group, paste0("^", clust))) |>
-            dplyr::mutate(color_group = .data$lvs |> purrr::set_names(.data$color_group)) |>
-            dplyr::pull("color_group") |>
-            forcats::fct_drop()
-
-          sup_clust_colorvar <- purrr::set_names(as.character(sup_clust_colorvar),
+        sup_clust_colorvar <- purrr::set_names(as.character(sup_clust_colorvar),
                                                names(sup_clust_colorvar))
 
-          color_profiles_in_colorvar <- sup_clust_colorvar |>
-            purrr::keep(\(x) x %in% ind_clust_levels) |>
-            purrr::keep(\(x) x %in% color_profiles)
+        color_profiles_in_colorvar <- sup_clust_colorvar |>
+          purrr::keep(\(x) x %in% ind_clust_levels) |>
+          purrr::keep(\(x) x %in% color_profiles)
 
-          color_profiles_not_in_colorvar <- color_profiles |>
-            purrr::keep(\(x) x %in% ind_clust_levels) |>
-            purrr::discard(\(x) x %in% sup_clust_colorvar)
+        color_profiles_not_in_colorvar <- color_profiles |>
+          purrr::keep(\(x) x %in% ind_clust_levels) |>
+          purrr::discard(\(x) x %in% sup_clust_colorvar)
 
-        } else {
-          color_profiles_in_colorvar <- character()
-          color_profiles_not_in_colorvar <-  color_profiles |>
-            purrr::keep(\(x) x %in% ind_clust_levels)
-        }
-
-
-        if (length(color_profiles_not_in_colorvar) != 0) {
-          named_color_profiles <- color_profiles_not_in_colorvar |>
-            (\(v) purrr::keep(v, !is.null(names(v))))()
-
-          if (length(named_color_profiles) != 0 ) {
-            new_colors_in_scale <- names(named_color_profiles) |>
-              purrr::set_names(named_color_profiles)
-
-            named_color_profiles <- named_color_profiles |>
-              purrr::set_names()
-
-            scale_color_named_vector <- scale_color_named_vector |>
-              append(new_colors_in_scale)
-          }
-
-
-          unnamed_color_profiles <- color_profiles_not_in_colorvar |>
-            (\(v) purrr::keep(v, is.null(names(v))))()
-
-          if (length(unnamed_color_profiles) > 0) {
-            remaining_colors <- material_colors_light() |>
-              purrr::discard(\(x) x %in% scale_color_named_vector)
-
-            unnamed_color_profiles <- unnamed_color_profiles |>
-              purrr::set_names()
-
-            scale_color_named_vector <- scale_color_named_vector |>
-              append(purrr::set_names(remaining_colors[1:length(unnamed_color_profiles)], unnamed_color_profiles))
-
-            if  (length(remaining_colors) < length(unnamed_color_profiles)) {
-              stop("Not enough colors in scale to color profiles.")
-            }
-          }
-        } else {
-          named_color_profiles   <- character()
-          unnamed_color_profiles <- character()
-        }
-
-        clust_colorvar_recode <- named_color_profiles |>
-          append(unnamed_color_profiles) |>
-          append(not_in_color_profiles) |>
-          append(color_profiles_in_colorvar)
-
-
-        ind_data <- ind_data |>
-          dplyr::mutate(color_group = forcats::fct_recode(.data$clust,
-                                                          !!!clust_colorvar_recode))
-        # ind_data |> dplyr::select(color_group) |> print(n = 40)
-
-        #Discard the points that are out of limits
-        profiles_coord <- ind_data
-        if (!missing(xlim)) profiles_coord <- profiles_coord |> outlims(xlim, !!dim1)
-        if (!missing(ylim)) profiles_coord <- profiles_coord |> outlims(ylim, !!dim2)
-
-        profiles <- ggiraph::geom_point_interactive(
-          data = profiles_coord,
-          ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
-                       tooltip = .data$interactive_text,
-                       data_id = .data$clust_id + 10000, color = .data$color_group),
-          na.rm = TRUE, inherit.aes = FALSE, show.legend = FALSE,
-          alpha = alpha_profiles, stroke = 0
-        )
-      }
-
-    } else { # If length(clust) == 0
-      if (!is.null(base_profiles_color) ) {
-
-        #Discard the points that are out of limits
-        profiles_coord <- ind_data
-        if (!missing(xlim)) profiles_coord <- profiles_coord |> outlims(xlim, !!dim1)
-        if (!missing(ylim)) profiles_coord <- profiles_coord |> outlims(ylim, !!dim2)
-
-        profiles <-
-          ggiraph::geom_point_interactive(
-            data = profiles_coord,
-            ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
-                         tooltip = .data$interactive_text,
-                         data_id = .data$nb + 10000),
-            color = base_profiles_color, na.rm = TRUE, inherit.aes = FALSE,
-            show.legend = FALSE, alpha = alpha_profiles
-          )
       } else {
-        profiles <- NULL
+        color_profiles_in_colorvar <- character()
+        color_profiles_not_in_colorvar <-  color_profiles |>
+          purrr::keep(\(x) x %in% ind_clust_levels)
       }
+
+
+      if (length(color_profiles_not_in_colorvar) != 0) {
+        named_color_profiles <- color_profiles_not_in_colorvar |>
+          (\(v) purrr::keep(v, !is.null(names(v))))()
+
+        if (length(named_color_profiles) != 0 ) {
+          new_colors_in_scale <- names(named_color_profiles) |>
+            purrr::set_names(named_color_profiles)
+
+          named_color_profiles <- named_color_profiles |>
+            purrr::set_names()
+
+          scale_color_named_vector <- scale_color_named_vector |>
+            append(new_colors_in_scale)
+        }
+
+
+        unnamed_color_profiles <- color_profiles_not_in_colorvar |>
+          (\(v) purrr::keep(v, is.null(names(v))))()
+
+        if (length(unnamed_color_profiles) > 0) {
+          remaining_colors <- material_colors_light() |>
+            purrr::discard(\(x) x %in% scale_color_named_vector)
+
+          unnamed_color_profiles <- unnamed_color_profiles |>
+            purrr::set_names()
+
+          scale_color_named_vector <- scale_color_named_vector |>
+            append(purrr::set_names(remaining_colors[1:length(unnamed_color_profiles)], unnamed_color_profiles))
+
+          if  (length(remaining_colors) < length(unnamed_color_profiles)) {
+            stop("Not enough colors in scale to color profiles.")
+          }
+        }
+      } else {
+        named_color_profiles   <- character()
+        unnamed_color_profiles <- character()
+      }
+
+      clust_colorvar_recode <- named_color_profiles |>
+        append(unnamed_color_profiles) |>
+        append(not_in_color_profiles) |>
+        append(color_profiles_in_colorvar)
+
+      profiles_coord <- profiles_coord |>
+        dplyr::mutate(color_group = forcats::fct_recode(.data$clust, !!!clust_colorvar_recode))
+
+      profiles <- ggiraph::geom_point_interactive(
+        data = profiles_coord,
+        ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
+                     tooltip = .data$interactive_text,
+                     data_id = .data$id, color = .data$color_group),
+        na.rm = TRUE, inherit.aes = FALSE, show.legend = FALSE,
+        alpha = alpha_profiles, stroke = 0
+      )
+
+    } else {
+      profiles <- ggiraph::geom_point_interactive(
+        data = profiles_coord,
+        ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
+                     tooltip = .data$interactive_text, data_id = .data$id),
+        color = base_profiles_color, na.rm = TRUE, inherit.aes = FALSE,
+        show.legend = FALSE, alpha = alpha_profiles
+      )
     }
+  }
 
 
-    if(type[1] == "facets" | !is.null(ellipses) ) {
-
-      ind_data <- ind_data |>
-        dplyr::mutate(sup_vars = purrr::map(.data$sup_vars,
-                                            ~ dplyr::select(., !!rlang::sym(sup_vars[1])))) |>
-        tidyr::unnest(c("sup_vars", "row.w"))
-
-      supvar1_lvs <-
-        dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
-        dplyr::pull("lvs") |> as.character() |> purrr::set_names()
-
-      supvar1_colorvar <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
-        dplyr::select("lvs", "color_group")
-      supvar1_colorvar <- as.character(supvar1_colorvar$color_group) |> purrr::set_names(supvar1_colorvar$lvs)
-
-      supvar1_infos <- dplyr::filter(vars_data, .data$vars == sup_vars[1]) |>
-        dplyr::mutate(nam = .data$lvs) |>
-        dplyr::select("nam", "lvs", "color_group", "id") |>
-        tidyr::nest(infos = c("lvs", "color_group", "id"))
-      supvar1_infos <- supvar1_infos$infos |> purrr::set_names(supvar1_infos$nam)
+  # Ellipses and facets: the individuals, grouped by the levels of the first sup var ----
+  ellipses_layer <- NULL
+  if (type[1] == "facets" | !is.null(ellipses)) {
+    if (is.null(individuals) || length(sup_vars) == 0) {
+      if (type[1] == "facets") stop("type = \"facets\" needs a supplementary variable (sup_vars)")
+      warning("ellipses need a supplementary variable (sup_vars): none drawn")
+    } else {
+      sup1 <- sup_vars[1]
+      sup1_data <- dplyr::filter(vars_data, .data$vars == sup1)
+      lv <- match(as.character(individuals[[sup1]]), as.character(sup1_data$lvs))
+      sup1_individuals <- individuals |>
+        dplyr::mutate(lvs         = sup1_data$lvs[lv],
+                      color_group = sup1_data$color_group[lv],
+                      id          = sup1_data$id[lv]) |>
+        dplyr::filter(!is.na(lv))
 
       if (!is.null(ellipses)) {
-        ellipses_coord <- ind_data |>
-          dplyr::select(!!dim1, !!dim2, "row.w", tidyselect::all_of(sup_vars[1]), tidyselect::any_of("lvs")) |>
-          dplyr::mutate(infos = supvar1_infos[as.character(!!rlang::sym(sup_vars[1]))],
-          ) |>
-          tidyr::unnest(cols = c("infos")) |>
-          dplyr::filter(!is.na(.data$lvs))
+        ellipses_coord <- dplyr::select(sup1_individuals, !!dim1, !!dim2, "row.w",
+                                        tidyselect::all_of(sup1), "lvs", "color_group", "id")
 
-
-        ellipses <-
+        ellipses_layer <-
           if (type[1] == "facets") {
             ggiraph::geom_path_interactive(data = ellipses_coord,
                                            ggplot2::aes(x = !!dim1, y = !!dim2,
@@ -473,52 +373,26 @@ ggmca_plot <- function(plot_data,
                                type = "t", level = ellipses, linewidth = 1,
                                segments = 360, alpha = 1, inherit.aes = FALSE)
           }
-
-        # ggplot2::stat_ellipse(data = ind_data,
-        #                       ggplot2::aes(x = !!dim1, y = !!dim2,
-        #                                    group = !!rlang::sym(sup_vars[1]),
-        #                                    color = !!rlang::sym(sup_vars[1]) ),
-        #                       type = "t", level = ellipses, size = 1,
-        #                       segments = 360, alpha = 1)
-
-      } else {
-        ellipses <- NULL
       }
 
-      if(type[1] == "facets") {
-        ind_data <- ind_data |>
-          tidyr::nest(row.w = "row.w") |>
-          dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
-                        wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
-          ) |>
-          #dplyr::select(-.data$row.w) %>%
-          dplyr::arrange(!!rlang::sym(sup_vars[1]), -.data$wcount) |>
-          dplyr::mutate(lvs = purrr::map(!!rlang::sym(sup_vars[1]),
-                                         ~ supvar1_lvs[as.character(.)]
-          ) |> unlist(),
-
-          color_group = purrr::map(!!rlang::sym(sup_vars[1]),
-                                   ~ supvar1_colorvar[as.character(.)]
-          ) |> unlist()
-          ) |>
-          dplyr::filter(!is.na(.data$lvs))
+      # One point per drawn profile within each level, sized by its count there. Individuals are
+      # ordered by profile first, so profiles tied on weight keep the rank order of the cloud.
+      if (type[1] == "facets") {
+        drawn <- sup1_individuals[order(sup1_individuals$nb), ] |>
+          dplyr::filter(!is.na(.data$nb))
+        group <- vctrs::vec_group_id(drawn[c("nb", "lvs")])
+        facet_data <- drawn[!duplicated(group), ]
+        facet_data$count  <- tabulate(group)
+        facet_data$wcount <- as.vector(rowsum(drawn$row.w, group, reorder = TRUE))
+        facet_data <- facet_data[order(facet_data[[sup1]], -facet_data$wcount), ]
+        facet_data$lvs <- as.character(facet_data$lvs)
       }
     }
-
-
-  } else {
-    profiles <- NULL
-    ellipses <- NULL
   }
-
-
-
 
 
   #Draw plot  -----------------------------------------------------
 
-  # If type is text, put the active_vars on the same base than suplementary vars, to avoid overlapping of the two.
-  #if (type[1] == "text" & length(sup_vars) != 0) {
   vars_data <- vars_data |>
     dplyr::mutate(
       face = dplyr::case_when(
@@ -529,7 +403,6 @@ ggmca_plot <- function(plot_data,
         actives_in_bold                                ~ "plain",
         TRUE                                           ~ "bold" ,
       ))
-  #}
 
 
   #Mean point:
@@ -546,7 +419,7 @@ ggmca_plot <- function(plot_data,
 
   #Theme
   if (!missing(title)) {
-    title_graph <- ggplot2::labs(title = title) #str_c("Les Active variables de l'ACM sur les axes ",axes[1], " et ", axes[2] )
+    title_graph <- ggplot2::labs(title = title)
   } else {
     title_graph <- NULL
   }
@@ -599,7 +472,7 @@ ggmca_plot <- function(plot_data,
   if (get_data) return(
     list(vars_data = vars_data, mean_point_data = mean_point_data,
          profiles_coord = if (length(profiles) != 0) {profiles_coord} else {NULL},
-         ellipses_coord = if (length(ellipses) != 0) {ellipses_coord} else {NULL},
+         ellipses_coord = if (!is.null(ellipses_layer)) {ellipses_coord} else {NULL},
          graph_theme_acm = graph_theme_acm)
   )
 
@@ -622,30 +495,15 @@ ggmca_plot <- function(plot_data,
           )
 
       } else {
-        graph_clust <-
-          # list(
-          # geom_segment(
-          #   data = acm_clust |>
-          #     mutate(!!dim1 = pmin(1.3, pmax(!!dim1, -0.9)),
-          #            !!dim2 = pmin(1.3, pmax(!!dim2, -0.85)),
-          #            start1  = pmin(0.95, pmax(!!dim1, -0.5)),
-          #            start2  = pmin(1.25, pmax(!!dim2, -0.775)),
-          #     ),
-          #   ggplot2::aes(x = start1, xend = !!dim1, y = start2, yend = !!dim2,
-          #                color = color_group),
-          #   arrow = ggplot2::arrow(length = ggplot2::unit(0.3, "lines")), na.rm = TRUE
-        # ),
-        ggiraph::geom_label_repel_interactive(
+        graph_clust <- ggiraph::geom_label_repel_interactive(
           data = clust_data,
           ggplot2::aes(label = .data$lvs, color = .data$color_group,
                        tooltip = .data$interactive_text),
           fill = grDevices::rgb(1, 1, 1, alpha = 0.9),
           direction = "both", force = 0.5, force_pull = 1, point.padding = 0, point.size = NA,
           arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
-          fontface = "bold", size = text_size, na.rm = TRUE #,
-          #box.padding = 0,
+          fontface = "bold", size = text_size, na.rm = TRUE
         )
-        #)
       }
     } else {
       graph_clust <- NULL
@@ -674,10 +532,8 @@ ggmca_plot <- function(plot_data,
       ggplot2::ggplot(vars_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
                                    color = .data$color_group, data_id = .data$id)) +
-      graph_theme_acm + profiles + ellipses + graph_text + graph_clust +
+      graph_theme_acm + profiles + ellipses_layer + graph_text + graph_clust +
       mean_point_graph
-
-
 
 
   } else if (type[1] == "points") {
@@ -700,12 +556,8 @@ ggmca_plot <- function(plot_data,
       ggplot2::ggplot(sup_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
                                    color = .data$color_group, data_id = .data$id)) +
-      graph_theme_acm + profiles + active_graph + ellipses + sup_points +
+      graph_theme_acm + profiles + active_graph + ellipses_layer + sup_points +
       mean_point_graph
-
-    # css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
-    #                                  text = "color:gold4;stroke:none;")
-    # plot_output <- plot_output %>% append(c("css_hover" = css_hover)) #retrieves class ggplot2::ggplot after
 
 
 
@@ -731,17 +583,16 @@ ggmca_plot <- function(plot_data,
       ggplot2::ggplot(sup_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
                                    color = .data$color_group, data_id = .data$id)) +
-      graph_theme_acm + profiles + active_graph + ellipses + (if (has_sup) graph_labels) +
+      graph_theme_acm + profiles + active_graph + ellipses_layer + (if (has_sup) graph_labels) +
       mean_point_graph
 
 
 
   } else if(type[1] == "facets") {
-    #facets : profiles by sup_vars, no active vars
-    #for each sup_var, for the first ?
+    #facets: the profiles of each level of the first sup var, no active variable
 
     plot_output <-
-      ggplot2::ggplot(data = ind_data,
+      ggplot2::ggplot(data = facet_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
                                    color = .data$color_group, group = .data$lvs)) +
       ggplot2::geom_point(na.rm = TRUE, show.legend = FALSE) +
@@ -753,7 +604,7 @@ ggmca_plot <- function(plot_data,
         inherit.aes = FALSE, na.rm = TRUE, show.legend = FALSE
       ) +
       ggplot2::facet_wrap(ggplot2::vars(.data$lvs), scales = "fixed") +
-      graph_theme_acm + ellipses
+      graph_theme_acm + ellipses_layer
 
 
     css_hover <- ggiraph::girafe_css("stroke:orange;stroke-width:2;",

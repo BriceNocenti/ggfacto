@@ -8,14 +8,6 @@
 #   - `%>%` is re-exported for one deprecation cycle only; every internal pipe is `|>`.
 # See: CLAUDE.md section ggfacto architecture.
 
-#Import data.table in NAMESPACE :
-#' Internal data.table methods
-#' @import data.table
-#' @keywords internal
-#' @name ggfacto-data.table
-NULL
-
-
 #' Pipe operator (deprecated)
 #'
 #' Re-exported from magrittr for backward compatibility. Deprecated: use the base pipe

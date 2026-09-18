@@ -558,9 +558,9 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
     dplyr::select(
       "vars", "lvs", "freq", #"wcount",
       "Dim 1", "Dim 2", "start_Dim 1", "start_Dim 2", "proj1", "proj2",
-      tidyselect::everything() & -tidyselect::any_of(
-        c("color_group", "id", "clust_id", "interactive_text", "face")
-      )
+      tidyselect::everything() &
+        -tidyselect::any_of(c("color_group", "id", "begin_text", "interactive_text", "face")) &
+        -tidyselect::starts_with("contrib")
     )
 
 

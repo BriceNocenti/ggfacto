@@ -153,8 +153,8 @@ Finish by removing `export("%>%")` and `importFrom(magrittr, "%>%")`, deleting `
 
 Recorded so the question is not reopened.
 
-- **data.table** --- 0 MB, tabxplor imports it. The whole surface is one internal function, `complete_cah()` at `:6893-6935`. The only change worth considering is narrowing `import(data.table)` to targeted `importFrom` to cut masking risk, and even that is awkward: the `:=`/`.N` idiom wants the full namespace.
-- **withr** --- 0 MB. Two live sites, both `with_options(list(tabxplor.output_kable = FALSE), ...)` at `:6637` and `:6663`. That option is still live in tabxplor 2.0.0 (`tab-options.R:314`, `tab.R:380`), so the calls are current. Keep.
+- **data.table** --- no longer imported. Its one function, `complete_cah()`, became a vectorised aggregation over the answer profiles; it still installs, as a tabxplor import, so dropping it cost nothing and removed the masking risk of `import(data.table)`.
+- **withr** --- 0 MB. The one `with_options(list(tabxplor.output_kable = FALSE), ...)` in `R/tooltips.R` guards against a superseded option tabxplor still honours (it would turn the crosstab into html), and `R/interpret.R` states the print medium with it. Keep.
 - **vctrs, ggrepel, htmlwidgets, scales** --- 0 MB each, all reachable through ggplot2, FactoMineR or ggiraph.
 - **plotly** --- 5 packages / 10.9 MB, but 33 live sites implementing the 3D graphs the Description advertises. Keep; already guarded by `requireNamespace()`.
 - **ggiraph** --- the expensive `Import` that cannot go: it *is* the interactive-graph feature. Note for the record that roughly 41 MB of its tail is `htmlwidgets` pulling `knitr` and `rmarkdown` through `Imports` rather than `Suggests`. That is upstream's decision and outside ggfacto's control.
@@ -171,6 +171,7 @@ Applied in 0.4.0:
   does not have).
 - `Suggests` --- dropped `finalfit`, `stringi`, `kableExtra`; added `testthat`. `plotly`,
   `htmlwidgets` and `widgetframe` stay for good.
+- `data.table` --- dropped from `Imports` (see Tier 5).
 - `magrittr` stays one deprecation cycle: every internal use is now `|>`, but `%>%` is still
   re-exported for users. It costs 0 MB, so there is no hurry.
 

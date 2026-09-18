@@ -20,38 +20,6 @@ cleannames_condition <- function() {
 
 
 
-#' Recode Factor Levels with Detected Pattern inside
-#' @description Recode factor levels whose name matches a regex.
-#' @param factor A factor.
-#' @param pattern A character vector of length 1.
-#' @param replacement A character vector of length 1.
-#' @param negate A factor.
-#'
-#' @return A factor.
-#' @keywords internal
-# @export
-#'
-# @examples
-fct_detect_replace <- function(factor, pattern, replacement, negate = FALSE){
-  if (is.data.frame(factor)) {stop("must be a vector, not a data.frame")}
-  if (!is.factor(factor)) { factor <- as.factor(factor) }
-  lvs <- levels(factor)
-  levels <- if (negate == FALSE) {
-    purrr::set_names(lvs, purrr::map(lvs, ~ dplyr::if_else(str_detect(.x, pattern), replacement, .x)))
-  } else {
-    purrr::set_names(lvs, purrr::map(lvs, ~ dplyr::if_else(!str_detect(.x, pattern), replacement, .x)))
-  }
-  return(forcats::fct_recode(factor, !!!levels))
-}
-
-
-
-
-
-
-
-
-
 # === SECTION: String helpers ==================================================
 
 # Base-R stand-ins for the twelve stringr functions this package used, so stringr

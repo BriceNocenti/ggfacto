@@ -99,6 +99,38 @@ test_that("profiles and ellipses build", {
     quietly(ggmca(fx_mca(), fx_tea_clust(), clust = "clust", profiles = TRUE))))
   expect_no_error(ggplot2::ggplot_build(
     quietly(ggmca(fx_mca(), fx_tea(), sup_vars = "SPC", profiles = TRUE, ellipses = 0.5))))
+  expect_no_error(ggplot2::ggplot_build(
+    quietly(ggmca(fx_mca(), fx_tea(), sup_vars = "SPC", profiles = TRUE, type = "facets"))))
+})
+
+test_that("ellipses cover every individual, and need no profiles", {
+  # An ellipse describes the individuals of a level, not the profiles that happen to be drawn:
+  # max_profiles thins the cloud, never the ellipses.
+  local_null_device()
+  p <- quietly(ggmca(fx_mca(), fx_tea(), sup_vars = "SPC", ellipses = 0.5))
+  expect_true(any(vapply(p$layers, function(l) inherits(l$stat, "StatEllipse"), logical(1))))
+
+  pd <- md(fx_mca(), fx_tea(), sup_vars = "SPC", profiles = TRUE, max_profiles = 5)
+  coord <- quietly(ggmca_plot(pd, ellipses = 0.5, get_data = TRUE))$ellipses_coord
+  expect_equal(nrow(coord), sum(!is.na(fx_tea()$SPC)))
+  expect_lte(nrow(pd$ind_data), 5L)
+})
+
+test_that("facets draw the profiles of each level, with or without profiles = TRUE", {
+  local_null_device()
+  p <- quietly(ggmca(fx_mca(), fx_tea(), sup_vars = "SPC", type = "facets"))
+  facet_counts <- ggplot2::ggplot_build(p)$data[[1]]
+  expect_gt(nrow(facet_counts), nlevels(fx_tea()$SPC))
+  expect_error(quietly(ggmca(fx_mca(), fx_tea(), type = "facets")), "supplementary variable")
+})
+
+test_that("axes_reverse = 1:2 reverses both axes", {
+  local_null_device()
+  pd <- fx_pd_sup()
+  flipped <- quietly(ggmca_plot(pd, axes_reverse = 1:2, get_data = TRUE))$vars_data
+  plain   <- quietly(ggmca_plot(pd, get_data = TRUE))$vars_data
+  expect_equal(flipped$`Dim 1`, -plain$`Dim 1`)
+  expect_equal(flipped$`Dim 2`, -plain$`Dim 2`)
 })
 
 # --- the seam -----------------------------------------------------------------------------------
@@ -177,8 +209,9 @@ test_that("hover ids are banded so a whole cluster lights up together", {
   plot_data <- fx_pd_clust()
   actives <- plot_data$vars_data$id[plot_data$vars_data$color_group == "active_vars"]
   expect_true(all(actives >= 1000L))
-  clust_ids <- plot_data$vars_data$clust_id[!is.na(plot_data$vars_data$clust_id)]
+  clust_ids <- plot_data$vars_data$id[plot_data$vars_data$vars == "clust"]
   expect_true(all(clust_ids >= 10000L))
+  expect_true(all(plot_data$ind_data$id >= 10000L))
 })
 
 # --- 3D, behind Suggests ------------------------------------------------------------------------

@@ -1,8 +1,8 @@
 # PURPOSE: The MCA entry point and the data half of its graph -- multiple_correspondence_analysis()
 #   (alias MCA2()), ggmca(), ggmca_data().
 # ROLE: Turns a FactoMineR MCA plus its microdata into the plot model R/mca-plot.R draws:
-#   list(vars_data, ind_data, res.mca, clust). ggmca() itself is pure orchestration of the two
-#   halves and holds no logic.
+#   list(vars_data, ind_data, individuals, res.mca, clust), flat tables with no list-column.
+#   ggmca() itself is pure orchestration of the two halves and holds no logic.
 # KEY CONSTRAINTS:
 #   - Weights are read back from res.mca$call$row.w, never from `data`, so a tooltip always
 #     describes the population the analysis was actually fitted on; `data` itself comes back
@@ -13,6 +13,10 @@
 #     `plot_data` and the microdata is `data`: one name each, no collision.
 #   - vars_data always carries wcount, derived from the column margin when the tooltip crosstabs
 #     do not supply it: type = "points" sizes by it unconditionally.
+#   - An answer profile is a group of individuals: its membership is one integer vector
+#     (answer_profiles()), and every per-profile number -- counts, cluster, coordinates -- is one
+#     vectorised aggregation over it, never a nested tibble per profile.
+#   - A cluster's hover id is matched by its NAME, for its label and its profiles alike.
 #   - Several arguments are inert on their own and only act alongside an enabling one --
 #     keep_levels/discard_levels need sup_vars, tooltip_vars/tooltip_vars_1lv need a table to be
 #     built at all, clust needs profiles. tests/testthat/test-ggmca-data.R pins both halves.
@@ -155,7 +159,8 @@ MCA2 <- multiple_correspondence_analysis
 #'    \item \code{"labels"} : colored labels
 #'    \item \code{"active_vars_only"} : no \code{sup_vars}
 #'    \item \code{"facets"} : one graph of profiles of answer for each levels of the
-#'    first \code{sup_vars}. A different color is used for each.
+#'    first \code{sup_vars} (`profiles = TRUE` is not needed). A different color is used for
+#'    each.
 #'  }
 #' @param keep_levels A character vector of variables levels to keep : others
 #' will be discarded.
@@ -202,8 +207,8 @@ MCA2 <- multiple_correspondence_analysis
 #' @param ellipses Set to a number between 0 and 1 to draw a concentration ellipse for
 #' each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
 #' individuals of each category. \code{0.5} draw median-ellipses, containing half
-#' the individuals of each category. Note that, if `max_profiles` is provided, ellipses
-#' won't be made with all individuals.
+#' the individuals of each category. Every individual counts, whether or not
+#' `profiles = TRUE`.
 #' @param color_profiles By default, if \code{clust} is provided, profiles are
 #' colored based on clust levels (HCPC clusters). Set do \code{FALSE} to avoid this behaviour.
 #' You can also give a character vector with only some of the levels of
@@ -318,7 +323,9 @@ ggmca <-
 
 #' @describeIn ggmca get the data frames with all parameters to print a MCA graph
 # @inheritParams ggmca
-#' @return A list containing the data frames to pass to \link{ggmca_plot}.
+#' @return A list to pass to \link{ggmca_plot}: `vars_data` (one row per level), `ind_data`
+#'  (one row per answer profile, with `profiles = TRUE`), `individuals` (one row per individual,
+#'  with `sup_vars`), `res.mca` and `clust`.
 #' @export
 ggmca_data <-
   function(res.mca, data, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
@@ -367,18 +374,11 @@ ggmca_data <-
     if (length(sup_vars)    != 0 )      sup_vars <- sup_vars |>
       purrr::discard(\(x) x %in% active_vars)
     if (length(tooltip_vars_1lv) != 0 ) tooltip_vars_1lv <- tooltip_vars_1lv |>
-      purrr::discard(\(x) x %in% active_vars) #| . %in% sup_vars
+      purrr::discard(\(x) x %in% active_vars)
     if (length(tooltip_vars) != 0 )     tooltip_vars <- tooltip_vars |>
-      purrr::discard(\(x) x %in% active_vars | x %in% tooltip_vars_1lv) #| . %in% sup_vars
+      purrr::discard(\(x) x %in% active_vars | x %in% tooltip_vars_1lv)
 
-
-    #if (names_darker == "auto") {      # if (type[1] == "points") names_darker <- TRUE
-    # if (type[1] %in% c("active_vars_only", "labels", "text")) names_darker <- FALSE
-    #}
-
-
-
-
+    clean_lvs <- function(x) if (cleannames) str_remove_all(x, cleannames_condition()) else x
 
 
     # Active variables --------------------------------------------------------------------
@@ -397,8 +397,7 @@ ggmca_data <-
     active_vars_data <- active_var_levels |>
       dplyr::left_join(freqs, by = "lvs") |>
       dplyr::left_join(coords, by = "lvs") |>
-      dplyr::left_join(contribs, by = "lvs") |>
-      tidyr::nest(contribs = tidyselect::starts_with("contrib"))
+      dplyr::left_join(contribs, by = "lvs")
 
     # DESIGN: wcount is computed here, from the raw margin, so it exists on EVERY path -- the
     # tooltip crosstabs supply it only for the variables they actually tabulate, but type =
@@ -415,10 +414,6 @@ ggmca_data <-
       dplyr::mutate(freq = round(.data$freq/sum(.data$freq) * 100, 0)) |>
       dplyr::ungroup()
 
-    dimensions <- names(active_vars_data)[str_detect(names(active_vars_data), "Dim ")] |>
-      purrr::set_names() |>
-      purrr::map_dfc(~ 0)
-
     active_vars_data <- active_vars_data |>
       dplyr::filter(!is.na(.data$`Dim 1`)) |>  #Remove excluded levels of active variables
       dplyr::mutate(lvs = str_remove(.data$lvs, str_c("^", .data$vars, "_")))
@@ -431,19 +426,11 @@ ggmca_data <-
                     id = as.integer(forcats::as_factor(.data$vars)) + 1000L)
 
 
-
-
-
-
-
-
     # Supplementary variables -------------------------------------------------------------
     if (length(sup_vars) != 0) {
 
       sup_vars_data <- purrr::map(sup_vars, ~ varsup(res.mca, data[[.]]) ) |>
         purrr::set_names(sup_vars)
-
-      # Do something with "within" et "between" variance ? ($var)
 
       sup_vars_data <-
         purrr::imap(sup_vars_data,
@@ -470,7 +457,6 @@ ggmca_data <-
       if (length(clust) > 0 ) {
         color_groups[sup_vars == clust] <- clust_color_groups
       }
-      # print(purrr::set_names(color_groups, sup_vars))
 
       sup_vars_data <- sup_vars_data |>
         purrr::map2(color_groups,
@@ -499,56 +485,25 @@ ggmca_data <-
           lvs = forcats::fct_relabel(.data$lvs, ~ str_remove_all(., cleannames_condition()))
         ))
 
-      dimensions <- names(sup_vars_data[[1]]) |>
-        purrr::keep(\(x) str_detect(x, "Dim ")) |>
-        purrr::set_names() |>
-        purrr::map_dfc(~ 0)
+      sup_vars_data <- sup_vars_data |>
+        dplyr::bind_rows() |>
+        dplyr::mutate(id = dplyr::row_number())
 
-
-      #Make that, if HCPC is in sup_vars AND in profiles, ggiraph data_id are the same :
-      # les deux seront colores lorsqu'on survolera l'un ou l'autre
-      #sup_vars_data <- sup_vars_data %>% purrr::imap(~ dplyr::mutate(.x, sup_var = .y))
+      # WARNING: a cluster's hover id is matched by NAME, the same way for its label here and for
+      #   its profiles below -- never as.integer(lvs): a factor's codes follow its level order, which
+      #   cleannames re-sorts alphabetically ("1", "10", "11", "2", ...), and the label then lit up
+      #   another cluster's profiles. Clusters share one id, so hovering any point lights them all.
       if (length(clust) != 0) {
-        if (clust %in% sup_vars) sup_vars_data <- sup_vars_data |>
-            (\(l) purrr::map_if(l, names(l) == clust,
-                          ~ dplyr::mutate(., clust_id = as.integer(.data$lvs) + 10000L),
-                          .else = ~ dplyr::mutate(., clust_id = NA_integer_)))()
+        clust_levels <- clean_lvs(levels(forcats::fct_drop(as.factor(data[[clust]]))))
+        is_clust <- sup_vars_data$vars == clust
+        sup_vars_data$id[is_clust] <- 10000L +
+          match(as.character(sup_vars_data$lvs[is_clust]), clust_levels)
       }
-
-      #Bind sup_vars data
-      sup_vars_data <- sup_vars_data |> dplyr::bind_rows()
-
-      # ID numbers to use with ggiraph to highlight elements at hover
-      if (length(clust) != 0) {
-        if (clust %in% sup_vars) {
-          sup_vars_data <- sup_vars_data |>
-            dplyr::mutate(id = dplyr::if_else(is.na(.data$clust_id),
-                                              dplyr::row_number(),
-                                              .data$clust_id))
-        } else {
-          sup_vars_data <- sup_vars_data |> dplyr::mutate(id = dplyr::row_number())
-        }
-      } else {
-        sup_vars_data <- sup_vars_data |> dplyr::mutate(id = dplyr::row_number())
-      }
-
-      #Useful functions :
-      #fct_relevel_quiet <- purrr::quietly(forcats::fct_relevel)
-      # bind_cols_quiet   <- purrr::quietly(dplyr::bind_cols)
-      #tab_spread <- function(data) dplyr::mutate_at(data, dplyr::vars(-1, -ncol(data)), ~. - dplyr::last(.))
-      # tab_spread_chr <- function(data) {
-      #   dplyr::mutate_at(data, dplyr::vars(-1, -tidyselect::any_of("Total")), ~ dplyr::case_when(
-      #     dplyr::row_number() == nrow(data) ~ str_c(., "%"),
-      #     . - dplyr::last(.) > 0         ~ str_c("(", str_pad(str_c("+" , sign(. - dplyr::last(.)) * (. - dplyr::last(.))), 3 + get_digits(.)), "%) ", str_pad(., 2 + get_digits(.)), "%"),
-      #     TRUE                    ~ str_c("(", str_pad(str_c(" -", sign(. - dplyr::last(.)) * (. - dplyr::last(.))), 4 + get_digits(.)), "%) ", str_pad(., 2 + get_digits(.)), "%") )
-      #   )
-      # }
 
       vars_data <- dplyr::bind_rows(active_vars_data, sup_vars_data)
 
     } else {
       vars_data <- active_vars_data
-      #sup_vars_data <- NULL
     }
 
     #Add central point
@@ -563,51 +518,29 @@ ggmca_data <-
         ~ dplyr::if_else(.data$lvs == "Central point", 0, .)
       ))
 
-    #Reorder variables in vars_data
     vars_data <- vars_data |>
-      dplyr::relocate(tidyselect::starts_with("Dim "), tidyselect::any_of("contribs"),
+      dplyr::relocate(tidyselect::starts_with("Dim "), tidyselect::starts_with("contrib"),
                       .after = dplyr::last_col())
 
 
-
-
-
-    ###Prepare data for tooltips and profiles ---
+    # The microdata of tooltips and profiles ----------------------------------------------
     non_active_vars <- c(sup_vars, tooltip_vars_1lv, tooltip_vars)
-    if (length(non_active_vars) != 0 ) {
-      data  <- dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]),
-                               dplyr::select(data, tidyselect::all_of(non_active_vars)))
+    data <- if (length(non_active_vars) != 0) {
+      dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]),
+                       dplyr::select(data, tidyselect::all_of(non_active_vars)))
     } else {
-      data <- tibble::as_tibble(res.mca$call$X[active_vars])
+      tibble::as_tibble(res.mca$call$X[active_vars])
     }
-    #sel3 <- tooltip_vars[!tooltip_vars %in% c(sel1, active_vars)]
-    #dat3 <- data %>% dplyr::select(tidyselect::all_of(sel3))
 
     data <- data |>
       dplyr::mutate(dplyr::across(where(is.character), as.factor)) |>
       dplyr::mutate(dplyr::across(where(is.factor), forcats::fct_drop)) |>
       tibble::add_column(row.w = res.mca$call$row.w)
 
-    #Remove excluded levels (now, or after by renaming them here)
-    excl_levels <-
-      purrr::imap_dfr(data[active_vars],
-                      ~ tibble::tibble(active_vars = .y, lvs = levels(.x))
-                      ) |>
-      #dplyr::mutate(lvs2 = str_c(.data$active_vars, "_",.data$ lvs)) |>
-      dplyr::filter(.data$lvs %in% excl) #| .data$lvs2 %in% excl
-
-    excl_levels <- excl_levels |>
-      dplyr::group_by(active_vars) |>
-      dplyr::summarise(excl = list(.data$lvs), .groups = "drop")
-
-    excl_levels <- purrr::set_names(excl_levels$excl, excl_levels$active_vars)
-
-    active_var_real_levels <-
-      purrr::imap(data[active_vars], ~ tibble::tibble(active_vars = .y, lvs = levels(.x)))
-
-    active_vars_excl <- active_var_real_levels |>
-      purrr::map(~ dplyr::filter(., .data$lvs %in% excl) |> dplyr::pull("lvs"))
-    active_vars_excl <- active_vars_excl[purrr::map_lgl(active_vars_excl, ~ length(.) != 0)]
+    # The excluded levels are merged into one "Remove_levels", which the tooltips and the profiles
+    # leave out.
+    active_vars_excl <- purrr::map(data[active_vars], \(x) levels(x)[levels(x) %in% excl])
+    active_vars_excl <- active_vars_excl[lengths(active_vars_excl) != 0]
 
     data <- data |>
       dplyr::mutate(dplyr::across(
@@ -631,10 +564,6 @@ ggmca_data <-
       ))
 
 
-
-
-
-
     # Interactive tooltips (sup/active) ----
     if ("active" %in% active_tables | "sup" %in% active_tables) {
       vars_to_keep <- character()
@@ -650,30 +579,24 @@ ggmca_data <-
     tables_to_do <- c(active_tables[!active_tables %in% sup_vars], sup_vars)
     if(length(tables_to_do) != 0) {
 
-      interactive_text <- interactive_tooltips(data,
-                                               sup_vars         = sup_vars,
-                                               active_vars      = active_vars,
-                                               active_tables    = active_tables,
-                                               tooltip_vars_1lv = tooltip_vars_1lv,
-                                               tooltip_vars     = tooltip_vars
+      tips <- interactive_tooltips(data,
+                                   sup_vars         = sup_vars,
+                                   active_vars      = active_vars,
+                                   active_tables    = active_tables,
+                                   tooltip_vars_1lv = tooltip_vars_1lv,
+                                   tooltip_vars     = tooltip_vars
       )
-
-      text_vars <- names(interactive_text)[purrr::map_lgl(interactive_text, is.character)]
 
       # The crosstabs carry their own wcount; where they have one it wins, and the margin-derived
       # one computed above fills in the variables they did not tabulate.
       vars_data <- vars_data |>
-        dplyr::left_join(interactive_text, by = c("vars", "lvs"), suffix = c("_pre", ""))
-
-      if ("wcount_pre" %in% names(vars_data)) {
-        vars_data <- vars_data |>
-          dplyr::mutate(wcount = dplyr::coalesce(.data$wcount, .data$wcount_pre)) |>
-          dplyr::select(-"wcount_pre")
-      }
+        dplyr::left_join(tips, by = c("vars", "lvs"), suffix = c("_pre", "")) |>
+        dplyr::mutate(wcount = dplyr::coalesce(.data$wcount, .data$wcount_pre)) |>
+        dplyr::select(-"wcount_pre")
 
     } else {
-      text_vars <- "begin_text"
-      vars_data <- vars_data |> dplyr::mutate(begin_text = NA_character_)
+      vars_data <- vars_data |>
+        dplyr::mutate(begin_text = NA_character_, interactive_text = NA_character_)
     }
 
     if (length(active_vars_without_crosstables) != 0) {
@@ -685,15 +608,11 @@ ggmca_data <-
           false = .data$begin_text
         ))
     }
-    # If no active tables, we still want to calculate wcounts
 
     #If no entire table have been calculated, we don't have the data for mean point
     #   => we use the data available in res.mca
-
-    # if(length(tables_to_do) == 0) {
     if (length(active_tables) == 0) {
       mean_point_interactive_text <- vars_data |>
-        dplyr::ungroup() |>
         dplyr::filter(.data$color_group == "active_vars") |>
         dplyr::mutate(
           text = str_c("\n", .data$lvs, " : ", .data$freq,"%")
@@ -715,256 +634,119 @@ ggmca_data <-
           true  = mean_point_interactive_text,
           false = .data$begin_text
         ))
-
-      # mean_point_data <-
-      #   tibble::tibble(!!!dimensions := 0,
-      #                  color_group = "0", numbers = 0, wcount = 1,
-      #                  interactive_text = mean_point_interactive_text)
-      # scale_color_named_vector <- character()
-      # type <- "active_vars_only"
     }
-
-    if (sum(vars_data$lvs == "Central point", na.rm = TRUE) >= 2) {
-
-      vars_data <- vars_data |>
-        dplyr::filter(!(.data$lvs == "Central point" & duplicated(.data$lvs)))
-    }
-
 
     vars_data <- dplyr::select(vars_data, -tidyselect::any_of("freq"))
-    vars_data <- tidyr::nest(vars_data, interactive_text = tidyselect::all_of(text_vars))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # res.mca$var$cos2 %>% tibble::as_tibble(rownames = "lvs") %>% dplyr::mutate_at(-1, ~ tabxplor::as_pct(.)) # %>% dplyr::rowwise() %>% dplyr::mutate(Total = sum(dplyr::c_across(`Dim 1`:`Dim 8`)))
-    # res.mca$var$v.test %>% tibble::as_tibble(rownames = "lvs")
-    # res.mca$var$eta2 %>% tibble::as_tibble(rownames = "lvs") %>% dplyr::mutate_at(-1, ~ tabxplor::as_pct(.))
-
-    # #Quality of representation, calculated by % of the variance of questions (must be done with all axes in res.mca !)
-    # res.mca$var$cos2 %>% tibble::as_tibble(rownames = NULL) %>%
-    #   purrr::map2_dfc(res.mca$eig[1:length(.), 1], ~.x*.y) %>% dplyr::rowwise() %>%
-    #   dplyr::mutate(Total = sum(dplyr::c_across(1:length(.)))) %>% dplyr::ungroup() %>%
-    #   dplyr::mutate_all(~ tabxplor::as_pct(./Total)) %>% dplyr::bind_cols(tibble::as_tibble(res.mca$var$cos2, rownames = "lvs")[1]) %>%
-    #   dplyr::select(lvs, tidyselect::everything())
-
-    # # Add tables of crossed active vars in tooltips
-    #  interactive_text <- interactive_tooltips(data, sup_vars, active_vars,
-    #                                           tooltip_vars_1lv, tooltip_vars)
-    #
-    #  interactive_text <- interactive_text %>%
-    #    purrr::map(~ tidyr::nest(., interactive_text = names(.)[purrr::map_lgl(., is.character)] ))
-
-
-
-
 
 
     #  Profiles of answers ----
-    #; weighted : nb of individuals * weight variable
+    # The answer profiles are needed for their own points and, through `individuals`, for the
+    # ellipses and facets of the first supplementary variable.
+    ind_data    <- NULL
+    individuals <- NULL
+    if (profiles || length(sup_vars) != 0) {
+      prof <- answer_profiles(data[active_vars], data$row.w, max_profiles)
+      ind_coord <- tibble::as_tibble(res.mca$ind$coord)
+
+      if (length(sup_vars) != 0) {
+        individuals <- dplyr::bind_cols(
+          tibble::tibble(nb = prof$nb[prof$key], row.w = data$row.w),
+          ind_coord,
+          data[sup_vars]
+        )
+      }
+    }
+
     if (profiles) {
-      ind_data <- dplyr::bind_cols(
-        dplyr::select(data, -tidyselect::any_of(c(tooltip_vars_1lv[!tooltip_vars_1lv %in% sup_vars],
-                                                 tooltip_vars[!tooltip_vars %in% sup_vars]))),
-        tibble::as_tibble(res.mca$ind$coord)
-      ) # |>
-      # # re put base active vars, without removing `excl = `
-      # dplyr::select(-tidyselect::all_of(active_vars)) |>
-      # dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]))
+      drawn <- prof$drawn
+      first <- prof$first[drawn]
+      ind_data <- tibble::tibble(nb     = seq_along(drawn),
+                                 count  = prof$count[drawn],
+                                 wcount = prof$wcount[drawn])
 
-      # ind_data <-
-      #   tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == clust),
-      #                                      which(names(res.mca$call$X) %in% sup_vars) )]) %>%
-      #   tibble::add_column(row.w = res.mca$call$row.w) %>%
-      #   dplyr::bind_cols(tibble::as_tibble(res.mca$ind$coord))
-
-      coord_names <- colnames(res.mca$ind$coord)
-
-      # if (cleannames == TRUE) ind_data <- ind_data %>%
-      #   dplyr::mutate(dplyr::across(
-      #     where(is.factor),
-      #     ~ forcats::fct_relabel(~ str_remove_all(., cleannames_condition()))
-      #     ))
-
-      # If NA in HCPC clust : for each combination of active_vars, we attribute
-      #  the majotity class (>50%)
-
+      # DESIGN: a profile's cluster is the weighted plurality of its individuals, missing ones
+      #   left out. Clusters made on the analysis are pure within a profile (its individuals share
+      #   one point), so the rule only decides for clusters made elsewhere or partly missing, and
+      #   every profile with one clustered individual is coloured.
       if (length(clust) != 0) {
-        #clust_levels <- dplyr::pull(ind_data, !!rlang::sym(clust) ) %>% levels()
+        cl <- data[[clust]]
+        by_clust <- tapply(data$row.w, list(factor(prof$key, seq_along(prof$first)), cl), sum,
+                           default = 0)
+        plural <- max.col(by_clust, ties.method = "first")
+        plural[rowSums(by_clust) == 0] <- NA
+        ind_data$clust <- factor(levels(cl)[plural[drawn]], levels(cl))
+        ind_data$id    <- 10000L + as.integer(ind_data$clust)
+      } else {
+        ind_data$id    <- 10000L + ind_data$nb
+      }
 
-        # ind_data_save <- ind_data
-        # ind_data <- ind_data_save
-
-        # # add false NAs to test
-        # samp <- ind_data |>
-        #   dplyr::mutate(rn = dplyr::row_number()) |>
-        #   dplyr::group_by(!!!rlang::syms(active_vars)) |>
-        #   dplyr::mutate(n = dplyr::n()) |>
-        #   dplyr::ungroup() |>
-        #   dplyr::select(rn, n) |>
-        #   dplyr::filter(n >=2 ) |>
-        #   dplyr::slice_sample(n = 15) |>
-        #   dplyr::pull(rn)
-        #
-        # ind_data <- ind_data |>
-        #   dplyr::mutate(
-        #        clust_culture = dplyr::if_else(!dplyr::row_number() %in% samp,
-        #                                  clust_culture, factor(NA))
-        #   )
-        # ind_data <- ind_data |> dplyr::mutate(sup1 = clust_culture)
-        # sup_vars <- c(sup_vars, "sup1")
-
-        clust_any_NA <- dplyr::pull(ind_data, clust) |> is.na() |> any()
-        if (clust_any_NA) {
-          ind_data <- ind_data |> complete_clust(clust = clust, active_vars = active_vars)
+      # An excluded answer, or one matching profiles_tooltip_discard, is left out of the tooltip.
+      answers <- purrr::map(unname(as.list(data[first, active_vars])), \(a) {
+        a <- as.character(a)
+        a[a == "Remove_levels"] <- NA_character_
+        if (length(profiles_tooltip_discard) != 0) {
+          a[str_detect(a, profiles_tooltip_discard) %in% TRUE] <- NA_character_
         }
-        # data |> tibble::as_tibble() |> tabxplor::tab(clust_culture)
-        # data |> tabxplor::tab(clust, wt = count)
+        a
+      })
 
-        clust_levels <- dplyr::pull(ind_data, clust) |> levels()
+      counts <- tibble::tibble(
+        count  = str_c("n: ", format(round(ind_data$count, 0), trim = TRUE, big.mark = " ")),
+        wcount = dplyr::if_else(ind_data$count == ind_data$wcount,
+                                true  = "",
+                                false = str_c("weighted n: ",
+                                              format(round(ind_data$wcount, 0),
+                                                     trim = TRUE, big.mark = " "), "\n"))
+      )
 
-        ind_data <- ind_data |>
-          dplyr::mutate(!!rlang::sym(clust) := as.character(!!rlang::sym(clust) ) ) |>
-          tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
-                      row.w    = "row.w",
-                      coord    = tidyselect::all_of(coord_names),
-                      clust      = !!rlang::sym(clust)
-          ) |>
-          dplyr::mutate(
-            count  = purrr::map_int(.data$row.w, ~ nrow(.)),
-
-            wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE)),
-
-            clust    = purrr::map_chr(.data$clust, ~ dplyr::first(dplyr::pull(., 1))) |>
-              as.factor() |> forcats::fct_relevel(clust_levels)
-          ) |>
-          dplyr::arrange(-.data$wcount)
-        # 0.661149 secs (much longer in data.table here)
-
-
-
-        if (length(max_profiles) != 0) ind_data <- ind_data |> dplyr::slice(1:max_profiles)
-
-        ind_data <- ind_data |>
-          dplyr::mutate(nb = dplyr::row_number(),
-                        clust_id = as.integer(.data$clust)) |>
-          dplyr::group_by(.data$clust) |>
-          dplyr::mutate(nb_in_clust = dplyr::row_number(),
-                        nb_tot_clust = dplyr::n()) |>
-          dplyr::ungroup() |>
-          dplyr::mutate(coord = purrr::map(.data$coord, ~ .[1,])) |>
-          tidyr::unnest("coord")
-
-
+      heading <- if (length(clust) != 0) {
+        in_clust <- vctrs::vec_group_id(ind_data$clust)
+        tibble::tibble(
+          clust      = str_c("<b>Cluster: ", ind_data$clust, "</b>"),
+          profile_nb = str_c("<b>Answer profile n", "\u00b0",
+                             stats::ave(ind_data$nb, in_clust, FUN = seq_along), "/",
+                             stats::ave(ind_data$nb, in_clust, FUN = length), "</b>")
+        )
       } else {
-        ind_data <- ind_data |>
-          tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
-                      row.w    = "row.w",
-                      coord    = tidyselect::all_of(coord_names)
-
-          ) |>
-          dplyr::mutate(count  = purrr::map_int(.data$row.w, ~ nrow(.)),
-                        wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE))
-          ) |>
-          dplyr::arrange(-.data$wcount)
-
-        if (length(max_profiles) != 0) ind_data <- ind_data |> dplyr::slice(1:max_profiles)
-
-        ind_data <- ind_data |>
-          dplyr::mutate(nb    = dplyr::row_number(),
-                        coord = purrr::map(.data$coord, ~ .[1,])) |>
-          tidyr::unnest("coord")
+        tibble::tibble(profile_nb = str_c("<b>Answer profile n", "\u00b0", ind_data$nb, "</b>"))
       }
 
-      ind_data <- ind_data |>
-        dplyr::mutate(dplyr::across(tidyselect::all_of(active_vars),
-                                    ~ fct_detect_replace(., profiles_tooltip_discard, "#"))) |>
-        dplyr::mutate(dplyr::across(where(is.factor), as.character))
+      frags <- c(as.list(heading), as.list(counts), answers)
+      names(frags) <- paste0("f", seq_along(frags))
+      ind_data$interactive_text <- tidyr::unite(tibble::as_tibble(frags), "text",
+                                                tidyselect::everything(), sep = "\n",
+                                                na.rm = TRUE)$text
 
-
-      if (length(clust) != 0) {
-        ind_data <- ind_data |>
-          dplyr::mutate(
-            clust_base = .data$clust,
-            count_base = .data$count,
-            wcount_base = .data$wcount,
-            clust        = str_c("<b>Cluster: ", .data$clust, "</b>"),
-            profile_nb = str_c("<b>Answer profile n",
-                                        "\u00b0",
-                                        .data$nb_in_clust, "/", .data$nb_tot_clust, "</b>"),
-            count      = str_c("n: ", format(round(.data$count, 0),
-                                                      trim = TRUE, big.mark = " ")),
-            # WARNING: compare the *_base columns, not count/wcount. Within one mutate() the
-            # `count` above has already become the string "n: 36", so comparing it to a number is
-            # always FALSE and the weighted n was printed even when it equalled the unweighted one.
-            wcount     = dplyr::if_else(
-              condition = .data$count_base == .data$wcount_base,
-              true      = "",
-              false     = str_c("weighted n: ",
-                                         format(round(.data$wcount, 0),
-                                                trim = TRUE, big.mark = " "), "\n")
-            )
-
-          ) |>
-          tidyr::nest(interactive_text = tidyselect::all_of(c("clust", "profile_nb", "count", "wcount",
-                                                              active_vars))) |>
-          dplyr::rename("clust" = "clust_base", "count" = "count_base",
-                        "wcount" = "wcount_base")
-
-      } else {
-        ind_data <- ind_data |>
-          dplyr::mutate(
-            count_base  = .data$count,
-            wcount_base = .data$wcount,
-            profile_nb  = str_c("<b>Answer profile n",
-                                         "\u00b0",
-                                         nb = .data$nb,  "</b>"),
-            count       = str_c("n: ", format(round(.data$count, 0),
-                                                       trim = TRUE, big.mark = " ")),
-            # WARNING: see the twin above -- compare the *_base columns, not the formatted ones.
-            wcount      = dplyr::if_else(
-              condition = .data$count_base == .data$wcount_base,
-              true      = "",
-              false     = str_c("weighted n: ",
-                                         format(round(.data$wcount, 0),
-                                                trim = TRUE, big.mark = " "), "\n")
-            )
-          ) |>
-          tidyr::nest(interactive_text = c("profile_nb", "count", "wcount",
-                                           tidyselect::all_of(active_vars))) |>
-          dplyr::rename("count" = "count_base", "wcount" = "wcount_base")
-      }
-
-      ind_data <- ind_data |>
-        dplyr::select(-tidyselect::any_of(c("nb_in_clust", "nb_tot_clust"))) |>
-        dplyr::relocate(tidyselect::any_of(c("nb", "count", "wcount", "clust", "clust_id",
-                                             "interactive_text", "sup_vars", "row.w")),
-                        .before = 1)
-
-    } else {
-      ind_data <- NULL
+      ind_data <- dplyr::bind_cols(ind_data, ind_coord[first, ])
     }
 
 
-    plot_data <- list("vars_data" = vars_data,
-                      "ind_data"  = ind_data,
-                      "res.mca"   = list(eig = res.mca$eig, axes_names = res.mca$axes_names),
-                      "clust"       = clust
-    )
-
-    plot_data
+    list("vars_data"   = vars_data,
+         "ind_data"    = ind_data,
+         "individuals" = individuals,
+         "res.mca"     = list(eig = res.mca$eig, axes_names = res.mca$axes_names),
+         "clust"       = clust)
   }
+
+
+# Why this exists: an answer profile is a group of individuals, so every per-profile number is one
+# vectorised aggregation over their membership vector -- never a nested tibble per profile.
+# `nb` ranks the profiles by weighted count; `drawn` holds the first `max_profiles` of them.
+answer_profiles <- function(answers, row.w, max_profiles) {
+  # DESIGN: the key is the answers the tooltip SHOWS (excluded ones merged, names cleaned): the
+  #   individuals of such a group share one point, even under `excl`, so it is one profile.
+  key    <- as.integer(vctrs::vec_group_id(answers))
+  first  <- which(!duplicated(key))
+  count  <- tabulate(key, length(first))
+  wcount <- as.vector(rowsum(row.w, key, reorder = TRUE))
+
+  drawn <- order(-wcount)
+  if (length(max_profiles) != 0) drawn <- drawn[seq_len(min(max_profiles, length(drawn)))]
+  nb <- rep(NA_integer_, length(first))
+  nb[drawn] <- seq_along(drawn)
+
+  list(key = key, first = first, count = count, wcount = wcount, drawn = drawn, nb = nb)
+}
 
 
 
@@ -1067,50 +849,4 @@ varsup <- function (resmca, var){
        var = round(vrc, 6), typic = round(typic, 6), pval = round(pval, 6)#,
        #cor = cor
   )
-}
-
-
-#' @keywords internal
-complete_clust <- function(data, clust, active_vars, treshold = 0.5) {
-  data.table::setDT(data)
-
-
-group_count <- clust_pct  <- clust_max <- rn <-  clust_counts <- NULL
-
-  # data[, clust_base := eval(str2expression(clust))]
-  data[, clust_counts := .N, by = c(active_vars, clust)]
-  data[, group_count := .N, by = eval(active_vars)]
-  data[, rn := 1:.N]
-  data[, clust_pct := dplyr::if_else(
-    !is.na(eval(str2expression(clust))),
-    true  = eval(str2expression("clust_counts"))/eval(str2expression("group_count")),
-    false = eval(str2expression("clust_counts"))/eval(str2expression("group_count")) - 0.01
-    )]
-  data[, clust_max := dplyr::first(eval(str2expression("rn"))) - 1L +
-         dplyr::first(which(eval(str2expression("clust_pct")) >= treshold), default = NA_real_),
-       by = eval(active_vars)]
-  data[, eval(clust) := eval(str2expression(clust))[eval(str2expression("clust_max"))] ]
-
-  # data |>
-  #   dplyr::mutate(group = paste0(!!!rlang::syms(active_vars)) |>
-  #                   forcats::as_factor() |> as.integer()) |>
-  #   dplyr::select(group,
-  #                 group_count, clust_counts, clust_base, clust_culture, clust_pct,
-  #                 clust_max ) |>
-  #   tibble::as_tibble() |>
-  #   tabxplor::new_tab() |>
-  #   dplyr::filter(clust_pct < 1)  |>
-  #   dplyr::group_by(group) |>
-  #   dplyr::arrange(.by_group = TRUE) |>
-  #   print(n = 900)
-
-  data[, clust_counts := NULL]
-  data[, group_count := NULL]
-  data[, clust_pct := NULL]
-  data[, clust_max := NULL]
-  data[, rn := NULL]
-
-  data.table::setDF(data)
-  data <- data |> tibble::as_tibble()
-  data
 }
