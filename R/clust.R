@@ -7,8 +7,9 @@
 # KEY CONSTRAINTS:
 #   - The clusters are FactoMineR::HCPC()'s, computed here for their memory: HCPC() builds its tree
 #     from n x n matrices. Ward's tree is built on the DISTINCT points of the cloud by fastcluster,
-#     in memory linear in their number; the point order, the cut and the k-means consolidation are
-#     HCPC()'s, and test-clust.R pins the equality.
+#     in memory linear in their number; the point order, the cut and, by default, the unweighted
+#     k-means consolidation are HCPC()'s, and test-clust.R pins the equality. `consol = "weighted"`
+#     opts in to a k-means counting each individual by its weight.
 #   - The clusters are a column of the data frame, never an HCPC object: renaming them is then an
 #     ordinary fct_recode(), and every function that describes them reads the same column.
 #   - hierarchical_clust() aligns its result by context -- on the data frame of the mutate() it is
@@ -49,8 +50,12 @@
 #' @param tree Should the clustering tree be drawn, to choose the number of clusters? By default,
 #' only when `nb_clust = -1`. Its leaves are the distinct points of the cloud: the answer profiles
 #' of a multiple correspondence analysis, the levels of a correspondence analysis.
-#' @param consol Set to `FALSE` to keep the clusters as the tree cuts them, without the k-means
-#' consolidation that then moves each individual to its nearest cluster.
+#' @param consol The k-means consolidation, which moves each individual to its nearest cluster once
+#' the tree is cut. `TRUE`, the default, is \code{FactoMineR::\link[FactoMineR]{HCPC}}'s k-means,
+#' which counts every individual once, weights or not. `"weighted"` counts each by its weight (the
+#' survey weights, or a level's count in a correspondence analysis) with a simpler k-means, Lloyd's,
+#' which can place a few individuals differently even without weights. `FALSE` keeps the clusters as
+#' the tree cuts them.
 #' @param margin For a correspondence analysis, the levels to cluster: `"rows"`, the default, or
 #' `"columns"`.
 #'
@@ -99,6 +104,9 @@ hierarchical_clust <- function(res, ncp, nb_clust = -1, tree = nb_clust == -1, c
   if (!(nb_clust == -1 || nb_clust >= 2)) stop(
     "`nb_clust` is the number of clusters, at least 2, or -1 to cut the tree where the gain in ",
     "between-cluster inertia drops the most.", call. = FALSE)
+  if (!(isTRUE(consol) || isFALSE(consol) || identical(consol, "weighted"))) stop(
+    "`consol` is TRUE (FactoMineR's k-means), \"weighted\" (a k-means counting each individual by ",
+    "its weight) or FALSE (no consolidation).", call. = FALSE)
 
   pts <- clust_points(res, ncp, margin)
   hc  <- ward_clusters(pts$coord, pts$w, pts$answers, nb_clust, consol)
@@ -166,8 +174,8 @@ ward_clusters <- function(coord, w, answers, nb_clust, consol) {
     "`nb_clust` must be less than the number of distinct points to cluster, ", length(first), ".",
     call. = FALSE)
 
-  tree <- fastcluster::hclust.vector(X[first, , drop = FALSE], method = "ward",
-                                     members = as.vector(rowsum(w[ord], leaf)))
+  lw   <- as.vector(rowsum(w[ord], leaf))
+  tree <- fastcluster::hclust.vector(X[first, , drop = FALSE], method = "ward", members = lw)
   # WARNING: fastcluster's Ward height is sqrt(2 x the inertia gain); HCPC() plots and cuts the
   #   gain, as a share of the total weight.
   tree$height <- tree$height^2 / 2 / sum(w)
@@ -175,19 +183,43 @@ ward_clusters <- function(coord, w, answers, nb_clust, consol) {
 
   h   <- rev(tree$height)
   cut <- (h[nb_clust - 1] + h[nb_clust]) / 2
-  cl  <- stats::cutree(tree, h = cut)[leaf]
-  centers <- rowsum(X, cl) / tabulate(cl)
-  # DESIGN: HCPC()'s consolidation is an UNWEIGHTED k-means on the individuals, kept as is so the
-  #   clusters stay HCPC()'s, survey weights or not.
-  if (consol) {
-    km      <- stats::kmeans(X, centers = centers, iter.max = 10)
-    cl      <- km$cluster
+  cl  <- unname(stats::cutree(tree, h = cut))
+  if (identical(consol, "weighted")) {
+    km      <- weighted_kmeans(X[first, , drop = FALSE], lw, cl)
+    cl      <- km$cluster[leaf]
     centers <- km$centers
+  } else {
+    cl      <- cl[leaf]
+    centers <- rowsum(X, cl) / tabulate(cl)
+    # DESIGN: HCPC()'s consolidation, the default, is an UNWEIGHTED k-means on the individuals, kept
+    #   as is so the clusters stay HCPC()'s, survey weights or not.
+    if (isTRUE(consol)) {
+      km      <- stats::kmeans(X, centers = centers, iter.max = 10)
+      cl      <- km$cluster
+      centers <- km$centers
+    }
   }
   cl  <- order(order(centers[, 1]))[cl]
   out <- integer(n)
   out[ord] <- cl
   list(clust = factor(out), tree = tree, cut = cut, nb_clust = max(cl), leaf_clust = cl[first])
+}
+
+# Why this exists: stats::kmeans() takes no weights. Lloyd's algorithm with weighted centres, from
+# the tree's clusters, on the distinct points: identical individuals always share their nearest
+# centre, so it is the same k-means as on the individuals. A cluster that empties is dropped.
+weighted_kmeans <- function(X, w, cl, iter.max = 100) {
+  centers <- function(cl) rowsum(X * w, cl) / as.vector(rowsum(w, cl))
+  for (i in seq_len(iter.max)) {
+    ctr <- centers(cl)
+    d   <- vapply(seq_len(nrow(ctr)), function(k) rowSums(sweep(X, 2, ctr[k, ])^2),
+                  numeric(nrow(X)))
+    new <- max.col(-d, ties.method = "first")
+    if (identical(new, cl)) break
+    cl <- new
+  }
+  cl <- match(cl, sort(unique(cl)))
+  list(cluster = cl, centers = centers(cl))
 }
 
 # HCPC()'s rule for `nb_clust = -1` (its auto.cut.tree(), defaults min = 3, max = 10): the number of

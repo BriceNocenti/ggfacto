@@ -95,7 +95,7 @@ The package computes no analysis of its own, the clustering apart (below). `mult
 
 `varsup()`, vendored from GDAtools 1.7.2, is the only extractor that dispatches on the object's class (`MCA` / `speMCA` / `csMCA` / `stMCA` / `multiMCA`) and it covers supplementary variables only. ggfacto adds two slots of its own: **`res$axes_names`**, the user's, read defensively and used by `theme_facto()` for the axis titles; and **`res$source`**, the ingress's, `list(n, rows)` — which rows of the data frame the user named were analysed. It is read off the call itself: `pc_AGD |> filter(...) |> multiple_correspondence_analysis(...)` is re-run with a hidden row id, and kept only if it gives back exactly the analysed data (a `%>%`, a `select()` or a `slice_sample()` record nothing). Every function that takes the microdata back — `ggmca()`, `ggmca_3d()`, `hierarchical_clust()` inside `mutate()` — goes through `align_to_fit()`, which picks those rows and **re-checks the active answers**, so a subset needs no second filter and a reordered data frame is refused rather than misaligned. `correspondence_analysis()` writes the margin names back on `call$X`, which `FactoMineR::CA()` strips. ⚠ There is no shared extractor for the *active* side: `active_vars` is re-derived from `res.mca$call$X` and `$call$quali` in `mca-data.R`, twice in `mca-teach.R`, and by `active_names()` in `ingress.R`.
 
-**The clusters are `HCPC()`'s, computed here.** `FactoMineR::HCPC()` builds its Ward tree from a `dist()` and an n × n `outer()` of weights — +3.3 GB for the course's 9 234 rows, so a 32 GB machine runs out near 30 000. Ward merges identical points first, at no cost, so `hierarchical_clust()` builds the same tree on the **distinct points** of the cloud (an MCA's answer profiles, weighted by the sum of their individuals) with `fastcluster::hclust.vector()`, which keeps no dissimilarity matrix: memory linear in the points, time still quadratic (~25 s at 40 000 distinct points). The rest is `HCPC()`'s and must stay so: the points sorted along axis 1 (it decides the ties and where the k-means starts), the cut rule, the **unweighted** k-means consolidation, the clusters numbered along axis 1. `test-clust.R` pins the equality for the three analyses. A CA clusters the levels of one `margin`, weighted by their counts, and in `mutate()` each individual takes its level's cluster, matched by name. A tree built by parts, for larger clouds, was measured and kept out of `R/`: `dev/hclust_chunked.R`.
+**The clusters are `HCPC()`'s, computed here.** `FactoMineR::HCPC()` builds its Ward tree from a `dist()` and an n × n `outer()` of weights — +3.3 GB for the course's 9 234 rows, so a 32 GB machine runs out near 30 000. Ward merges identical points first, at no cost, so `hierarchical_clust()` builds the same tree on the **distinct points** of the cloud (an MCA's answer profiles, weighted by the sum of their individuals) with `fastcluster::hclust.vector()`, which keeps no dissimilarity matrix: memory linear in the points, time still quadratic (~25 s at 40 000 distinct points). The rest is `HCPC()`'s and must stay so: the points sorted along axis 1 (it decides the ties and where the k-means starts), the cut rule, the **unweighted** k-means consolidation, the clusters numbered along axis 1. `test-clust.R` pins the equality for the three analyses. `consol = "weighted"` opts in to a Lloyd k-means counting each individual by its weight, run on the distinct points; by default the clusters stay FactoMineR's, weighted analysis or not. A CA clusters the levels of one `margin`, weighted by their counts, and in `mutate()` each individual takes its level's cluster, matched by name. A tree built by parts, for larger clouds, was measured and kept out of `R/`: `dev/hclust_chunked.R`.
 
 ### Weights ride one channel
 
@@ -183,7 +183,7 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 **Fixtures are `tea[1:6]`, never `tea[1:18]`.** Tooltip crosstabs are quadratic in the number of active variables: `active_tables = "active"` costs 1.2 s on six and 10.4 s on eighteen. Six reaches every code path. The models the suite reuses are memoised in `helper-fixtures.R`, among them `fx_tea_na()` (missing answers for the `excl` rule) and `fx_mca_young()` (an analysis of a piped subset, which records its rows). The one exception is `fx_mca_multi()`, local to `test-interpret.R`: `tea[1:6]` is all binary, so `mca_interpret()`'s row packing collapses every question to one line there and its display blanking has nothing to hide — that needs multi-level variables and a third axis.
 
-The suite is **small and serial**: 557 assertions, about 36 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
+The suite is **small and serial**: 560 assertions, about 36 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
 
 **Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text (as `ggmca_plot()` joins it) and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(tabxplor.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
 
@@ -375,23 +375,40 @@ La feuille de route annonçait 1 Go : c'était 3,3 Go, le `dist()` et surtout l'
 
 **L'arbre par morceaux : mesuré, gardé hors de `R/`, dans `dev/hclust_chunked.R`.** Des tranches de points le long de l'axe 1, un arbre de Ward par tranche coupé en micro-classes, un arbre sur leurs centres pondérés, puis la consolidation — la voie de CURE ou de BIRCH. La qualité de Ward est la même (R² inter-classes égal ; même part d'individus plus proches d'un autre centre que du leur, ~1,5 % après consolidation, ~17 % sans, arbre exact compris : ces « isolés » tiennent à Ward, pas au découpage), et c'est quatre fois plus rapide à 20 000 points. Mais 0 à 26 % des individus changent de classe par rapport à l'arbre exact — autant que l'arbre exact lui-même quand on retire 1 % des individus au hasard (0,7 à 48 %). On ne peut donc le juger que sur la qualité, jamais sur l'égalité à `HCPC()`, et l'arbre exact en mémoire linéaire n'en aurait besoin que bien au-delà de 100 000 points distincts.
 
-**Deux bogues trouvés.** Une ACM ajustée avec `ind.sup` voyait ses individus supplémentaires classés comme actifs — le réajustement perdait `ind.sup` — : elle est refusée, comme l'ACP. Et `HCPC()` rend les **lignes** d'une AC dans son propre ordre, trié le long de l'axe 1 (il teste `cluster.CA == "row"`, jamais vrai), ses colonnes dans le leur : les tests comparent par le nom. ⚠ Gardé tel quel, à trancher plus tard : la consolidation de `HCPC()` ignore les poids de sondage.
+**Deux bogues trouvés.** Une ACM ajustée avec `ind.sup` voyait ses individus supplémentaires classés comme actifs — le réajustement perdait `ind.sup` — : elle est refusée, comme l'ACP. Et `HCPC()` rend les **lignes** d'une AC dans son propre ordre, trié le long de l'axe 1 (il teste `cluster.CA == "row"`, jamais vrai), ses colonnes dans le leur : les tests comparent par le nom.
 
-**Tests** : **557 assertions** (542), 0 échec, 0 avertissement, ~36 s ; `check` 0/0/0. **Dépendances** : `fastcluster` (+1 paquet, +0,3 Mo, aucune dépendance), `graphics` (paquet de base).
+**La consolidation pondérée, en option.** La consolidation de `HCPC()` ignore les poids de sondage : ses k-means comptent chaque individu une fois, même quand l'arbre a été pondéré. `consol = "weighted"` compte chacun selon son poids (poids de sondage, ou effectif d'une modalité d'AC) ; `TRUE` reste le défaut, donc les classes restent celles de FactoMineR. `stats::kmeans()` ne prend pas de poids : c'est un Lloyd à centres pondérés, parti des classes de l'arbre et exécuté sur les points distincts (des individus identiques partagent toujours leur centre le plus proche). Épinglé par deux faits : un poids de 2 vaut deux copies de l'individu, et chaque individu finit dans la classe du centre pondéré le plus proche. Sur `pc_AGD`, pondéré par `POND` : 13 à 15 % des individus changent de classe ; sans poids, 0,9 à 1,6 % seulement — l'écart tient donc aux poids, pas à l'algorithme. ⚠ Lloyd est un optimum local : l'inertie intra pondérée baisse à 6 classes (0,13167 contre 0,13238) mais monte un peu à 9 (0,09588 contre 0,09561), Hartigan-Wong trouvant parfois mieux même au critère pondéré.
 
-#### Phase 1p —
+**Au passage, R ≥ 4.1 redevient vrai.** `R/interpret.R` utilisait l'opérateur `%||%` de R de base, qui n'existe que depuis R 4.4, alors que `DESCRIPTION` annonce `R (>= 4.1.0)`. Les cinq usages sont réécrits sans lui : un défaut à `getOption()`, `$` sur `NULL`, `max()` sur un vecteur vide, deux `if`.
 
-Now that ggfacto fully own the hierarchical clustering function, I wonder about the further simplifications of usage and quality-of-life features we could add, for the most straight-to-the-point workflows for the user ?
+**Tests** : **560 assertions** (542), 0 échec, 0 avertissement, ~36 s ; `check` 0/0/0. **Dépendances** : `fastcluster` (+1 paquet, +0,3 Mo, aucune dépendance), `graphics` (paquet de base).
 
-One point is that it’s useless to do the same hierarchical clustering twice on the same 
+#### Phase 1p — full rethinking of the hierarchical clustering framework and workflow ?
+
+Now that ggfacto fully owns the hierarchical clustering function, I wonder about the further simplifications of usage and quality-of-life features we could add, for the most straight-to-the-point an-user-friendly hierarchical clustering workflows possible ? Look at my current workflows in the course `/home/dev1/github/formations_stat/cours/M2S1/livre/`, and think about what would be the best way to teach my students the more simple, straight-to-the-point, readable code possible. 
+
+One point is that it’s useless and wasteful to do the same hierarchical clustering twice on the same ACP/AC/ACM, but the current workflow teach do redo everything with a different nb_clust. Just create an R object for the HCPC object like before ? Use variable’s attributes to keep the tree ? Make the function take the data.frame as input rather than the variable, pass a variable name, if the variable doesn’t exist we do the HCPC and create it with the tree as attribute (maybe only the first branches of the tree ? maybe we just save the number of partitions the user want, like the first 15 partitions ? Maybe we create a light vctrs vector that keeps attributes, that behaves like a normal factor for everything, but with the other partitions as attributes, and helpers to change the nb_clust partition ? ), if the variable exists we check if it’s the same ACM, if it’s the same ACM we just take another partition without redoing the hierarchical clustering ? How could it be made very reliable, solid to changes, readable for both beginners and R experts that want to customise things, etc. ? Or should we better do a hack to save a cache somewhere in R ?
+- Also think about hierarchical clustering in a possible future jamovi module for ggfacto (see `/home/dev1/github/tabxplor/dev/jamovi_*.md`), where the workflow needs cache.
+
+Another point is the filters management : I want to find the best way to do ACM etc. and HCPC on subpopulations, but still working with the same unfiltered data.frame for sup_vars, clust variables, etc. I really need a smart framework here.
+
+Look at my old (very old) HCPC workflows on `/home/dev1/github/socio_public_services/current_private/ctall.R` : there may be good ideas, and bad ideas. Also look at my old `HCPC_tab()` workflows. Also look at `~/Data/CASD%20SIASP%20FGE/Scripts/pts_analysis.R`, the part with sequence analysis/analyses de séquences I think, we I export many partitions at the same time.
+
+
+Est-ce que cela aurait un sens d’adapter `clust_tab` aussi avec une ACP ? Comment faire intelligemment ? Utiliser des moyennes avec coefficient de variation, ou utiliser des `sd_bands`, ou permettre les deux (et toutes les shapes adaptées de tabxplor) ?
+Donne-moi le code `tab()` de tabxplor 2.0.0 qui permet d’avoir le même résultat que `clust_tab()` : si c’est suffisamment simple, peut-être que le mieux est d’enseigner `tab()` directement. What would be lost ? Même chose pour une ACP.
 
 
 
-Est-ce cela aurait un sens de faire marcher `clust_tab` aussi avec une ACP, et est-ce que cela à un sens ? Utiliser des moyennes avec coefficient de variation, ou utiliser des `sd_bands` ?
-Est-ce que `tab()` de tabxplor 2.0.0 
+#### Phase 1q — abandon FactoMineR dependency ?
+
+I’m thinking about a radical move : to copy everything we need from FactoMineR and thank them in the code and description, drop everything that is not needed, do our own API and workflows, and do parity tests with the last version of FactoMineR to still get exactly the same results. I want you to make a full research about that possibility in a new file in `dev/` : what would be the gains, would it be possible, what would be the caveats ?
 
 
-#### Phase 1q — vignette and pkgdown site
+
+
+
+#### Phase 1r — vignette and pkgdown site
 
 Look at `/home/dev1/github/tabxplor/` vignettes and pkgdown site : I want the same kind of pkgdown site for ggfacto, except it will be **much more concise**.
 
@@ -409,7 +426,7 @@ In the pkgdown site, organise the functions in the "Reference" page in a user-fr
 
 
 
-#### Phase 1r — 0.4.0 release
+#### Phase 1s — 0.4.0 release
 
 Help me do the new CRAN release, so I don’t have to check everything myself : I want you to plan for everything, and only let me accept the pull request on github.com and do the `devtools::submit_cran()` myself. You can commit (but you do not sign the commits), you can push : I’ll have a harness permission asked, that’s all.
 

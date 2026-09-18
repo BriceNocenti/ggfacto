@@ -142,7 +142,7 @@ gda_plain <- function(x) {
 # THE one reading of options(tabxplor.print) for a summary -- the three media tabxplor's own router
 # names: "html" (with "kable", its pre-2.0.0 synonym), "md", or the console. There is no ggfacto
 # option: a summary and a crosstab obey the same one, so a script sets it once.
-# WARNING: `%||%`, never a bare read. tabxplor seeds the option in its .onLoad(), but ggfacto reaches
+# WARNING: `getOption()`'s default, never a bare read. tabxplor seeds the option in its .onLoad(), but ggfacto reaches
 #   it through `tabxplor::` alone, so `library(ggfacto)` leaves the namespace unloaded and the option
 #   UNSET -- on which `switch()` stops. Measured.
 # DESIGN: an unknown value falls back to the console, which is what tabxplor's own router does with
@@ -150,7 +150,7 @@ gda_plain <- function(x) {
 #' @keywords internal
 #' @noRd
 gda_medium <- function() {
-  switch(getOption("tabxplor.print") %||% "console",
+  switch(getOption("tabxplor.print", "console"),
          html = , kable = "html", md = "md", "console")
 }
 
@@ -162,7 +162,7 @@ gda_medium <- function() {
 #' @keywords internal
 #' @noRd
 gda_render <- function(x, ...) {
-  o <- attr(x, "ggfacto_render") %||% list()
+  o <- attr(x, "ggfacto_render")                  # NULL on a plain table: `$` then gives NULL
   args <- utils::modifyList(list(var_names = o$var_names, tooltips = isTRUE(o$tooltips)),
                             rlang::list2(...))
   do.call(tabxplor::tab_html, c(list(gda_plain(x)), args))
@@ -253,7 +253,7 @@ benzecri_mrv <- function(res.mca, fmt = FALSE) {
 gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL, color = TRUE) {
   n    <- nrow(eig)
   # never fewer axes than `eig` holds: a caller's count is a hint, `eig` is a fact.
-  n_total <- max(as.integer(n_total %||% n), n)
+  n_total <- max(as.integer(n_total), n)
   k    <- max(1L, min(n, as.integer(n_axes)))
   rows <- seq_len(k)
   gap  <- n_total > k                             # are there axes the table does not show?
@@ -766,7 +766,7 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
   # WARNING: FactoMineR::CA() drops `names(dimnames())` from every matrix it keeps; only
   #   correspondence_analysis() writes them back on `call$X`. Without either, the two words that are
   #   always true.
-  nm <- as.character(vars %||% names(dimnames(res.ca$call$X)))
+  nm <- as.character(if (is.null(vars)) names(dimnames(res.ca$call$X)) else vars)
   if (length(nm) != 2L || !all(nzchar(nm)) || anyNA(nm)) nm <- c(gettext("Rows"), gettext("Columns"))
 
   axes   <- axes[axes <= nrow(res.ca$eig)]
@@ -846,7 +846,7 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
   #   still describes the very cloud the axes were built on.
   act     <- rownames(res.pca$var$coord)
   x_act   <- as.data.frame(res.pca$call$X)[, act, drop = FALSE]
-  row_w   <- res.pca$call$row.w %||% rep(1, nrow(x_act))
+  row_w   <- if (is.null(res.pca$call$row.w)) rep(1, nrow(x_act)) else res.pca$call$row.w
   ctr_all <- res.pca$call$centre
   ctr_pca <- if (!is.null(names(ctr_all)) && all(act %in% names(ctr_all))) ctr_all[act]
              else purrr::map_dbl(x_act, ~ stats::weighted.mean(.x, row_w, na.rm = TRUE))

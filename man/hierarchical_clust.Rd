@@ -29,8 +29,12 @@ between-cluster inertia drops the most.}
 only when `nb_clust = -1`. Its leaves are the distinct points of the cloud: the answer profiles
 of a multiple correspondence analysis, the levels of a correspondence analysis.}
 
-\item{consol}{Set to `FALSE` to keep the clusters as the tree cuts them, without the k-means
-consolidation that then moves each individual to its nearest cluster.}
+\item{consol}{The k-means consolidation, which moves each individual to its nearest cluster once
+the tree is cut. `TRUE`, the default, is \code{FactoMineR::\link[FactoMineR]{HCPC}}'s k-means,
+which counts every individual once, weights or not. `"weighted"` counts each by its weight (the
+survey weights, or a level's count in a correspondence analysis) with a simpler k-means, Lloyd's,
+which can place a few individuals differently even without weights. `FALSE` keeps the clusters as
+the tree cuts them.}
 
 \item{margin}{For a correspondence analysis, the levels to cluster: `"rows"`, the default, or
 `"columns"`.}

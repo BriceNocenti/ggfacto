@@ -51,6 +51,25 @@ test_that("hierarchical_clust gives HCPC()'s clusters for each margin of a CA", 
   }
 })
 
+test_that("consol = \"weighted\" counts an individual weighted 2 as two copies of it", {
+  d <- fx_tea()
+  d$w <- rep(1:2, length.out = nrow(d))
+  copies <- rep(seq_len(nrow(d)), d$w)
+  by_weight <- hc(MCA2(d, 1:6, wt = "w"), ncp = 3, nb_clust = 5, consol = "weighted")
+  by_copies <- hc(MCA2(d[copies, ], 1:6), ncp = 3, nb_clust = 5, consol = "weighted")
+  expect_identical(by_weight, by_copies[match(seq_len(nrow(d)), copies)])
+})
+
+test_that("consol = \"weighted\" leaves each individual in the cluster of its nearest weighted centre", {
+  cl <- hc(fx_mca_wt(), ncp = 3, nb_clust = 5, consol = "weighted")
+  X  <- fx_mca_wt()$ind$coord[, 1:3]
+  w  <- fx_mca_wt()$call$row.w
+  centres <- rowsum(X * w, cl) / as.vector(rowsum(w, cl))
+  d <- vapply(seq_len(nrow(centres)), function(k) rowSums(sweep(X, 2, centres[k, ])^2),
+              numeric(nrow(X)))
+  expect_identical(max.col(-d, ties.method = "first"), as.integer(cl))
+})
+
 test_that("in mutate(), a CA gives each individual the cluster of its level, NA outside", {
   gss <- forcats::gss_cat |> dplyr::mutate(cl = hc(fx_ca_relig(), ncp = 2, nb_clust = 4))
   by_level <- hc(fx_ca_relig(), ncp = 2, nb_clust = 4)
@@ -69,6 +88,7 @@ test_that("hierarchical_clust asks for what it needs, and says why", {
   expect_error(hc(fx_mca(), ncp = 50), "keeps")
   expect_error(hc(fx_mca(), ncp = 3, nb_clust = 35), "distinct points")
   expect_error(hc(fx_mca(), ncp = 3, nb_clust = 1), "at least 2")
+  expect_error(hc(fx_mca(), ncp = 3, nb_clust = 4, consol = "yes"), "weighted")
   expect_error(hc(FactoMineR::MCA(fx_tea()[1:6], ind.sup = 1:10, graph = FALSE), ncp = 3),
                "supplementary individuals")
   expect_error(dplyr::mutate(forcats::gss_cat, cl = hc(fx_ca(), ncp = 2, nb_clust = 2)),
