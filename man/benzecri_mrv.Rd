@@ -20,6 +20,6 @@ Benzecri's modified rate of variance
 }
 \examples{
 data(tea, package = "FactoMineR")
-res.mca <- MCA2(tea, active_vars = 1:18)
+res.mca <- multiple_correspondence_analysis(tea, 1:18)
 benzecri_mrv(res.mca)
 }

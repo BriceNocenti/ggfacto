@@ -10,7 +10,7 @@
 #       * keep_levels / discard_levels only act inside `if (length(sup_vars) != 0)`;
 #       * tooltip_vars / tooltip_vars_1lv only act when a tooltip is built at all, i.e. alongside
 #         sup_vars or active_tables -- on their own the result is byte-identical to a plain call;
-#       * cah only colours anything alongside profiles = TRUE.
+#       * clust only colours anything alongside profiles = TRUE.
 #     Every case below therefore supplies the enabling argument too, and the vacuous paths are
 #     pinned explicitly so a future reader does not "simplify" them back into nothing.
 # See: CLAUDE.md section ggfacto architecture > The plot model.
@@ -20,7 +20,7 @@
 test_that("ggmca_data returns the four-element plot model", {
   plot_data <- md(fx_mca(), fx_tea())
   expect_type(plot_data, "list")
-  expect_named(plot_data, c("vars_data", "ind_data", "res.mca", "cah"))
+  expect_named(plot_data, c("vars_data", "ind_data", "res.mca", "clust"))
 })
 
 test_that("the model carries a STRIPPED res.mca, not the FactoMineR object", {
@@ -51,8 +51,8 @@ test_that("ind_data is NULL unless profiles are asked for", {
   expect_s3_class(fx_pd_profiles()$ind_data, "data.frame")
 })
 
-test_that("cah is character() when unused", {
-  expect_identical(fx_pd_plain()$cah, character())
+test_that("clust is character() when unused", {
+  expect_identical(fx_pd_plain()$clust, character())
 })
 
 # --- sup_vars -----------------------------------------------------------------------------------
@@ -184,31 +184,30 @@ test_that("max_profiles caps the profile cloud, keeping the largest", {
                sort(full$wcount, decreasing = TRUE)[seq_len(nrow(capped))])
 })
 
-# --- cah ----------------------------------------------------------------------------------------
+# --- clust ----------------------------------------------------------------------------------------
 
-test_that("cah adds a cah_id offset into its own band, so hover links a whole cluster", {
+test_that("clust adds a clust_id offset into its own band, so hover links a whole cluster", {
   # Ids are banded on purpose: active variables from 1000, clusters and profiles from 10000, so
   # every point of one cluster shares an id and hovering any of them lights them all.
-  plot_data <- fx_pd_cah()
-  expect_true("cah_id" %in% names(plot_data$vars_data))
-  ids <- plot_data$vars_data$cah_id[!is.na(plot_data$vars_data$cah_id)]
+  plot_data <- fx_pd_clust()
+  expect_true("clust_id" %in% names(plot_data$vars_data))
+  ids <- plot_data$vars_data$clust_id[!is.na(plot_data$vars_data$clust_id)]
   expect_true(length(ids) > 0)
   expect_true(all(ids >= 10000L))
-  expect_identical(plot_data$cah, "clust")
+  expect_identical(plot_data$clust, "clust")
 })
 
-test_that("cah is added to the supplementary variables automatically", {
-  plot_data <- md(fx_mca(), fx_tea_clust(), cah = "clust")
+test_that("clust is added to the supplementary variables automatically", {
+  plot_data <- md(fx_mca(), fx_tea_clust(), clust = "clust")
   expect_true("clust" %in% as.character(plot_data$vars_data$vars))
 })
 
-test_that("cah must be the NAME of a column, and says so when it is not", {
-  # The roxygen used to read as "pass the clusters", and passing them died on the opaque
-  # "the condition has length > 1" from `cah %in% sup_vars`.
-  expect_error(md(fx_mca(), fx_tea_clust(), cah = fx_tea_clust()$clust),
-               "must be a single string naming a column")
-  expect_error(md(fx_mca(), fx_tea_clust(), cah = c("clust", "SPC")),
-               "must be a single string naming a column")
+test_that("clust takes a bare name, a string or the clusters, and refuses anything else", {
+  d <- fx_tea_clust()
+  by_name <- md(fx_mca(), d, clust = clust)$vars_data
+  expect_identical(md(fx_mca(), d, clust = "clust")$vars_data$`Dim 1`, by_name$`Dim 1`)
+  expect_identical(md(fx_mca(), d, clust = d$clust)$vars_data$`Dim 1`, by_name$`Dim 1`)
+  expect_error(md(fx_mca(), d, clust = c("clust", "SPC")), "column of `data` that holds")
 })
 
 # --- cleannames ---------------------------------------------------------------------------------

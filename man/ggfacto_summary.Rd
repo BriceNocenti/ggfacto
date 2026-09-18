@@ -17,7 +17,7 @@
 }
 \description{
 \code{\link{mca_interpret}}, \code{\link{ca_interpret}}, \code{\link{pca_interpret}},
-\code{\link{HCPC_tab}} and \code{\link{mean_sd_tab}} all return \strong{one}
+\code{\link{clust_tab}} and \code{\link{mean_sd_tab}} all return \strong{one}
 \code{tabxplor} table, so it can be piped, filtered and exported like any other. What differs is
 only how it is \emph{shown}:
 
@@ -28,7 +28,7 @@ prints the plain \code{tabxplor} grid. It is the same option that governs an ord
 after the table is built. For a text file or a language model, pipe the table into
 \code{\link[tabxplor]{tab_md}} explicitly. An html summary of \emph{axes} carries no hover
 tooltip --- every figure one would reveal already has a column of its own --- while
-\code{\link{HCPC_tab}}, being a crosstab of percentages, keeps them: the count behind each one
+\code{\link{clust_tab}}, being a crosstab of percentages, keeps them: the count behind each one
 is worth hovering for.
 
 An analysis-of-axes summary carries the \strong{eigenvalues} as a subordinate table
@@ -84,5 +84,5 @@ either way. What is lost is only the hover policy and the margin names.
 }
 
 \seealso{
-[mca_interpret()], [ca_interpret()], [pca_interpret()], [HCPC_tab()], [mean_sd_tab()].
+[mca_interpret()], [ca_interpret()], [pca_interpret()], [clust_tab()], [mean_sd_tab()].
 }

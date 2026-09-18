@@ -1,10 +1,13 @@
-# PURPOSE: The MCA entry point and the data half of its graph -- MCA2(), ggmca(), ggmca_data().
+# PURPOSE: The MCA entry point and the data half of its graph -- multiple_correspondence_analysis()
+#   (alias MCA2()), ggmca(), ggmca_data().
 # ROLE: Turns a FactoMineR MCA plus its microdata into the plot model R/mca-plot.R draws:
-#   list(vars_data, ind_data, res.mca, cah). ggmca() itself is pure orchestration of the two
+#   list(vars_data, ind_data, res.mca, clust). ggmca() itself is pure orchestration of the two
 #   halves and holds no logic.
 # KEY CONSTRAINTS:
 #   - Weights are read back from res.mca$call$row.w, never from `data`, so a tooltip always
-#     describes the population the analysis was actually fitted on.
+#     describes the population the analysis was actually fitted on; `data` itself comes back
+#     through R/ingress.R's align_to_fit(), cut down to the fitted rows, and only when a
+#     supplementary variable, a cluster or a tooltip variable needs it.
 #   - ggmca()'s signature is exactly ggmca_data()'s plus ggmca_plot()'s, with zero overlap. A new
 #     argument belongs to one half and must be routed to that half only. That is why the model is
 #     `plot_data` and the microdata is `data`: one name each, no collision.
@@ -12,89 +15,77 @@
 #     do not supply it: type = "points" sizes by it unconditionally.
 #   - Several arguments are inert on their own and only act alongside an enabling one --
 #     keep_levels/discard_levels need sup_vars, tooltip_vars/tooltip_vars_1lv need a table to be
-#     built at all, cah needs profiles. tests/testthat/test-ggmca-data.R pins both halves.
+#     built at all, clust needs profiles. tests/testthat/test-ggmca-data.R pins both halves.
 #   - varsup() is vendored from GDAtools 1.7.2 (credited in place) and is the only extractor that
 #     dispatches on the analysis object's class.
 # See: CLAUDE.md section ggfacto architecture > The plot model.
 
 #' Multiple Correspondence Analysis
 #' @description A user-friendly wrapper around \code{\link[FactoMineR]{MCA}}, made to
-#'  work better with \pkg{ggfacto} functions like \code{\link{ggmca}}. All variables can
-#'  be selected by many different expressions, in the way of the `tidyverse`.
-#'  No supplementary vars are to be provided here, since they can be added afterward
-#'  in \code{\link{ggmca}}.
+#'  work with \pkg{ggfacto} functions like \code{\link{ggmca}}, \code{\link{mca_interpret}} and
+#'  \code{\link{hierarchical_clust}}. Variables are selected the way of the `tidyverse`, as in
+#'  \code{tabxplor::tab()}. Supplementary variables are not given here: they are added afterwards,
+#'  in \code{\link{ggmca}}. `MCA2()` is a shorter name for the same function.
 #'
-#' @param data The data frame.
-#' @param active_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}>
-# @param sup_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}>
-# @param sup_quanti <\link[tidyr:tidyr_tidy_select]{tidy-select}>
-#' @param wt <\link[tidyr:tidyr_tidy_select]{tidy-select}>
-#' @param graph By default no graph is made, since the result can be ploted with
-#'  \code{\link{ggmca}}.
+#' @param data The data frame. To analyse a subset of the population, filter it inside the call with
+#'  the native pipe, `data |> dplyr::filter(...) |> multiple_correspondence_analysis(...)`: the
+#'  analysis then remembers which rows it used, so that \code{\link{hierarchical_clust}} and
+#'  \code{\link{ggmca}} can be given the whole data frame afterwards.
+#' @param active_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The active variables.
+#' @param wt <\link[tidyr:tidyr_tidy_select]{tidy-select}> The weight variable, if any.
+#' @param excl The levels to exclude from the calculation of the axes (specific multiple
+#'  correspondence analysis), matched exactly by name. The missing values of each active variable
+#'  become a level named `<VAR>.NA`, and `NA`, the default, excludes all of them: `excl = NA` for
+#'  missing values only, `excl = c(NA, "Other")` to exclude a level too, `excl = "DIPLOMA.NA"` for
+#'  the missing values of one variable only, `excl = NULL` to keep every level.
 #' @param ncp The number of axes to keep. All of them by default: the eigenvalue table is how one
 #'   chooses how many axes to interpret, and a truncated one cannot show the drop --- it also
 #'   renormalises Benzecri's modified rate over the axes it kept, so the same axis gets a different
-#'   rate. Lower it only to feed \code{FactoMineR::HCPC()}, which clusters on the axes kept.
-#' @param excl A character vector of regular expressions to exclude "junk" categories.
-#' Any level of an active variable with any of the detected patterns is not taken into
-#' account in the calculation of axes (which is called specific multiple correspondence analysis).
-#' @param ... Additionnal arguments to pass to \code{\link[FactoMineR]{MCA}}.
+#'   rate. To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp`.
+#' @param graph By default no graph is made, since the result can be plotted with
+#'  \code{\link{ggmca}}.
+#' @param ... Additional arguments to pass to \code{\link[FactoMineR]{MCA}}.
 #'
-#' @return A `res.mca` object, with all the data necessary to draw the MCA.
+#' @return A `MCA` object from \pkg{FactoMineR}, with one more element, `source`, which records the
+#'  rows of `data` that were analysed.
 #' @export
 #'
-#' @examples  data(tea, package = "FactoMineR")
-#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' @examples
+#' data(tea, package = "FactoMineR")
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
+#' mca_interpret(res.mca)
 #'
-#' res.mca %>%
-#'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) %>%
-#'   ggi() #to make the graph interactive
-MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
-                 wt, excl, ncp = Inf, graph = FALSE, ...) {
-  active_vars <- tidyselect::eval_select(rlang::enquo(active_vars), data)
-  #sup_vars    <- tidyselect::eval_select(rlang::enquo(sup_vars)   , data)
-  #sup_quanti  <- tidyselect::eval_select(rlang::enquo(sup_quanti) , data)
-  wt          <- tidyselect::eval_select(rlang::enquo(wt)         , data)
+#' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2)) |>
+#'   ggi() # to make the graph interactive
+#'
+#' # A subset of the population: the analysis remembers which rows it used
+#' res.mca_young <- tea |>
+#'   dplyr::filter(age < 30) |>
+#'   multiple_correspondence_analysis(1:18)
+multiple_correspondence_analysis <- function(data, active_vars, wt, excl = NA, ncp = Inf,
+                                             graph = FALSE, ...) {
+  # WARNING: the caller's frame is captured HERE, before any promise is forced: rlang::caller_env()
+  #   evaluated lazily inside source_rows() would name the wrong frame.
+  expr   <- rlang::enexpr(data)
+  env    <- rlang::caller_env()
+  source <- source_rows(expr, env, data)
+
+  active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
+  wt          <- tidyselect::eval_select(rlang::enquo(wt), data)
   stopifnot(length(wt) < 2)
+  wt <- if (length(wt) != 0) data[[wt]] else NULL
 
-  vars <- active_vars #c(active_vars, sup_vars, sup_quanti)
-  wt   <- if (length(wt) != 0) { data[[wt]] } else {NULL}
-  data <- data[vars]
+  data <- na_levels(as.data.frame(data[active_vars]), active_vars)
 
-  new_excl <- character()
-  if (!missing(excl)) {
-    if (any(is.na(excl))) {
-      data <- data |>
-        dplyr::mutate(dplyr::across(tidyselect::all_of(names(active_vars)),
-                                    ~ forcats::fct_na_value_to_level(., "NA")
-        ))
-      new_excl <- c("NA", paste0(names(active_vars), "_NA"))
-      excl     <- c(excl[!is.na(excl)])
-    }
-
-    if (length(excl) != 0) {
-      lvs <- purrr::imap_dfr(data, ~ tibble::tibble(var = .y, lvs = levels(.x)))
-      lvs <- lvs |>
-        dplyr::mutate(excl = str_detect(.data$lvs, paste0(excl, collapse = "|")),
-                      lvs2 = paste0(.data$var, "_", .data$lvs)
-        ) |>
-        dplyr::filter(excl)
-
-      new_excl <- c(lvs$lvs, lvs$lvs2, new_excl)
-    }
-  }
-
-  FactoMineR::MCA(
-    data,
-    ncp = ncp,
-    #quali.sup  = if(length(sup_vars  ) != 0) { which(names(data) %in% names(sup_vars  )) } else {NULL},
-    #quanti.sup = if(length(sup_quanti) != 0) { which(names(data) %in% names(sup_quanti)) } else {NULL},
-    row.w = wt,
-    graph = graph,
-    excl  = if (length(new_excl) != 0) {new_excl} else {NULL},
-    ...
-  )
+  res <- FactoMineR::MCA(data, ncp = ncp, row.w = wt, graph = graph,
+                         excl = excl_index(data, active_vars, excl), ...)
+  res$source <- source
+  res
 }
+
+#' @rdname multiple_correspondence_analysis
+#' @export
+MCA2 <- multiple_correspondence_analysis
 
 
 
@@ -119,9 +110,13 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' Step-by-step functions : use \link{ggmca_data} to get the data frames with every
 #' parameter in a MCA printing, then modify, and pass to \link{ggmca_plot}
 #' to draw the graph.
-#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-#' @param data The data in which to find the supplementary variables, etc.
-#' @param sup_vars A character vectors of supplementary qualitative variables
+#' @param res.mca An object created with \code{\link{multiple_correspondence_analysis}} or
+#' \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param data The data frame the analysis was made on, in which to find the supplementary
+#' variables and the clusters: the whole data frame, even when the analysis was made on a subset
+#' of it with \code{\link{multiple_correspondence_analysis}}. Only needed with `sup_vars`,
+#' `clust` or the tooltip variables.
+#' @param sup_vars A character vector of supplementary qualitative variables
 #' to print (they don't need to be passed in \code{\link[FactoMineR]{MCA}} before).
 #' @param tooltip_vars_1lv A character vectors of variables, whose first level
 #' (if character/factor) or weighted_mean (if numeric) will be added
@@ -147,9 +142,9 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' as double vectors of length 2.
 #' @param cleannames Set to \code{TRUE} to clean levels names, by removing
 #' prefix numbers like \code{"1-"}, and text in parentheses.
-#' @param text_repel When \code{TRUE} the graph is not interactive anymore,
-#'  but the resulting image is better to print because points and labels don't
-#'  overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.
+#' @param text_repel By default, labels are moved so that they do not overlap, with
+#'  \code{ggrepel::\link[ggrepel]{geom_text_repel}}. Set to \code{FALSE} to print each label
+#'  exactly at its point, which is faster to draw.
 #' @param out_lims_move When \code{TRUE}, the points out of \code{xlim} or
 #'  \code{ylim} are not removed, but moved at the edges of the graph.
 #' @param title The title of the graph.
@@ -168,16 +163,16 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @param profiles When set to \code{TRUE}, profiles of answers are drawn in the back
 #' of the graph with light-grey points. When hovering with mouse in the interactive
 #' version (passed in \code{\link{ggi}}), the answers of individuals to active variables
-#' will appears. If \code{cah} is provided, to hover near one point will color all the
+#' will appears. If \code{clust} is provided, to hover near one point will color all the
 #' points of the same \code{\link[FactoMineR]{HCPC}} class.
 #' @param profiles_tooltip_discard A regex pattern to remove useless levels
 #' among interactive tooltips for profiles of answers (ex. : levels expressing
 #' "no" answers).
-#' @param cah The NAME of a column of `data` holding HCPC clusters, as a single
-#' string, to link the answers-profiles points who share the same HCPC class (they
-#' are colored alike and linked at mouse hover). Add the clusters to `data` first:
-#' `data$clust <- FactoMineR::HCPC(res.mca, graph = FALSE)$data.clust$clust`, then
-#' pass `cah = "clust"`. Only has an effect together with `profiles = TRUE`.
+#' @param clust The variable of `data` holding the clusters, typically made with
+#' \code{\link{hierarchical_clust}}, as a bare name (`clust = cah_culture`) or a string. The
+#' clusters are drawn as a supplementary variable and, with `profiles = TRUE`, the answer profiles
+#' of one cluster are coloured alike and linked at mouse hover.
+#' @param cah,cah_color_groups Deprecated former names of `clust` and `clust_color_groups`.
 #' @param max_profiles The maximum number of profiles points to print. Default to 5000.
 #' @param dat Deprecated former name of `data`. Still accepted, with a warning;
 #' use `data` instead.
@@ -189,7 +184,7 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #'  \code{color_groups = "^.{3}"} upon the first three characters.
 #'  \code{color_groups = "NB.+$"} takes anything between the `"NB"` and the end of levels
 #'  names, etc.
-#' @param cah_color_groups Color groups for the `cah` variable (HCPC clusters).
+#' @param clust_color_groups Color groups for the `clust` variable (the clusters).
 #' @param shift_colors Change colors of the \code{sup_vars} points.
 #' @param colornames_recode A named character vector with
 #' \code{\link[forcats]{fct_recode}} style to rename the levels of the color
@@ -209,10 +204,10 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' individuals of each category. \code{0.5} draw median-ellipses, containing half
 #' the individuals of each category. Note that, if `max_profiles` is provided, ellipses
 #' won't be made with all individuals.
-#' @param color_profiles By default, if \code{cah} is provided, profiles are
-#' colored based on cah levels (HCPC clusters). Set do \code{FALSE} to avoid this behaviour.
+#' @param color_profiles By default, if \code{clust} is provided, profiles are
+#' colored based on clust levels (HCPC clusters). Set do \code{FALSE} to avoid this behaviour.
 #' You can also give a character vector with only some of the levels of
-#' the `cah` variable .
+#' the `clust` variable .
 #' @param base_profiles_color The base color for answers profiles. Default to gray.
 #' Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
 #' non-colored profiles.
@@ -232,29 +227,27 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 #' @examples
 #' \donttest{
 #' data(tea, package = "FactoMineR")
-#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
 #'
 #' # Interactive graph for multiple correspondence analysis :
-#' res.mca |>
-#'   ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) |>
-#'   ggi() #to make the graph interactive
+#' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2)) |>
+#'   ggi() # to make the graph interactive
 #'
 #' # Interactive graph with access to all crosstables between active variables (burt table).
 #' #  Spread from mean are colored and, usually, points near the middle will have less
 #' #  colors, and points at the edges will have plenty. It may takes time to print, but
 #' #  helps to interpret the MCA in close proximity with the underlying data.
-#' res.mca |>
-#'   ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) |>
+#' ggmca(res.mca, ylim = c(NA, 1.2), active_tables = "active") |>
 #'   ggi()
 #'
-#' # Graph with colored HCPC clusters
-#' cah <- FactoMineR::HCPC(res.mca, nb.clust = 6, graph = FALSE)
-#' tea$clust <- cah$data.clust$clust
-#' ggmca(res.mca, tea, cah = "clust", profiles = TRUE, text_repel = TRUE)
+#' # Graph with colored clusters (hierarchical clustering on the first three axes)
+#' tea <- tea |>
+#'   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+#' ggmca(res.mca, tea, clust = clust, profiles = TRUE)
 #'
 #' # Concentration ellipses for each levels of a supplementary variable :
 #' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
-#'   ellipses = 0.5, text_repel = TRUE, profiles = TRUE)
+#'   ellipses = 0.5, profiles = TRUE)
 #'
 #' # Graph of profiles of answer for each levels of a supplementary variable :
 #' ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
@@ -263,16 +256,16 @@ MCA2 <- function(data, active_vars, #sup_vars, sup_quanti,
 ggmca <-
   function(res.mca, data, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
            axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
-           type = c("text", "labels", "points", "facets"),
+           type = c("text", "labels", "points", "active_vars_only", "facets"),
 
-           color_groups = "^.{0}", cah_color_groups =  "^.+$",
+           color_groups = "^.{0}", clust_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
 
-           profiles = FALSE, profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
-           cah, max_profiles = 5000,
+           profiles = FALSE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+           clust, max_profiles = 5000,
            alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#aaaaaa",
 
-           text_repel = FALSE, title, actives_in_bold = NULL, sup_in_italic = FALSE,
+           text_repel = TRUE, title, actives_in_bold = NULL, sup_in_italic = FALSE,
            ellipses = NULL,
            xlim, ylim, out_lims_move = FALSE,
 
@@ -281,10 +274,17 @@ ggmca <-
            scale_color_dark  = material_colors_dark(),
            text_size = 3.5, size_scale_max = 4, dist_labels = c("auto", 0.04),
            right_margin = 0, use_theme = TRUE, get_data = FALSE,
-           dat
+           dat, cah, cah_color_groups
   ) {
-    # `dat` was renamed `data` in 0.4.0; it sits last so no positional call can reach it.
+    # Renamed in 0.4.0; they sit last so no positional call can reach them.
     if (!missing(dat) && missing(data)) data <- renamed_arg(dat, "dat", "data", "ggmca")
+    clust <- if (!missing(cah)) {
+      rlang::quo(!!renamed_arg(cah, "cah", "clust", "ggmca"))
+    } else {
+      rlang::enquo(clust)
+    }
+    if (!missing(cah_color_groups)) clust_color_groups <-
+      renamed_arg(cah_color_groups, "cah_color_groups", "clust_color_groups", "ggmca")
 
     plot_data <- ggmca_data(
       data = data,
@@ -293,8 +293,8 @@ ggmca <-
       cleannames = cleannames,
       keep_levels = keep_levels, discard_levels = discard_levels,
       profiles = profiles, profiles_tooltip_discard = profiles_tooltip_discard,
-      cah = cah, max_profiles = max_profiles,
-      color_groups = color_groups, cah_color_groups = cah_color_groups
+      clust = !!clust, max_profiles = max_profiles,
+      color_groups = color_groups, clust_color_groups = clust_color_groups
     )
 
     ggmca_plot(plot_data = plot_data,
@@ -323,15 +323,22 @@ ggmca <-
 ggmca_data <-
   function(res.mca, data, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
 
-           color_groups = "^.{0}", cah_color_groups =  "^.+$",
+           color_groups = "^.{0}", clust_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
 
            profiles = FALSE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-           cah, max_profiles = 5000,
-           dat
+           clust, max_profiles = 5000,
+           dat, cah, cah_color_groups
   ) {
-    # `dat` was renamed `data` in 0.4.0; it sits last so no positional call can reach it.
+    # Renamed in 0.4.0; they sit last so no positional call can reach them.
     if (!missing(dat) && missing(data)) data <- renamed_arg(dat, "dat", "data", "ggmca_data")
+    clust <- if (!missing(cah)) {
+      rlang::quo(!!renamed_arg(cah, "cah", "clust", "ggmca_data"))
+    } else {
+      rlang::enquo(clust)
+    }
+    if (!missing(cah_color_groups)) clust_color_groups <-
+      renamed_arg(cah_color_groups, "cah_color_groups", "clust_color_groups", "ggmca_data")
 
     if (missing(sup_vars))          sup_vars          <- character()
     if (missing(active_tables))     active_tables     <- character()
@@ -339,22 +346,19 @@ ggmca_data <-
     if (missing(tooltip_vars))      tooltip_vars      <- character()
     if (missing(keep_levels))       keep_levels       <- character()
     if (missing(discard_levels))    discard_levels    <- character()
-    if (missing(cah) ) {
-      cah <- character()
-    } else if (length(cah) == 0) {
-      cah <- character()
-    } else if (!is.character(cah) || length(cah) != 1) {
-      # WARNING: cah is a column NAME, not the clusters themselves. Without this guard a factor or
-      # an HCPC object reaches `cah %in% sup_vars` below and dies on "the condition has length > 1".
-      stop("`cah` must be a single string naming a column of `data` that holds the HCPC clusters, ",
-           "not the clusters themselves. Add them first, e.g. ",
-           "`data$clust <- FactoMineR::HCPC(res.mca, graph = FALSE)$data.clust$clust`, ",
-           "then pass `cah = \"clust\"`.", call. = FALSE)
-    } else if(! cah %in% sup_vars) {
-      # warning(cah, " was not found among the supplementary variables of the mca")
-      #cah <- character()
-      sup_vars <- c(sup_vars, cah)
+
+    # The microdata is needed for anything that is not an active variable. It is taken back through
+    # the one gate (R/ingress.R), which cuts it down to the fitted rows, in the fitted order.
+    if (!rlang::quo_is_missing(clust) && !rlang::quo_is_null(clust) ||
+        length(c(sup_vars, tooltip_vars_1lv, tooltip_vars)) != 0) {
+      need_data(missing(data), "the supplementary variables and the clusters", "ggmca")
+      clust <- resolve_clust(clust, data)
+      data  <- align_to_fit(res.mca, clust$data)
+      clust <- clust$name
+    } else {
+      clust <- character()
     }
+    if (length(clust) != 0 && !clust %in% sup_vars) sup_vars <- c(sup_vars, clust)
     stopifnot(length(max_profiles) < 2)
 
     active_vars <- str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
@@ -450,11 +454,11 @@ ggmca_data <-
 
       # color_group depending on nb of supplementary variables and nb of characters
       #  indicated in color_groups
-      if (length(cah) > 0 & length(color_groups) != 1 &
+      if (length(clust) > 0 & length(color_groups) != 1 &
           length(color_groups) == length(sup_vars) - 1L) {
 
         color_groups_base <- rep(NA_character_, length(sup_vars))
-        color_groups_base[sup_vars != cah] <-
+        color_groups_base[sup_vars != clust] <-
           vctrs::vec_recycle(color_groups, length(sup_vars) - 1L)
 
         color_groups <- color_groups_base
@@ -463,8 +467,8 @@ ggmca_data <-
         color_groups <- vctrs::vec_recycle(color_groups, length(sup_vars))
       }
 
-      if (length(cah) > 0 ) {
-        color_groups[sup_vars == cah] <- cah_color_groups
+      if (length(clust) > 0 ) {
+        color_groups[sup_vars == clust] <- clust_color_groups
       }
       # print(purrr::set_names(color_groups, sup_vars))
 
@@ -504,23 +508,23 @@ ggmca_data <-
       #Make that, if HCPC is in sup_vars AND in profiles, ggiraph data_id are the same :
       # les deux seront colores lorsqu'on survolera l'un ou l'autre
       #sup_vars_data <- sup_vars_data %>% purrr::imap(~ dplyr::mutate(.x, sup_var = .y))
-      if (length(cah) != 0) {
-        if (cah %in% sup_vars) sup_vars_data <- sup_vars_data |>
-            (\(l) purrr::map_if(l, names(l) == cah,
-                          ~ dplyr::mutate(., cah_id = as.integer(.data$lvs) + 10000L),
-                          .else = ~ dplyr::mutate(., cah_id = NA_integer_)))()
+      if (length(clust) != 0) {
+        if (clust %in% sup_vars) sup_vars_data <- sup_vars_data |>
+            (\(l) purrr::map_if(l, names(l) == clust,
+                          ~ dplyr::mutate(., clust_id = as.integer(.data$lvs) + 10000L),
+                          .else = ~ dplyr::mutate(., clust_id = NA_integer_)))()
       }
 
       #Bind sup_vars data
       sup_vars_data <- sup_vars_data |> dplyr::bind_rows()
 
       # ID numbers to use with ggiraph to highlight elements at hover
-      if (length(cah) != 0) {
-        if (cah %in% sup_vars) {
+      if (length(clust) != 0) {
+        if (clust %in% sup_vars) {
           sup_vars_data <- sup_vars_data |>
-            dplyr::mutate(id = dplyr::if_else(is.na(.data$cah_id),
+            dplyr::mutate(id = dplyr::if_else(is.na(.data$clust_id),
                                               dplyr::row_number(),
-                                              .data$cah_id))
+                                              .data$clust_id))
         } else {
           sup_vars_data <- sup_vars_data |> dplyr::mutate(id = dplyr::row_number())
         }
@@ -780,7 +784,7 @@ ggmca_data <-
       # dplyr::bind_cols(tibble::as_tibble(res.mca$call$X[active_vars]))
 
       # ind_data <-
-      #   tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == cah),
+      #   tibble::as_tibble(res.mca$call$X[c(res.mca$call$quali, which(names(res.mca$call$X) == clust),
       #                                      which(names(res.mca$call$X) %in% sup_vars) )]) %>%
       #   tibble::add_column(row.w = res.mca$call$row.w) %>%
       #   dplyr::bind_cols(tibble::as_tibble(res.mca$ind$coord))
@@ -796,8 +800,8 @@ ggmca_data <-
       # If NA in HCPC clust : for each combination of active_vars, we attribute
       #  the majotity class (>50%)
 
-      if (length(cah) != 0) {
-        #cah_levels <- dplyr::pull(ind_data, !!rlang::sym(cah) ) %>% levels()
+      if (length(clust) != 0) {
+        #clust_levels <- dplyr::pull(ind_data, !!rlang::sym(clust) ) %>% levels()
 
         # ind_data_save <- ind_data
         # ind_data <- ind_data_save
@@ -815,35 +819,35 @@ ggmca_data <-
         #
         # ind_data <- ind_data |>
         #   dplyr::mutate(
-        #        cah_culture = dplyr::if_else(!dplyr::row_number() %in% samp,
-        #                                  cah_culture, factor(NA))
+        #        clust_culture = dplyr::if_else(!dplyr::row_number() %in% samp,
+        #                                  clust_culture, factor(NA))
         #   )
-        # ind_data <- ind_data |> dplyr::mutate(sup1 = cah_culture)
+        # ind_data <- ind_data |> dplyr::mutate(sup1 = clust_culture)
         # sup_vars <- c(sup_vars, "sup1")
 
-        cah_any_NA <- dplyr::pull(ind_data, cah) |> is.na() |> any()
-        if (cah_any_NA) {
-          ind_data <- ind_data |> complete_cah(cah = cah, active_vars = active_vars)
+        clust_any_NA <- dplyr::pull(ind_data, clust) |> is.na() |> any()
+        if (clust_any_NA) {
+          ind_data <- ind_data |> complete_clust(clust = clust, active_vars = active_vars)
         }
-        # data |> tibble::as_tibble() |> tabxplor::tab(cah_culture)
-        # data |> tabxplor::tab(cah, wt = count)
+        # data |> tibble::as_tibble() |> tabxplor::tab(clust_culture)
+        # data |> tabxplor::tab(clust, wt = count)
 
-        cah_levels <- dplyr::pull(ind_data, cah) |> levels()
+        clust_levels <- dplyr::pull(ind_data, clust) |> levels()
 
         ind_data <- ind_data |>
-          dplyr::mutate(!!rlang::sym(cah) := as.character(!!rlang::sym(cah) ) ) |>
+          dplyr::mutate(!!rlang::sym(clust) := as.character(!!rlang::sym(clust) ) ) |>
           tidyr::nest(sup_vars = tidyselect::all_of(sup_vars),
                       row.w    = "row.w",
                       coord    = tidyselect::all_of(coord_names),
-                      cah      = !!rlang::sym(cah)
+                      clust      = !!rlang::sym(clust)
           ) |>
           dplyr::mutate(
             count  = purrr::map_int(.data$row.w, ~ nrow(.)),
 
             wcount = purrr::map_dbl(.data$row.w, ~ sum(., na.rm = TRUE)),
 
-            cah    = purrr::map_chr(.data$cah, ~ dplyr::first(dplyr::pull(., 1))) |>
-              as.factor() |> forcats::fct_relevel(cah_levels)
+            clust    = purrr::map_chr(.data$clust, ~ dplyr::first(dplyr::pull(., 1))) |>
+              as.factor() |> forcats::fct_relevel(clust_levels)
           ) |>
           dplyr::arrange(-.data$wcount)
         # 0.661149 secs (much longer in data.table here)
@@ -854,10 +858,10 @@ ggmca_data <-
 
         ind_data <- ind_data |>
           dplyr::mutate(nb = dplyr::row_number(),
-                        cah_id = as.integer(.data$cah)) |>
-          dplyr::group_by(.data$cah) |>
-          dplyr::mutate(nb_in_cah = dplyr::row_number(),
-                        nb_tot_cah = dplyr::n()) |>
+                        clust_id = as.integer(.data$clust)) |>
+          dplyr::group_by(.data$clust) |>
+          dplyr::mutate(nb_in_clust = dplyr::row_number(),
+                        nb_tot_clust = dplyr::n()) |>
           dplyr::ungroup() |>
           dplyr::mutate(coord = purrr::map(.data$coord, ~ .[1,])) |>
           tidyr::unnest("coord")
@@ -889,16 +893,16 @@ ggmca_data <-
         dplyr::mutate(dplyr::across(where(is.factor), as.character))
 
 
-      if (length(cah) != 0) {
+      if (length(clust) != 0) {
         ind_data <- ind_data |>
           dplyr::mutate(
-            cah_base = .data$cah,
+            clust_base = .data$clust,
             count_base = .data$count,
             wcount_base = .data$wcount,
-            cah        = str_c("<b>Cah: ", .data$cah, "</b>"),
+            clust        = str_c("<b>Cluster: ", .data$clust, "</b>"),
             profile_nb = str_c("<b>Answer profile n",
                                         "\u00b0",
-                                        .data$nb_in_cah, "/", .data$nb_tot_cah, "</b>"),
+                                        .data$nb_in_clust, "/", .data$nb_tot_clust, "</b>"),
             count      = str_c("n: ", format(round(.data$count, 0),
                                                       trim = TRUE, big.mark = " ")),
             # WARNING: compare the *_base columns, not count/wcount. Within one mutate() the
@@ -913,9 +917,9 @@ ggmca_data <-
             )
 
           ) |>
-          tidyr::nest(interactive_text = tidyselect::all_of(c("cah", "profile_nb", "count", "wcount",
+          tidyr::nest(interactive_text = tidyselect::all_of(c("clust", "profile_nb", "count", "wcount",
                                                               active_vars))) |>
-          dplyr::rename("cah" = "cah_base", "count" = "count_base",
+          dplyr::rename("clust" = "clust_base", "count" = "count_base",
                         "wcount" = "wcount_base")
 
       } else {
@@ -943,8 +947,8 @@ ggmca_data <-
       }
 
       ind_data <- ind_data |>
-        dplyr::select(-tidyselect::any_of(c("nb_in_cah", "nb_tot_cah"))) |>
-        dplyr::relocate(tidyselect::any_of(c("nb", "count", "wcount", "cah", "cah_id",
+        dplyr::select(-tidyselect::any_of(c("nb_in_clust", "nb_tot_clust"))) |>
+        dplyr::relocate(tidyselect::any_of(c("nb", "count", "wcount", "clust", "clust_id",
                                              "interactive_text", "sup_vars", "row.w")),
                         .before = 1)
 
@@ -956,7 +960,7 @@ ggmca_data <-
     plot_data <- list("vars_data" = vars_data,
                       "ind_data"  = ind_data,
                       "res.mca"   = list(eig = res.mca$eig, axes_names = res.mca$axes_names),
-                      "cah"       = cah
+                      "clust"       = clust
     )
 
     plot_data
@@ -1067,43 +1071,43 @@ varsup <- function (resmca, var){
 
 
 #' @keywords internal
-complete_cah <- function(data, cah, active_vars, treshold = 0.5) {
+complete_clust <- function(data, clust, active_vars, treshold = 0.5) {
   data.table::setDT(data)
 
 
-group_count <- cah_pct  <- cah_max <- rn <-  cah_counts <- NULL
+group_count <- clust_pct  <- clust_max <- rn <-  clust_counts <- NULL
 
-  # data[, cah_base := eval(str2expression(cah))]
-  data[, cah_counts := .N, by = c(active_vars, cah)]
+  # data[, clust_base := eval(str2expression(clust))]
+  data[, clust_counts := .N, by = c(active_vars, clust)]
   data[, group_count := .N, by = eval(active_vars)]
   data[, rn := 1:.N]
-  data[, cah_pct := dplyr::if_else(
-    !is.na(eval(str2expression(cah))),
-    true  = eval(str2expression("cah_counts"))/eval(str2expression("group_count")),
-    false = eval(str2expression("cah_counts"))/eval(str2expression("group_count")) - 0.01
+  data[, clust_pct := dplyr::if_else(
+    !is.na(eval(str2expression(clust))),
+    true  = eval(str2expression("clust_counts"))/eval(str2expression("group_count")),
+    false = eval(str2expression("clust_counts"))/eval(str2expression("group_count")) - 0.01
     )]
-  data[, cah_max := dplyr::first(eval(str2expression("rn"))) - 1L +
-         dplyr::first(which(eval(str2expression("cah_pct")) >= treshold), default = NA_real_),
+  data[, clust_max := dplyr::first(eval(str2expression("rn"))) - 1L +
+         dplyr::first(which(eval(str2expression("clust_pct")) >= treshold), default = NA_real_),
        by = eval(active_vars)]
-  data[, eval(cah) := eval(str2expression(cah))[eval(str2expression("cah_max"))] ]
+  data[, eval(clust) := eval(str2expression(clust))[eval(str2expression("clust_max"))] ]
 
   # data |>
   #   dplyr::mutate(group = paste0(!!!rlang::syms(active_vars)) |>
   #                   forcats::as_factor() |> as.integer()) |>
   #   dplyr::select(group,
-  #                 group_count, cah_counts, cah_base, cah_culture, cah_pct,
-  #                 cah_max ) |>
+  #                 group_count, clust_counts, clust_base, clust_culture, clust_pct,
+  #                 clust_max ) |>
   #   tibble::as_tibble() |>
   #   tabxplor::new_tab() |>
-  #   dplyr::filter(cah_pct < 1)  |>
+  #   dplyr::filter(clust_pct < 1)  |>
   #   dplyr::group_by(group) |>
   #   dplyr::arrange(.by_group = TRUE) |>
   #   print(n = 900)
 
-  data[, cah_counts := NULL]
+  data[, clust_counts := NULL]
   data[, group_count := NULL]
-  data[, cah_pct := NULL]
-  data[, cah_max := NULL]
+  data[, clust_pct := NULL]
+  data[, clust_max := NULL]
   data[, rn := NULL]
 
   data.table::setDF(data)

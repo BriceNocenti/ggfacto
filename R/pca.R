@@ -1,8 +1,9 @@
-# PURPOSE: The PCA entry point and its 2D graph -- PCA2(), ggpca_cor_circle(), plus the shared
-#   projector PCA_ind.sup_coord().
-# ROLE: PCA2() is the tidyselect ingress normaliser (row and column weights, supplementary and
-#   named individuals); ggpca_cor_circle() draws the correlation circle. PCA_ind.sup_coord()
-#   projects arbitrary raw rows into principal space and is shared with R/pca-3d.R.
+# PURPOSE: The PCA entry point and its 2D graph -- principal_component_analysis() (alias PCA2()),
+#   ggpca_cor_circle(), the shared projector PCA_ind.sup_coord(), and the deprecated mean_sd_tab().
+# ROLE: principal_component_analysis() is the tidyselect ingress normaliser (row and column weights,
+#   supplementary and named individuals, and the source rows R/ingress.R records);
+#   ggpca_cor_circle() draws the correlation circle. PCA_ind.sup_coord() projects arbitrary raw rows
+#   into principal space and is shared with R/pca-3d.R.
 # KEY CONSTRAINTS:
 #   - ggpca_cor_circle(interactive = TRUE), the default, calls ggi() itself and returns a girafe
 #     widget, not a ggplot. Pass interactive = FALSE to get a `+`-able object.
@@ -12,11 +13,13 @@
 
 #' Principal Component Analysis
 #' @description A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to
-#'  work better with \pkg{ggfacto} functions like \code{\link{ggpca_cor_circle}}.
-#'  All variables can be selected by many different expressions, in the way of
-#'  the `tidyverse`. No supplementary vars are to be provided here,
-#'  since they can be added afterward.
-#' @param data The data frame.
+#'  work with \pkg{ggfacto} functions like \code{\link{ggpca_cor_circle}},
+#'  \code{\link{pca_interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
+#'  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
+#'  function.
+#' @param data The data frame. To analyse a subset of the population, filter it inside the call with
+#'  the native pipe, `data |> dplyr::filter(...) |> principal_component_analysis(...)`: the analysis
+#'  then remembers which rows it used, for \code{\link{hierarchical_clust}}.
 #' @param active_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The names
 #'  of the active variables.
 #' @param wt The name of the row weight variable
@@ -28,40 +31,32 @@
 #' @param ind.sup A vector indicating the indexes of the supplementary individuals.
 #' @param ncp Number of dimensions kept in the results. All of them by default: the eigenvalue
 #'   table is how one chooses how many axes to interpret, and a truncated one cannot show the drop.
-#'   Lower it only to feed \code{FactoMineR::HCPC()}, which clusters on the axes kept.
+#'   To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp`.
 #' @param graph A boolean, set to `TRUE` to display the base graph.
 #' @param ... Additional arguments to pass to \code{\link[FactoMineR]{PCA}}.
 #'
-#' @return A `res.pca` object, with all the data necessary to draw the PCA.
+#' @return A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which records the
+#'  rows of `data` that were analysed.
 #' @export
 #'
 #' @examples
 #' active_vars <- c("mpg", "cyl", "hp", "drat", "qsec")
-#' res.pca <- PCA2(mtcars, tidyselect::all_of(active_vars) )
-#'
-PCA2 <- function(data, active_vars, wt, col.w = NULL, ind_name, scale.unit = TRUE,
-                 ind.sup = NULL, ncp = Inf, graph = FALSE, ...) {
+#' res.pca <- principal_component_analysis(mtcars, tidyselect::all_of(active_vars))
+#' pca_interpret(res.pca)
+principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, ind_name,
+                                         scale.unit = TRUE, ind.sup = NULL, ncp = Inf,
+                                         graph = FALSE, ...) {
+  # WARNING: the caller's frame is captured HERE, before any promise is forced: rlang::caller_env()
+  #   evaluated lazily inside source_rows() would name the wrong frame.
+  expr   <- rlang::enexpr(data)
+  env    <- rlang::caller_env()
+  source <- source_rows(expr, env, data)
   active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
 
   wt <- if (missing(wt)) {character()} else {as.character(rlang::ensym(wt))}
   stopifnot(length(wt) <= 1)
   stopifnot(is.integer(ind.sup) | is.null(ind.sup))
 
-  # if(length(col.w) == 0) {
-  #   col.w <- NULL
-  #
-  # } else if (all(is.na(col.w))) {
-  #   col.w <- NULL
-  #
-  # } else {
-  #   col.w <- tidyr::replace_na(col.w, 1L)
-  # }
-
-
-  # ind.sup <- rlang::enquo(ind.sup)
-
-
-  # vars <- active_vars #c(active_vars, sup_vars, sup_quanti)
   wt   <- if (length(wt) != 0) { data[[wt]] } else {NULL}
 
   if (!missing(ind_name)) {
@@ -83,16 +78,21 @@ PCA2 <- function(data, active_vars, wt, col.w = NULL, ind_name, scale.unit = TRU
 
   if (length(ind.sup) > 0) wt <- wt[-ind.sup]
 
-
-  FactoMineR::PCA(data,
-                  scale.unit = scale.unit,
-                  ncp = ncp,
-                  row.w = wt,
-                  graph = graph,
-                  ind.sup = ind.sup,
-                  col.w = col.w,
-                  ...)
+  res <- FactoMineR::PCA(data,
+                         scale.unit = scale.unit,
+                         ncp = ncp,
+                         row.w = wt,
+                         graph = graph,
+                         ind.sup = ind.sup,
+                         col.w = col.w,
+                         ...)
+  res$source <- source
+  res
 }
+
+#' @rdname principal_component_analysis
+#' @export
+PCA2 <- principal_component_analysis
 
 #' Correlation Circle Plot for Principal Component Analysis
 #'
@@ -339,4 +339,74 @@ PCA_ind.sup_coord <- function(X.ind.sup, res.pca, center = TRUE) { #no_sd = FALS
   colnames(coord.ind.sup) <- paste("Dim", c(1:ncol(coord.ind.sup)), sep = ".")
   coord.ind.sup
 
+}
+
+
+#' Simple Mean and SD Summary (deprecated)
+#'
+#' @description
+#' One row per numeric variable: its base, its mean, its standard deviation, and its coefficient of
+#' variation --- the standard deviation as a percentage of the mean, which is what lets two variables
+#' measured in different units be compared for how dispersed they are.
+#'
+#' \strong{Deprecated}: \code{\link{pca_interpret}} now opens with the same three figures, taken
+#' from the analysis itself, so the description and the interpretation are one table and cannot
+#' disagree. Use it instead; this function still works and will be removed in a future release.
+#'
+#' @param data A data.frame.
+#' @param vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The names of the
+#' numeric variables to compute means and sds with.
+#' @param wt The name of the weight variable, if needed.
+#'
+#' @return A \code{tabxplor} table --- see [ggfacto_summary] for how it prints.
+#' @export
+#' @seealso [ggfacto_summary], [pca_interpret()].
+#'
+#' @examples
+#' mean_sd_tab(mtcars, 1:7)
+mean_sd_tab <- function(data, vars, wt) {
+  deprecated_fn("mean_sd_tab", "pca_interpret")
+  vars <- names(tidyselect::eval_select(rlang::enquo(vars), data))
+
+  not_num <- data |>
+    dplyr::select(tidyselect::all_of(vars)) |>
+    purrr::map_lgl(~ !is.numeric(.))
+
+  if(any(not_num)) {
+    stop(paste0("some vars are not numeric: ",
+                paste0(names(not_num)[not_num], collapse = ", ")
+    ))
+  }
+
+  w <- if (missing(wt)) NULL else dplyr::pull(data, !!rlang::ensym(wt))
+
+  stats <- purrr::map_dfr(purrr::set_names(vars), function(v) {
+    x  <- dplyr::pull(data, tidyselect::all_of(v))
+    ok <- !is.na(x)
+    if (is.null(w)) {
+      tibble::tibble(n = sum(ok), mean = mean(x[ok]), var = stats::var(x[ok]))
+    } else {
+      tibble::tibble(n = sum(ok),
+                     mean = stats::weighted.mean(x, w = w, na.rm = TRUE),
+                     var  = weighted.var(x, wt = w, na.rm = TRUE))
+    }
+  }, .id = "variables")
+
+  # ONE `fmt` record per variable, printed three times: the mean, then the two quantities tabxplor
+  # DERIVES from the same variance -- the standard deviation and the coefficient of variation. Nothing
+  # is stored twice, and the three columns cannot disagree.
+  col <- function(display, digits) tabxplor::fmt(
+    n = stats$n, scale = "level_mean", mean = stats$mean, var = stats$var,
+    color = "no", display = display, digits = digits)
+
+  out <- tibble::tibble(
+    "variables" = tabxplor::new_lvl(forcats::as_factor(stats$variables), role = "level"),
+    "n"         = tabxplor::fmt(n = stats$n, scale = "level_n", color = "no"),
+    "mean"      = col("mean", 2L),
+    "sd"        = col("sd"  , 2L),
+    "sd/mean"   = col("cv"  , 0L)
+  )
+
+  gda_summary(tabxplor::new_tab(out, meta = list(render_extras = list(n = "no"))),
+              glossary = gda_cv_line())
 }

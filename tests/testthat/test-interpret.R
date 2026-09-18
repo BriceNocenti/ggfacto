@@ -544,8 +544,47 @@ test_that("an export shows the bare column name under its axis span", {
   # The suffix tabxplor strips (tab_col_var_header) is what lets the tibble keep unique names while
   # html, markdown and Excel show "coord" under an "Axe 1" span.
   h <- as.character(ggfacto:::gda_render(pca_interpret(fx_pca(), axes = 1:2), "html"))
-  expect_true(grepl(">Axe 1</th>", h, fixed = TRUE))
+  # tabxplor sets a span header's spaces as narrow no-break spaces in html
+  expect_true(grepl(">Axe[ \u202f]1</th>", h))
   expect_true(grepl(">coord</th>", h, fixed = TRUE))
   expect_false(grepl("coord_Axe", h, fixed = TRUE))
   expect_true(grepl(">sd/mean</th>", h, fixed = TRUE))
+})
+
+
+# --- mean_sd_tab ---------------------------------------------------------------------------------
+
+test_that("mean_sd_tab reports one row per variable", {
+  tab <- suppressWarnings(mean_sd_tab(mtcars, 1:7))
+  expect_s3_class(tab, "tbl_df")
+  expect_equal(nrow(tab), 7L)
+  expect_identical(names(tab), c("variables", "n", "mean", "sd", "sd/mean"))
+})
+
+test_that("mean_sd_tab's unweighted mean and sd match base R", {
+  tab <- suppressWarnings(mean_sd_tab(mtcars, tidyselect::all_of("mpg")))
+  expect_equal(tab$mean$mean, mean(mtcars$mpg))
+  expect_equal(sqrt(tab$sd$var), stats::sd(mtcars$mpg))
+  # ONE record, printed three times: the sd and the cv are DERIVED from the same variance
+  expect_identical(tab$mean$var, tab$sd$var)
+  expect_identical(unique(tab$sd$display), "sd")
+  expect_identical(unique(tab[["sd/mean"]]$display), "cv")
+})
+
+test_that("weighting mean_sd_tab changes the mean it reports", {
+  # The weighted branch uses stats::weighted.mean and weighted.var from R/utils.R; a weight that is
+  # silently dropped would leave the two identical.
+  d <- mtcars[1:7]
+  d$w <- rep(c(0.5, 1.5), length.out = nrow(d))
+  expect_false(identical(as.character(suppressWarnings(mean_sd_tab(d, 1:7))),
+                         as.character(suppressWarnings(mean_sd_tab(d, 1:7, wt = "w")))))
+})
+
+# *Silent failure guarded: a function retired in the documentation and nowhere else.*
+test_that("mean_sd_tab() says it is retired, and names its replacement", {
+  # the notice fires ONCE per session, so the register is cleared first -- an earlier call in this
+  # file has already spent it.
+  e <- ggfacto:::deprecated_args_warned
+  rm(list = ls(envir = e), envir = e)
+  expect_warning(mean_sd_tab(mtcars, 1:3), "pca_interpret")
 })

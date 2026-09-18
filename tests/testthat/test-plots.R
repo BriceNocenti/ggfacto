@@ -96,7 +96,7 @@ test_that("xlim/ylim and text_repel build, which a plain call does not reach", {
 test_that("profiles and ellipses build", {
   local_null_device()
   expect_no_error(ggplot2::ggplot_build(
-    quietly(ggmca(fx_mca(), fx_tea_clust(), cah = "clust", profiles = TRUE))))
+    quietly(ggmca(fx_mca(), fx_tea_clust(), clust = "clust", profiles = TRUE))))
   expect_no_error(ggplot2::ggplot_build(
     quietly(ggmca(fx_mca(), fx_tea(), sup_vars = "SPC", profiles = TRUE, ellipses = 0.5))))
 })
@@ -174,11 +174,11 @@ test_that("ggi and ggsave2 tolerate a plain ggplot, which carries no hints at al
 test_that("hover ids are banded so a whole cluster lights up together", {
   # Active variables from 1000, HCPC clusters and answer profiles from 10000: every point of one
   # cluster shares an id, which is what makes hovering any of them highlight them all.
-  plot_data <- fx_pd_cah()
+  plot_data <- fx_pd_clust()
   actives <- plot_data$vars_data$id[plot_data$vars_data$color_group == "active_vars"]
   expect_true(all(actives >= 1000L))
-  cah_ids <- plot_data$vars_data$cah_id[!is.na(plot_data$vars_data$cah_id)]
-  expect_true(all(cah_ids >= 10000L))
+  clust_ids <- plot_data$vars_data$clust_id[!is.na(plot_data$vars_data$clust_id)]
+  expect_true(all(clust_ids >= 10000L))
 })
 
 # --- 3D, behind Suggests ------------------------------------------------------------------------

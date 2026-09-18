@@ -118,10 +118,10 @@ test_that("a profile tooltip lists the answers the profile is made of", {
   expect_gte(ncol(nested), length(fx_active()))
 })
 
-test_that("a cah profile tooltip names its cluster and its rank within it", {
-  ind <- fx_pd_cah()$ind_data
+test_that("a clust profile tooltip names its cluster and its rank within it", {
+  ind <- fx_pd_clust()$ind_data
   txt <- paste(unlist(ind$interactive_text[[1]]), collapse = " ")
-  expect_match(txt, "Cah")
+  expect_match(txt, "Cluster")
 })
 
 # --- golden ------------------------------------------------------------------------------------

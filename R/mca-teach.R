@@ -22,8 +22,10 @@
 #' analysis is done. To see initial dimensions axes in the space built by the
 #' analysis (principal axes), use \code{\link[ggfacto]{ggmca_with_base_ref}}.
 #'
-#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-#' @param data The data in which to find the supplementary variables, etc.
+#' @param res.mca An object created with \code{\link{multiple_correspondence_analysis}} or
+#' \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param data Optionally, the data frame the analysis was made on, whose order of levels is then
+#' used.
 #' @param proj_just Horizontal justification of text of the coordinates on axes,
 #' as a character vector of length 2 (x and y).
 #' @param cleannames Set to \code{TRUE} to clean levels names, by removing
@@ -39,8 +41,8 @@
 #' @examples
 #' \donttest{
 #' data(tea, package = "FactoMineR")
-#' res.mca <- MCA2(tea, active_vars = 1:18)
-#' ggmca_initial_dims(res.mca, data = tea)
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
+#' ggmca_initial_dims(res.mca, tea)
 #' }
 ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
                                cleannames = TRUE, keep = NULL) {
@@ -51,11 +53,12 @@ ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
 
   active_vars <- str_c(colnames(res.mca$call$X)[1:length(res.mca$call$quali)])
 
-  active_var_levels <- purrr::map(active_vars, ~ dplyr::pull(data, .) |>
-                                    as.factor() |>
-                                    forcats::fct_na_value_to_level("NA") |>
-                                    levels()
-  ) |>
+  # the order of the levels is the data's own; a missing answer is named as MCA2() names it
+  has_data <- !missing(data)
+  active_var_levels <- purrr::map(active_vars, function(v) {
+    x <- if (has_data) data[[v]] else res.mca$call$X[[v]]
+    levels(forcats::fct_na_value_to_level(as.factor(x), str_c(v, ".NA")))
+  }) |>
     purrr::set_names(active_vars) |>
     purrr::imap_dfr(~ tibble::tibble(vars = .y, lvs2 = .x))  |>
     dplyr::mutate(vars = forcats::as_factor(.data$vars))
@@ -377,7 +380,7 @@ ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
 #' @examples
 #' \donttest{
 #' data(tea, package = "FactoMineR")
-#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
 #' ggmca_with_base_ref(res.mca)
 #'
 #' # It is more readable to select just a few active variables
@@ -556,7 +559,7 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
       "vars", "lvs", "freq", #"wcount",
       "Dim 1", "Dim 2", "start_Dim 1", "start_Dim 2", "proj1", "proj2",
       tidyselect::everything() & -tidyselect::any_of(
-        c("color_group", "id", "cah_id", "interactive_text", "face")
+        c("color_group", "id", "clust_id", "interactive_text", "face")
       )
     )
 
@@ -581,7 +584,7 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
   acm_orga_from_base_ref |>
     ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
     theme_facto(res.mca, no_color_scale = TRUE) +
-    #acm_orga_1_cah$graph_theme_acm +
+    #acm_orga_1_clust$graph_theme_acm +
     ggplot2::geom_point(
       data = tibble::tibble(!!dim1 := 0, !!dim2 := 0),
       color = "black", fill = "#eeeeee", shape = 3, size = 5,

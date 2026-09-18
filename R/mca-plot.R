@@ -22,7 +22,7 @@
 ggmca_plot <- function(plot_data,
                        axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
                        type = c("text", "points", "labels", "active_vars_only", "facets"),
-                       text_repel = FALSE, title, ellipses = NULL,
+                       text_repel = TRUE, title, ellipses = NULL,
                        actives_in_bold = NULL, sup_in_italic = FALSE,
                        xlim, ylim, out_lims_move = FALSE,
                        color_profiles = TRUE, base_profiles_color = "#aaaaaa",
@@ -44,7 +44,7 @@ ggmca_plot <- function(plot_data,
   #active_vars_data <- plot_data$active_vars_data
   #sup_vars_data    <- plot_data$sup_vars_data
   #mean_point_data  <- plot_data$mean_point_data
-  cah              <- plot_data$cah
+  clust              <- plot_data$clust
   sup_vars         <- vars_data |>
     dplyr::filter(!.data$color_group %in% c("active_vars", "Central point")) |>
     dplyr::pull("vars") |> unique()
@@ -60,18 +60,18 @@ ggmca_plot <- function(plot_data,
   contrib2 <- rlang::sym(str_c("contrib", axes[2]))
 
   # if (length(color_profiles) == 0) {
-  #   if (length(cah) != 0) {
-  #     color_profiles <- levels(as.factor(dplyr::pull(ind_data, cah)))
+  #   if (length(clust) != 0) {
+  #     color_profiles <- levels(as.factor(dplyr::pull(ind_data, clust)))
   #   } else {
   #     color_profiles <- character()
   #   }
   #
   # } else {
-  if (length(cah) > 0 & !is.null(ind_data)) {
+  if (length(clust) > 0 & !is.null(ind_data)) {
     if (is.logical(color_profiles)) if (! color_profiles) {
       color_profiles <- character()
     } else {
-      color_profiles <- levels(as.factor(dplyr::pull(ind_data, cah)))
+      color_profiles <- levels(as.factor(dplyr::pull(ind_data, clust)))
     }
     #}
   }
@@ -282,7 +282,7 @@ ggmca_plot <- function(plot_data,
     #     str_remove_all("\n#")
     #   )
 
-    if (length(cah) != 0) { #& type[1] != "facets"
+    if (length(clust) != 0) { #& type[1] != "facets"
 
       if (length(color_profiles) == 0 ) {
         if (!is.null(base_profiles_color) ) {
@@ -295,7 +295,7 @@ ggmca_plot <- function(plot_data,
           profiles <- ggiraph::geom_point_interactive(
             data = profiles_coord,
             ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
-                         tooltip = .data$interactive_text, data_id = .data$cah_id + 10000),
+                         tooltip = .data$interactive_text, data_id = .data$clust_id + 10000),
             color = base_profiles_color, na.rm = TRUE, inherit.aes = FALSE,
             show.legend = FALSE, alpha = alpha_profiles
           )
@@ -305,36 +305,36 @@ ggmca_plot <- function(plot_data,
 
 
       } else {
-        ind_cah_levels <- ind_data |> dplyr::pull(cah) |> unique() |>
+        ind_clust_levels <- ind_data |> dplyr::pull(clust) |> unique() |>
           purrr::discard(is.na) |> purrr::discard(\(x) x == "NA")
 
-        not_in_color_profiles <- ind_cah_levels |>
+        not_in_color_profiles <- ind_clust_levels |>
           purrr::discard(\(x) x %in% color_profiles) |>
           (\(v) purrr::set_names(v, rep("base_profiles_color", length(v))))()
 
-        if (cah %in% sup_vars) {
-          sup_cah_colorvar <- vars_data |>
+        if (clust %in% sup_vars) {
+          sup_clust_colorvar <- vars_data |>
             dplyr::select("lvs", "color_group") |>
-            dplyr::filter(str_detect(.data$color_group, paste0("^", cah))) |>
+            dplyr::filter(str_detect(.data$color_group, paste0("^", clust))) |>
             dplyr::mutate(color_group = .data$lvs |> purrr::set_names(.data$color_group)) |>
             dplyr::pull("color_group") |>
             forcats::fct_drop()
 
-          sup_cah_colorvar <- purrr::set_names(as.character(sup_cah_colorvar),
-                                               names(sup_cah_colorvar))
+          sup_clust_colorvar <- purrr::set_names(as.character(sup_clust_colorvar),
+                                               names(sup_clust_colorvar))
 
-          color_profiles_in_colorvar <- sup_cah_colorvar |>
-            purrr::keep(\(x) x %in% ind_cah_levels) |>
+          color_profiles_in_colorvar <- sup_clust_colorvar |>
+            purrr::keep(\(x) x %in% ind_clust_levels) |>
             purrr::keep(\(x) x %in% color_profiles)
 
           color_profiles_not_in_colorvar <- color_profiles |>
-            purrr::keep(\(x) x %in% ind_cah_levels) |>
-            purrr::discard(\(x) x %in% sup_cah_colorvar)
+            purrr::keep(\(x) x %in% ind_clust_levels) |>
+            purrr::discard(\(x) x %in% sup_clust_colorvar)
 
         } else {
           color_profiles_in_colorvar <- character()
           color_profiles_not_in_colorvar <-  color_profiles |>
-            purrr::keep(\(x) x %in% ind_cah_levels)
+            purrr::keep(\(x) x %in% ind_clust_levels)
         }
 
 
@@ -376,15 +376,15 @@ ggmca_plot <- function(plot_data,
           unnamed_color_profiles <- character()
         }
 
-        cah_colorvar_recode <- named_color_profiles |>
+        clust_colorvar_recode <- named_color_profiles |>
           append(unnamed_color_profiles) |>
           append(not_in_color_profiles) |>
           append(color_profiles_in_colorvar)
 
 
         ind_data <- ind_data |>
-          dplyr::mutate(color_group = forcats::fct_recode(.data$cah,
-                                                          !!!cah_colorvar_recode))
+          dplyr::mutate(color_group = forcats::fct_recode(.data$clust,
+                                                          !!!clust_colorvar_recode))
         # ind_data |> dplyr::select(color_group) |> print(n = 40)
 
         #Discard the points that are out of limits
@@ -396,13 +396,13 @@ ggmca_plot <- function(plot_data,
           data = profiles_coord,
           ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount,
                        tooltip = .data$interactive_text,
-                       data_id = .data$cah_id + 10000, color = .data$color_group),
+                       data_id = .data$clust_id + 10000, color = .data$color_group),
           na.rm = TRUE, inherit.aes = FALSE, show.legend = FALSE,
           alpha = alpha_profiles, stroke = 0
         )
       }
 
-    } else { # If length(cah) == 0
+    } else { # If length(clust) == 0
       if (!is.null(base_profiles_color) ) {
 
         #Discard the points that are out of limits
@@ -462,7 +462,7 @@ ggmca_plot <- function(plot_data,
                                                         group = .data$lvs, data_id = .data$id),
                                            color = "black",
                                            stat = "ellipse",
-                                           type = "t", level = ellipses, size = 1,
+                                           type = "t", level = ellipses, linewidth = 1,
                                            segments = 360, alpha = 1, inherit.aes = FALSE)
           } else {
             ggplot2::geom_path(data = ellipses_coord,
@@ -470,7 +470,7 @@ ggmca_plot <- function(plot_data,
                                             group = .data$lvs,
                                             color = .data$color_group),
                                stat = "ellipse",
-                               type = "t", level = ellipses, size = 1,
+                               type = "t", level = ellipses, linewidth = 1,
                                segments = 360, alpha = 1, inherit.aes = FALSE)
           }
 
@@ -551,10 +551,19 @@ ggmca_plot <- function(plot_data,
     title_graph <- NULL
   }
 
+  # WARNING: with no supplementary variable, "points" and "labels" map no colour at all (the active
+  #   levels are drawn in fixed black): their sup layers are not built, and neither is the manual
+  #   scale, which ggplot2 would otherwise warn shares no level with the (empty) data.
+  sup_data <- dplyr::filter(vars_data, .data$color_group != "active_vars")
+  has_sup  <- nrow(sup_data) != 0
+  colour_scale <- if (has_sup || !type[1] %in% c("points", "labels")) {
+    ggplot2::scale_colour_manual(values = scale_color_named_vector,
+                                 aesthetics = c("colour", "fill"))
+  }
+
   graph_theme_acm <-
     list(theme_acm_with_lims,
-         ggplot2::scale_colour_manual(values = scale_color_named_vector,
-                                      aesthetics = c("colour", "fill")),
+         colour_scale,
          ggplot2::theme(plot.margin = ggplot2::margin(r = right_margin,
                                                       unit = "cm")),
          title_graph)
@@ -599,13 +608,13 @@ ggmca_plot <- function(plot_data,
   #The final plots
   if (type[1] == "text") {
 
-    if (length(cah) > 0 ) {
-      cah_data  <- vars_data |> dplyr::filter(.data$vars == cah)
-      vars_data <- vars_data |> dplyr::filter(.data$vars != cah)
+    if (length(clust) > 0 ) {
+      clust_data  <- vars_data |> dplyr::filter(.data$vars == clust)
+      vars_data <- vars_data |> dplyr::filter(.data$vars != clust)
       if (text_repel == FALSE) {
-        graph_cah <-
+        graph_clust <-
           ggiraph::geom_label_interactive(
-            data = cah_data,
+            data = clust_data,
             ggplot2::aes(label = .data$lvs, color = .data$color_group,
                          tooltip = .data$interactive_text),
             fill = grDevices::rgb(1, 1, 1, alpha = 0.9),
@@ -613,10 +622,10 @@ ggmca_plot <- function(plot_data,
           )
 
       } else {
-        graph_cah <-
+        graph_clust <-
           # list(
           # geom_segment(
-          #   data = acm_cah |>
+          #   data = acm_clust |>
           #     mutate(!!dim1 = pmin(1.3, pmax(!!dim1, -0.9)),
           #            !!dim2 = pmin(1.3, pmax(!!dim2, -0.85)),
           #            start1  = pmin(0.95, pmax(!!dim1, -0.5)),
@@ -627,7 +636,7 @@ ggmca_plot <- function(plot_data,
           #   arrow = ggplot2::arrow(length = ggplot2::unit(0.3, "lines")), na.rm = TRUE
         # ),
         ggiraph::geom_label_repel_interactive(
-          data = cah_data,
+          data = clust_data,
           ggplot2::aes(label = .data$lvs, color = .data$color_group,
                        tooltip = .data$interactive_text),
           fill = grDevices::rgb(1, 1, 1, alpha = 0.9),
@@ -639,7 +648,7 @@ ggmca_plot <- function(plot_data,
         #)
       }
     } else {
-      graph_cah <- NULL
+      graph_clust <- NULL
     }
 
     if (text_repel == FALSE) {
@@ -665,7 +674,7 @@ ggmca_plot <- function(plot_data,
       ggplot2::ggplot(vars_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
                                    color = .data$color_group, data_id = .data$id)) +
-      graph_theme_acm + profiles + ellipses + graph_text + graph_cah +
+      graph_theme_acm + profiles + ellipses + graph_text + graph_clust +
       mean_point_graph
 
 
@@ -673,23 +682,25 @@ ggmca_plot <- function(plot_data,
 
   } else if (type[1] == "points") {
     #If active vars too, points in gray
-
-    plot_output <-
-      ggplot2::ggplot(dplyr::filter(vars_data, .data$color_group != "active_vars"),
-                      ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
-                                   color = .data$color_group, data_id = .data$id)) +
-      graph_theme_acm + profiles + active_graph + ellipses +
+    sup_points <- if (has_sup) list(
       ggiraph::geom_text_repel_interactive(
         ggplot2::aes(color = .data$colorvar_names, tooltip = .data$interactive_text),
         size = text_size, hjust = "left",  segment.alpha = 0.2, #segment.colour = "black",
         direction = "both", nudge_x = dist_labels[1], point.padding = 0.25,
         na.rm = TRUE, fontface = "plain"
-      ) + # ifelse(names_darker == TRUE, "plain", "bold")
+      ),
       ggiraph::geom_point_interactive(
         ggplot2::aes(size = .data$wcount, fill = .data$color_group,
                      tooltip = .data$interactive_text),
         shape = 18, na.rm = TRUE
-      ) +
+      )
+    )
+
+    plot_output <-
+      ggplot2::ggplot(sup_data,
+                      ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
+                                   color = .data$color_group, data_id = .data$id)) +
+      graph_theme_acm + profiles + active_graph + ellipses + sup_points +
       mean_point_graph
 
     # css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
@@ -717,10 +728,10 @@ ggmca_plot <- function(plot_data,
         ) #point.padding = 0, segment.colour = "black"
     }
     plot_output <-
-      ggplot2::ggplot(dplyr::filter(vars_data, .data$color_group != "active_vars"),
+      ggplot2::ggplot(sup_data,
                       ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
                                    color = .data$color_group, data_id = .data$id)) +
-      graph_theme_acm + profiles + active_graph + ellipses + graph_labels +
+      graph_theme_acm + profiles + active_graph + ellipses + (if (has_sup) graph_labels) +
       mean_point_graph
 
 

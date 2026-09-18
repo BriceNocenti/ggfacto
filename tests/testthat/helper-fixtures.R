@@ -26,11 +26,11 @@ fx_tea <- function() fx("tea", function() {
 # items is the ordinary MCA input, and it is the shape that used to break ggmca_initial_dims().
 fx_active <- function() names(fx_tea())[1:6]
 
-# tea plus an HCPC cluster column, which is what `cah =` names. Clusters are a column of the data,
+# tea plus an HCPC cluster column, which is what `clust =` names. Clusters are a column of the data,
 # never the HCPC object itself.
 fx_tea_clust <- function() fx("tea_clust", function() {
   d <- fx_tea()
-  d$clust <- FactoMineR::HCPC(fx_mca(), nb.clust = 4, graph = FALSE)$data.clust$clust
+  d$clust <- hierarchical_clust(fx_mca(), ncp = 3, nb.clust = 4, tree = FALSE)
   d
 })
 
@@ -42,10 +42,25 @@ fx_tea_wt <- function() fx("tea_wt", function() {
   d
 })
 
+# tea with missing answers in two active variables, so the `<VAR>.NA` levels and `excl = NA` have
+# something to act on.
+fx_tea_na <- function() fx("tea_na", function() {
+  d <- fx_tea()
+  d$breakfast[1:20] <- NA
+  d$lunch[10:40]    <- NA
+  d
+})
+
 # --- the analyses ------------------------------------------------------------------------------
 
 fx_mca    <- function() fx("mca",    function() MCA2(fx_tea(), 1:6))
 fx_mca_wt <- function() fx("mca_wt", function() MCA2(fx_tea_wt(), 1:6, wt = "w"))
+
+# An MCA of a SUBSET, piped from a named data frame: it records which of its rows it analysed.
+fx_mca_young <- function() fx("mca_young", function() {
+  d <- fx_tea()
+  d |> dplyr::filter(age < 30) |> multiple_correspondence_analysis(1:6)
+})
 
 fx_pca <- function() fx("pca", function() {
   d <- mtcars[1:7]; names(d)[names(d) == "wt"] <- "weight"
@@ -74,8 +89,8 @@ fx_pd_plain    <- function() fx_pd("plain",    fx_mca(), fx_tea())
 fx_pd_active   <- function() fx_pd("active",   fx_mca(), fx_tea(), active_tables = "active")
 fx_pd_sup      <- function() fx_pd("sup",      fx_mca(), fx_tea(), sup_vars = "SPC")
 fx_pd_profiles <- function() fx_pd("profiles", fx_mca(), fx_tea(), profiles = TRUE)
-fx_pd_cah      <- function() fx_pd("cah",      fx_mca(), fx_tea_clust(),
-                                   cah = "clust", profiles = TRUE)
+fx_pd_clust    <- function() fx_pd("clust",    fx_mca(), fx_tea_clust(),
+                                 clust = "clust", profiles = TRUE)
 
 # --- drawing -----------------------------------------------------------------------------------
 

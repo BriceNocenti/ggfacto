@@ -1175,7 +1175,7 @@ ggpca_3d <- function(res.pca, axes = c(1, 2, 3),
     )
 
   } else if (!D2) {
-    scenes <- list("scene" = dplyr::case_when(
+    scenes <- list("scene" = first_case(
       view == plan12   ~ list(
         xaxis = axes_params[[axes[1]]],
         yaxis = axes_params[[axes[2]]],

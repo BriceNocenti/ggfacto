@@ -12,7 +12,7 @@ ggca(
   ylim,
   out_lims_move = FALSE,
   type = c("points", "text", "labels"),
-  text_repel = FALSE,
+  text_repel = TRUE,
   uppercase = "col",
   tooltips = c("row", "col"),
   rowtips_subtitle = "Row pct",
@@ -30,7 +30,8 @@ ggca(
 )
 }
 \arguments{
-\item{res.ca}{An object created with \code{FactoMineR::\link[FactoMineR]{CA}}.}
+\item{res.ca}{An object created with \code{\link{correspondence_analysis}} or
+\code{FactoMineR::\link[FactoMineR]{CA}}.}
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 
@@ -49,9 +50,9 @@ as double vectors of length 2.}
   \item \code{"labels"} : colored labels
 }}
 
-\item{text_repel}{When \code{TRUE} the graph is not interactive anymore,
-but the resulting image is better to print because points and labels don't
-overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
+\item{text_repel}{By default, labels are moved so that they do not overlap, with
+\code{ggrepel::\link[ggrepel]{geom_text_repel}}. Set to \code{FALSE} to print each label
+exactly at its point, which is faster to draw.}
 
 \item{uppercase}{Print \code{"row"} var or \code{"col"} var labels with
 uppercase.}
@@ -103,20 +104,12 @@ theme or add another plot elements with +. Then, interactive
 tooltips won't appear until you pass the result through \code{\link{ggi}}.
 }
 \examples{
-# Make the correspondence analysis :
 \donttest{
-tabs <- as.matrix(tabxplor::tab(forcats::gss_cat, race, marital))
-res.ca <- FactoMineR::CA(tabs, graph = FALSE)
+tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
+res.ca  <- correspondence_analysis(tableau)
 
 # Interactive plot :
-graph.ca <- ggca(res.ca,
-                 title = "Race by marital : correspondence analysis",
-                 tooltips = c("row", "col"))
-ggi(graph.ca) #to make the plot interactive
-
-# Image plot :
-ggca(res.ca,
-     title = "Race by marital status: correspondence analysis",
-     text_repel = TRUE)
-     }
+graph.ca <- ggca(res.ca, title = "Race by marital status: correspondence analysis")
+ggi(graph.ca) # to make the plot interactive
+}
 }

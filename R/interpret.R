@@ -1,5 +1,5 @@
 # PURPOSE: the interpretation tables -- mca_interpret(), ca_interpret(), pca_interpret(), and the
-#   contract they share with HCPC_tab() and mean_sd_tab().
+#   contract they share with clust_tab() and mean_sd_tab().
 # ROLE: reading a factorial analysis WITHOUT the cloud: which points build an axis, on which side,
 #   and how well the axis represents them. One family, one output contract.
 # KEY CONSTRAINTS:
@@ -45,7 +45,7 @@
 #'
 #' @description
 #' \code{\link{mca_interpret}}, \code{\link{ca_interpret}}, \code{\link{pca_interpret}},
-#' \code{\link{HCPC_tab}} and \code{\link{mean_sd_tab}} all return \strong{one}
+#' \code{\link{clust_tab}} and \code{\link{mean_sd_tab}} all return \strong{one}
 #' \code{tabxplor} table, so it can be piped, filtered and exported like any other. What differs is
 #' only how it is \emph{shown}:
 #'
@@ -56,7 +56,7 @@
 #' after the table is built. For a text file or a language model, pipe the table into
 #' \code{\link[tabxplor]{tab_md}} explicitly. An html summary of \emph{axes} carries no hover
 #' tooltip --- every figure one would reveal already has a column of its own --- while
-#' \code{\link{HCPC_tab}}, being a crosstab of percentages, keeps them: the count behind each one
+#' \code{\link{clust_tab}}, being a crosstab of percentages, keeps them: the count behind each one
 #' is worth hovering for.
 #'
 #' An analysis-of-axes summary carries the \strong{eigenvalues} as a subordinate table
@@ -108,7 +108,7 @@
 #' either way. What is lost is only the hover policy and the margin names.
 #'
 #' @name ggfacto_summary
-#' @seealso [mca_interpret()], [ca_interpret()], [pca_interpret()], [HCPC_tab()], [mean_sd_tab()].
+#' @seealso [mca_interpret()], [ca_interpret()], [pca_interpret()], [clust_tab()], [mean_sd_tab()].
 NULL
 
 
@@ -118,7 +118,7 @@ NULL
 # DESIGN: the render options ride a PLAIN attribute, not `meta`. dplyr drops both it and the class
 #   together, so the options can never outlive the methods that read them.
 # WARNING: `set_subtext()` ONLY when there are glossary lines. It hands back the whole template, so
-#   an unconditional call would REPLACE the one a table already carries -- and HCPC_tab()'s comes
+#   an unconditional call would REPLACE the one a table already carries -- and clust_tab()'s comes
 #   from tab(), where the caller may have put its own `subtext =` notes through the `...`.
 #' @keywords internal
 #' @noRd
@@ -158,7 +158,7 @@ gda_medium <- function() {
 # Nothing to suppress in the footer -- the colour legend is tabxplor's, saying ggfacto's words.
 # DESIGN: an AXIS SUMMARY carries no tooltip -- every figure it hides already has a column of its
 #   own, so the hover would repeat the row. A CLUSTER description is an ordinary crosstab of
-#   percentages, and the count behind each one is worth hovering for: HCPC_tab() asks for them.
+#   percentages, and the count behind each one is worth hovering for: clust_tab() asks for them.
 #' @keywords internal
 #' @noRd
 gda_render <- function(x, ...) {
@@ -212,7 +212,7 @@ knit_print.ggfacto_summary <- function(x, ...) {
 #'
 #' @examples
 #' data(tea, package = "FactoMineR")
-#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
 #' benzecri_mrv(res.mca)
 benzecri_mrv <- function(res.mca, fmt = FALSE) {
   Q   <- length(res.mca$call$quali)
@@ -642,7 +642,7 @@ mca_interpret_data <- function(res.mca, axes) {
 #' @seealso [ggfacto_summary], [ca_interpret()], [pca_interpret()], [benzecri_mrv()].
 #' @examples \donttest{
 #' data(tea, package = "FactoMineR")
-#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
 #'
 #' # ONE option decides how every tabxplor table prints, an interpretation table included.
 #' # In a script it goes once, at the top, beside the library() calls.
@@ -726,14 +726,14 @@ ca_interpret_data <- function(res.ca, axes, var_names) {
 #' average of the population.
 #'
 #' The eigenvalues of the axes travel under the table.
-#' @param res.ca An object created with \code{FactoMineR::\link[FactoMineR]{CA}}.
+#' @param res.ca An object created with \code{\link{correspondence_analysis}} or
+#' \code{FactoMineR::\link[FactoMineR]{CA}}.
 #' @param axes The axes to interpret, as an integer vector.
 #' @param complete Set to \code{TRUE} for the fuller summary: each side of the axis gains the point's
 #' coordinate and its cos2, and the table gains the spread between the two sides.
 #' @param vars The two margins' names, as a character vector of length 2 --- \code{c("CSER",
-#' "PR2017")}. They cannot be recovered from the analysis: \code{FactoMineR::CA()} drops
-#' \code{names(dimnames())} from every matrix it keeps, so without this the table says
-#' \dQuote{Rows} and \dQuote{Columns}.
+#' "PR2017")}. By default, the names \code{\link{correspondence_analysis}} kept; after a bare
+#' \code{FactoMineR::CA()}, which keeps none, the table says \dQuote{Rows} and \dQuote{Columns}.
 #' @param min_contrib The contribution threshold, in percent. \code{NULL} (the default) is the mean
 #' contribution of the point's own set; \code{0} keeps every point.
 #' @param color Set to \code{FALSE} to build the table with no colour measure, and no data bar
@@ -749,12 +749,12 @@ ca_interpret_data <- function(res.ca, axes, var_names) {
 #' @seealso [ggfacto_summary], [mca_interpret()], [ggca()].
 #' @examples \donttest{
 #' crosstab <- tabxplor::tab(forcats::gss_cat, race, marital)
-#' res.ca   <- FactoMineR::CA(as.matrix(crosstab), graph = FALSE)
+#' res.ca   <- correspondence_analysis(crosstab)
 #'
 #' # ONE option decides how every tabxplor table prints, an interpretation table included.
 #' # In a script it goes once, at the top, beside the library() calls.
 #' options(tabxplor.print = "html")
-#' ca_interpret(res.ca, vars = c("race", "marital"))
+#' ca_interpret(res.ca)
 #'
 #' # a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of
 #' # their size, so the crosstab is asked for beside it, never instead of it:
@@ -763,10 +763,10 @@ ca_interpret_data <- function(res.ca, axes, var_names) {
 ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NULL,
                          vars = NULL, color = TRUE, eig = TRUE, n_axes = 8L, lang = NULL) {
   with_gda_lang(lang, function(lg) {
-  # ⚠ THE VARIABLES' NAMES CANNOT BE RECOVERED: FactoMineR::CA() drops `names(dimnames())` from every
-  #   matrix it keeps (`call$X`, `call$Xtot`), so even a table built with as.table() arrives anonymous.
-  #   `vars =` is the only way in; without it the two words that are always true.
-  nm <- if (is.null(vars)) NULL else as.character(vars)
+  # WARNING: FactoMineR::CA() drops `names(dimnames())` from every matrix it keeps; only
+  #   correspondence_analysis() writes them back on `call$X`. Without either, the two words that are
+  #   always true.
+  nm <- as.character(vars %||% names(dimnames(res.ca$call$X)))
   if (length(nm) != 2L || !all(nzchar(nm)) || anyNA(nm)) nm <- c(gettext("Rows"), gettext("Columns"))
 
   axes   <- axes[axes <= nrow(res.ca$eig)]

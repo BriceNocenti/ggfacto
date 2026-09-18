@@ -1,12 +1,65 @@
-# PURPOSE: ggca() -- the interactive graph for simple correspondence analysis.
-# ROLE: The CA counterpart of ggmca(), but a single function: it rebuilds coordinates, tooltips
-#   and its colour vector inline rather than going through a data/plot split.
+# PURPOSE: The CA entry point and its graph -- correspondence_analysis(), ggca().
+# ROLE: correspondence_analysis() is the ingress normaliser of a crosstab: it takes the table the
+#   student made with tabxplor::tab(), and gives FactoMineR the counts it needs. ggca() is the CA
+#   counterpart of ggmca(), but a single function: it rebuilds coordinates, tooltips and its colour
+#   vector inline rather than going through a data/plot split.
 # KEY CONSTRAINTS:
+#   - A CA reads COUNTS, whatever the table displays: a tab() in percentages still gives its
+#     weighted counts, and its Total row and column are dropped.
 #   - Its tooltips are the row and column percentages of the source table, computed here. It does
 #     NOT go through interactive_tooltips(), which is shaped for the MCA's Burt-table crosstabs.
 #   - Like ggmca_plot(), it carries css_tooltip and height_width_ratio on the returned object as
 #     ATTRIBUTES, so the object stays a real ggplot and the ggplot generics keep dispatching.
 # See: CLAUDE.md section ggfacto architecture > How a graph is built, for why this is not split.
+
+#' Correspondence Analysis of a Crosstab
+#'
+#' @description Makes the correspondence analysis of a crosstab with
+#' \code{FactoMineR::\link[FactoMineR]{CA}}: first make the table with \code{tabxplor::tab()},
+#' then analyse it. The analysis reads the (weighted) counts of the table, whatever it displays,
+#' without its Total row and column. To leave out some rows or columns, filter the table before, with
+#' \code{dplyr::filter()} and \code{dplyr::select()}.
+#'
+#' @param table A crosstab made with \code{tabxplor::tab()}, with one row variable and one column
+#' variable. A matrix or a \code{table} of counts works too.
+#' @param ncp The number of axes to keep. All of them by default.
+#' @param ... Additional arguments to pass to \code{\link[FactoMineR]{CA}}.
+#'
+#' @return A `CA` object from \pkg{FactoMineR}, which remembers the names of the two variables, so
+#' that \code{\link{ca_interpret}} can print them.
+#' @export
+#'
+#' @examples
+#' tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
+#' res.ca <- correspondence_analysis(tableau)
+#' ca_interpret(res.ca)
+#' ggca(res.ca) |> ggi()
+correspondence_analysis <- function(table, ncp = Inf, ...) {
+  if (inherits(table, "tabxplor_tab")) {
+    cols <- names(table)[purrr::map_lgl(table, tabxplor::is_fmt) & !tabxplor::is_totcol(table)]
+    rows <- !tabxplor::is_totrow(table)
+    X <- vapply(cols, function(col) {
+      x <- table[[col]]
+      dplyr::coalesce(vctrs::field(x, "wn"), as.numeric(vctrs::field(x, "n")))
+    }, numeric(nrow(table)))
+    X <- X[rows, , drop = FALSE]
+    rownames(X) <- as.character(table[[1]][rows])
+    col_var <- unique(tabxplor::get_col_var(table)[cols])
+    if (length(col_var) != 1L || !nzchar(col_var)) stop(
+      "correspondence_analysis() needs a crosstab of ONE row variable and ONE column variable.",
+      call. = FALSE)
+    names(dimnames(X)) <- c(names(table)[1], col_var)
+  } else {
+    X <- as.matrix(table)
+  }
+
+  res <- FactoMineR::CA(X, ncp = ncp, graph = FALSE, ...)
+  # WARNING: FactoMineR::CA() drops `names(dimnames())` from every matrix it keeps; they are written
+  #   back on `call$X`, where ca_interpret() reads the names of the two variables.
+  names(dimnames(res$call$X)) <- names(dimnames(X))
+  res
+}
+
 
 #' Readable and Interactive graph for simple correspondence analysis
 #' @description A readable, complete and beautiful graph for simple
@@ -17,7 +70,8 @@
 #' theme or add another plot elements with +. Then, interactive
 #' tooltips won't appear until you pass the result through \code{\link{ggi}}.
 #'
-#' @param res.ca An object created with \code{FactoMineR::\link[FactoMineR]{CA}}.
+#' @param res.ca An object created with \code{\link{correspondence_analysis}} or
+#' \code{FactoMineR::\link[FactoMineR]{CA}}.
 #' @param axes The axes to print, as a numeric vector of length 2.
 #' @param show_sup When \code{TRUE} show supplementary rows and cols.
 #' @param xlim,ylim Horizontal and vertical axes limits,
@@ -30,9 +84,9 @@
 #'    \item \code{"text"} : colored text
 #'    \item \code{"labels"} : colored labels
 #'  }
-#' @param text_repel When \code{TRUE} the graph is not interactive anymore,
-#'  but the resulting image is better to print because points and labels don't
-#'  overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.
+#' @param text_repel By default, labels are moved so that they do not overlap, with
+#'  \code{ggrepel::\link[ggrepel]{geom_text_repel}}. Set to \code{FALSE} to print each label
+#'  exactly at its point, which is faster to draw.
 #' @param uppercase Print \code{"row"} var or \code{"col"} var labels with
 #' uppercase.
 #' @param tooltips Choose the content of interactive tooltips at mouse hover :
@@ -62,26 +116,19 @@
 #' interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
 #' @export
 #'
-#' @examples # Make the correspondence analysis :
+#' @examples
 #' \donttest{
-#' tabs <- as.matrix(tabxplor::tab(forcats::gss_cat, race, marital))
-#' res.ca <- FactoMineR::CA(tabs, graph = FALSE)
+#' tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
+#' res.ca  <- correspondence_analysis(tableau)
 #'
 #' # Interactive plot :
-#' graph.ca <- ggca(res.ca,
-#'                  title = "Race by marital : correspondence analysis",
-#'                  tooltips = c("row", "col"))
-#' ggi(graph.ca) #to make the plot interactive
-#'
-#' # Image plot :
-#' ggca(res.ca,
-#'      title = "Race by marital status: correspondence analysis",
-#'      text_repel = TRUE)
-#'      }
+#' graph.ca <- ggca(res.ca, title = "Race by marital status: correspondence analysis")
+#' ggi(graph.ca) # to make the plot interactive
+#' }
 ggca <-
   function(res.ca, axes = c(1,2), show_sup = FALSE, xlim, ylim,
            out_lims_move = FALSE,
-           type = c("points", "text", "labels"), text_repel = FALSE, uppercase = "col",
+           type = c("points", "text", "labels"), text_repel = TRUE, uppercase = "col",
            tooltips = c("row", "col"),
            rowtips_subtitle = "Row pct", coltips_subtitle = "Column pct",
            rowcolor_numbers = 0, colcolor_numbers = 0, cleannames = TRUE, filter = "",

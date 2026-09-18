@@ -8,11 +8,13 @@
 
 #'  Interactive 3D Plot for Multiple Correspondence Analyses (plotly::)
 #'
-#' @param res.mca An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.
-#' @param data The data in which to find the cah variable, etc.
-#' @param cah A variable made with \code{\link[FactoMineR]{HCPC}}, to link
-#' the answers-profiles points who share the same HCPC class (will be colored
-#' the same color and linked at mouse hover).
+#' @param res.mca An object created with \code{\link{multiple_correspondence_analysis}} or
+#' \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' @param data The data frame the analysis was made on, in which to find the clusters.
+#' @param clust The variable of `data` holding the clusters, typically made with
+#' \code{\link{hierarchical_clust}}, as a bare name or a string: the answer profiles of one
+#' cluster are coloured alike and linked at mouse hover.
+#' @param cah Deprecated former name of `clust`.
 #' @param axes The axes to print, as a numeric vector of length 3.
 #' @param dat Deprecated former name of `data`. Still accepted, with a warning;
 #' use `data` instead.
@@ -40,28 +42,37 @@
 #' @examples
 #' \donttest{
 #' data(tea, package = "FactoMineR")
-#' res.mca <- MCA2(tea, active_vars = 1:18)
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
 #' ggmca_3d(res.mca)
 #'
-#' # 3D graph with colored HCPC clusters (cah)
-#' res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
-#' cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
-#' tea$clust <- cah$data.clust$clust
-#' ggmca_3d(res.mca, data = tea, cah = "clust")
+#' # 3D graph with colored clusters
+#' tea <- tea |>
+#'   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+#' ggmca_3d(res.mca, tea, clust = clust)
 #' }
-ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
+ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
                      base_zoom = 1, remove_buttons = FALSE, cone_size = 0.15,
                      view = "All",
                      camera_view, aspectratio_from_eig = FALSE, title,
                      ind_name.size = 10, max_point_size = 30, # ind.size = 4,
                      ...,
-                     dat) {
-  requireNamespace("plotly", quietly = TRUE)
+                     dat, cah) {
+  if (!requireNamespace("plotly", quietly = TRUE)) stop(
+    "ggmca_3d() needs the plotly package: install.packages(\"plotly\").", call. = FALSE)
 
-  # `dat` was renamed `data` in 0.4.0; after `...` it can only be supplied by name.
+  # Renamed in 0.4.0; after `...` they can only be supplied by name.
   if (!missing(dat) && missing(data)) data <- renamed_arg(dat, "dat", "data", "ggmca_3d")
-
-  if (missing(cah)) cah <- character()
+  clust <- if (!missing(cah)) {
+    rlang::quo(!!renamed_arg(cah, "cah", "clust", "ggmca_3d"))
+  } else {
+    rlang::enquo(clust)
+  }
+  clust_name <- if (rlang::quo_is_missing(clust) || rlang::quo_is_null(clust)) {
+    character()
+  } else {
+    need_data(missing(data), "the clusters", "ggmca_3d")
+    resolve_clust(clust, data)$name
+  }
 
   D2 <- length(axes) == 2 ; stopifnot(length(axes) %in% 2:3 )
   if (D2) axes <- c(axes, NA)
@@ -73,25 +84,25 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
 
   acm <- res.mca |>
     ggmca(data = data,
-          cah = cah,
+          clust = !!clust,
           # color_groups = color_groups,
           profiles = TRUE,
           get_data = TRUE,
           ...
     )
 
-  acm_cah <- acm$vars_data |>
-    dplyr::filter(str_detect(.data$color_group, paste0("^", cah)))
+  acm_clust <- acm$vars_data |>
+    dplyr::filter(str_detect(.data$color_group, paste0("^", clust_name)))
   # a plain plotting tibble: no fmt column, so the tab class bought nothing
   acm_vars <- acm$vars_data |>
-    dplyr::filter(!.data$vars %in% cah) |>
-    dplyr::mutate(face = dplyr::if_else(.data$color_group != "variables_actives", "italic", "bold") )
+    dplyr::filter(!.data$vars %in% clust_name) |>
+    dplyr::mutate(face = dplyr::if_else(.data$color_group != "active_vars", "italic", "bold") )
   acm_profiles <- acm$profiles_coord
 
-  if(length(cah) > 0) {
-    acm_profiles <- acm_profiles |> dplyr::filter(!is.na(cah))
+  if(length(clust_name) > 0) {
+    acm_profiles <- acm_profiles |> dplyr::filter(!is.na(.data$clust))
 
-    cah_name_with_pct <- acm_cah |>
+    clust_name_with_pct <- acm_clust |>
       dplyr::select("lvs", "wcount") |>
       dplyr::mutate(pct = round(.data$wcount/sum(.data$wcount)*100), 0) |>
       dplyr::mutate(recode_vect = purrr::set_names(as.character(.data$lvs),
@@ -99,8 +110,8 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
                                                           .data$pct, "%)"))) |>
       dplyr::pull("recode_vect")
 
-    acm_cah <- acm_cah |>
-      dplyr::mutate(lvs = forcats::fct_recode(.data$lvs, !!!cah_name_with_pct),
+    acm_clust <- acm_clust |>
+      dplyr::mutate(lvs = forcats::fct_recode(.data$lvs, !!!clust_name_with_pct),
                     lvs = paste0("<b>", .data$lvs, "</b>"))
   }
 
@@ -110,7 +121,7 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
 
   plot_range <-
     dplyr::bind_rows(dplyr::select(acm_profiles, tidyselect::starts_with("Dim ")),
-                     dplyr::select(acm_cah, tidyselect::starts_with("Dim ")),
+                     dplyr::select(acm_clust, tidyselect::starts_with("Dim ")),
                      dplyr::select(acm_vars, tidyselect::starts_with("Dim ")),
                      #dplyr::select(base_axis_in_princ, tidyselect::starts_with("Dim."))
     ) |>
@@ -158,7 +169,7 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
   #     point.size = NA, arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines"))
   #   ) +
   #   # ggplot2::geom_segment(
-  #   #   data = acm_cah |>
+  #   #   data = acm_clust |>
   #   #     dplyr::mutate(!!dim1 = pmin(1.3, pmax(!!dim1, -0.9)),
   #   #            !!dim2 = pmin(1.3, pmax(!!dim2, -0.85)),
   #   #            start1  = pmin(0.95, pmax(!!dim1, -0.5)),
@@ -169,7 +180,7 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
   #   #   arrow = ggplot2::arrow(length = ggplot2::unit(0.3, "lines")), na.rm = TRUE
   #   # ) +
   # ggrepel::geom_label_repel(
-  #   data = acm_cah,
+  #   data = acm_clust,
   #   ggplot2::aes(label = lvs, color = color_group), fill = grDevices::rgb(1, 1, 1, alpha = 0.7),
   #   direction = "y", force = 0.5, force_pull = 1, point.padding = 0, point.size = NA,
   #   arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
@@ -177,14 +188,14 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
   # )
 
 
-  if (length(cah) > 0) {
-    acm_lv <- acm_cah$color_group |> forcats::fct_drop() |> levels()
+  if (length(clust_name) > 0) {
+    acm_lv <- acm_clust$color_group |> forcats::fct_drop() |> levels()
     acm_lv <- purrr::set_names(acm_lv,
                                material_colors_light()[1:length(acm_lv)],
 
     )
 
-    acm_cah <- acm_cah |>
+    acm_clust <- acm_clust |>
       dplyr::mutate(
         color_group = forcats::fct_recode(.data$color_group, !!!acm_lv) |>
           forcats::fct_drop()
@@ -327,11 +338,11 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
         type = if (D2) {"scatter"} else {"scatter3d"},  # type = "scatter3d",
         mode = "text", showlegend = FALSE, inherit = FALSE)
 
-    # labels cah
-    if (length(cah) > 0) {
+    # labels clust
+    if (length(clust_name) > 0) {
       dual_plots[[i]] <- dual_plots[[i]] |>
         plotly::add_trace(
-          data = acm_cah, scene = scene_name[i],
+          data = acm_clust, scene = scene_name[i],
           x = ~eval(dim1), y = ~eval(dim2), z = ~eval(dim3),  # color = df$color_col
           text = ~lvs,
           textfont = list(color = ~color_group, size = ind_name.size),  # "#0077c2"
@@ -615,7 +626,7 @@ ggmca_3d <- function(res.mca, data, cah, axes = 1:3, # color_groups,
     )
 
   } else if (!D2) {
-    scenes <- list("scene" = dplyr::case_when(
+    scenes <- list("scene" = first_case(
       view == plan12   ~ list(
         xaxis = axes_params[[axes[1]]],
         yaxis = axes_params[[axes[2]]],

@@ -13,9 +13,11 @@ ggmca_initial_dims(
 )
 }
 \arguments{
-\item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.}
+\item{res.mca}{An object created with \code{\link{multiple_correspondence_analysis}} or
+\code{FactoMineR::\link[FactoMineR]{MCA}}.}
 
-\item{data}{The data in which to find the supplementary variables, etc.}
+\item{data}{Optionally, the data frame the analysis was made on, whose order of levels is then
+used.}
 
 \item{proj_just}{Horizontal justification of text of the coordinates on axes,
 as a character vector of length 2 (x and y).}
@@ -41,7 +43,7 @@ analysis (principal axes), use \code{\link[ggfacto]{ggmca_with_base_ref}}.
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")
-res.mca <- MCA2(tea, active_vars = 1:18)
-ggmca_initial_dims(res.mca, data = tea)
+res.mca <- multiple_correspondence_analysis(tea, 1:18)
+ggmca_initial_dims(res.mca, tea)
 }
 }

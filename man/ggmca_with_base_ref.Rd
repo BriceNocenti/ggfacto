@@ -32,7 +32,7 @@ dimensions in their initial reference frame, use \code{\link[ggfacto]{ggmca_init
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")
-res.mca <- MCA2(tea, active_vars = 1:18)
+res.mca <- multiple_correspondence_analysis(tea, 1:18)
 ggmca_with_base_ref(res.mca)
 
 # It is more readable to select just a few active variables

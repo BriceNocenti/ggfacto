@@ -46,29 +46,6 @@ fct_detect_replace <- function(factor, pattern, replacement, negate = FALSE){
 
 
 
-#' @keywords internal
-levels_to_na <- function(data, vars, excl, levels_to = "NULL") {
-  if (length(excl) == 0) return(data)
-
-  vars <- names(tidyselect::eval_select(rlang::enquo(vars), data))
-  excl <- paste0(excl, collapse = "|")
-
-  levels_to_excl <- data |>
-    dplyr::select(tidyselect::all_of(vars) & where(~ any(str_detect(levels(.), excl)))) |>
-    purrr::imap(~ levels(.x)[str_detect(levels(.x), excl)] ) |>
-    purrr::flatten_chr()
-
-  # print(levels_to_excl)
-
-  data <- data |>
-    dplyr::mutate(dplyr::across(
-      tidyselect::all_of(vars) & where(~ any(levels(.) %in% levels_to_excl)),
-      ~ suppressWarnings(forcats::fct_recode(., !!!purrr::set_names(levels_to_excl, levels_to))
-      )
-    ))
-
-  data
-}
 
 
 
@@ -276,4 +253,15 @@ renamed_arg <- function(value, old, new, fn) {
             call. = FALSE)
   }
   value
+}
+
+# Why this exists: the 3D views pick one scene LIST by a scalar condition; dplyr::case_when() would
+# recycle the condition over the list's elements, which dplyr 1.2 deprecates.
+first_case <- function(...) {
+  for (f in list(...)) {
+    if (isTRUE(rlang::eval_tidy(rlang::f_lhs(f), env = rlang::f_env(f)))) {
+      return(rlang::eval_tidy(rlang::f_rhs(f), env = rlang::f_env(f)))
+    }
+  }
+  NULL
 }

@@ -17,7 +17,8 @@ ca_interpret(
 )
 }
 \arguments{
-\item{res.ca}{An object created with \code{FactoMineR::\link[FactoMineR]{CA}}.}
+\item{res.ca}{An object created with \code{\link{correspondence_analysis}} or
+\code{FactoMineR::\link[FactoMineR]{CA}}.}
 
 \item{axes}{The axes to interpret, as an integer vector.}
 
@@ -28,9 +29,8 @@ coordinate and its cos2, and the table gains the spread between the two sides.}
 contribution of the point's own set; \code{0} keeps every point.}
 
 \item{vars}{The two margins' names, as a character vector of length 2 --- \code{c("CSER",
-"PR2017")}. They cannot be recovered from the analysis: \code{FactoMineR::CA()} drops
-\code{names(dimnames())} from every matrix it keeps, so without this the table says
-\dQuote{Rows} and \dQuote{Columns}.}
+"PR2017")}. By default, the names \code{\link{correspondence_analysis}} kept; after a bare
+\code{FactoMineR::CA()}, which keeps none, the table says \dQuote{Rows} and \dQuote{Columns}.}
 
 \item{color}{Set to \code{FALSE} to build the table with no colour measure, and no data bar
 under the eigenvalues.}
@@ -59,12 +59,12 @@ The eigenvalues of the axes travel under the table.
 \examples{
 \donttest{
 crosstab <- tabxplor::tab(forcats::gss_cat, race, marital)
-res.ca   <- FactoMineR::CA(as.matrix(crosstab), graph = FALSE)
+res.ca   <- correspondence_analysis(crosstab)
 
 # ONE option decides how every tabxplor table prints, an interpretation table included.
 # In a script it goes once, at the top, beside the library() calls.
 options(tabxplor.print = "html")
-ca_interpret(res.ca, vars = c("race", "marital"))
+ca_interpret(res.ca)
 
 # a correspondence analysis draws the STRUCTURE of a crosstab's deviations and says nothing of
 # their size, so the crosstab is asked for beside it, never instead of it:

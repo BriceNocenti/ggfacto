@@ -16,20 +16,20 @@ ggmca(
   axes = c(1, 2),
   axes_names = NULL,
   axes_reverse = NULL,
-  type = c("text", "labels", "points", "facets"),
+  type = c("text", "labels", "points", "active_vars_only", "facets"),
   color_groups = "^.{0}",
-  cah_color_groups = "^.+$",
+  clust_color_groups = "^.+$",
   keep_levels,
   discard_levels,
   cleannames = TRUE,
   profiles = FALSE,
-  profiles_tooltip_discard = "^Not |^No |^Pas |^Non ",
-  cah,
+  profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+  clust,
   max_profiles = 5000,
   alpha_profiles = 0.7,
   color_profiles = TRUE,
   base_profiles_color = "#aaaaaa",
-  text_repel = FALSE,
+  text_repel = TRUE,
   title,
   actives_in_bold = NULL,
   sup_in_italic = FALSE,
@@ -47,7 +47,9 @@ ggmca(
   right_margin = 0,
   use_theme = TRUE,
   get_data = FALSE,
-  dat
+  dat,
+  cah,
+  cah_color_groups
 )
 
 ggmca_data(
@@ -58,15 +60,17 @@ ggmca_data(
   tooltip_vars_1lv,
   tooltip_vars,
   color_groups = "^.{0}",
-  cah_color_groups = "^.+$",
+  clust_color_groups = "^.+$",
   keep_levels,
   discard_levels,
   cleannames = TRUE,
   profiles = FALSE,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-  cah,
+  clust,
   max_profiles = 5000,
-  dat
+  dat,
+  cah,
+  cah_color_groups
 )
 
 ggmca_plot(
@@ -75,7 +79,7 @@ ggmca_plot(
   axes_names = NULL,
   axes_reverse = NULL,
   type = c("text", "points", "labels", "active_vars_only", "facets"),
-  text_repel = FALSE,
+  text_repel = TRUE,
   title,
   ellipses = NULL,
   actives_in_bold = NULL,
@@ -100,11 +104,15 @@ ggmca_plot(
 )
 }
 \arguments{
-\item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.}
+\item{res.mca}{An object created with \code{\link{multiple_correspondence_analysis}} or
+\code{FactoMineR::\link[FactoMineR]{MCA}}.}
 
-\item{data}{The data in which to find the supplementary variables, etc.}
+\item{data}{The data frame the analysis was made on, in which to find the supplementary
+variables and the clusters: the whole data frame, even when the analysis was made on a subset
+of it with \code{\link{multiple_correspondence_analysis}}. Only needed with `sup_vars`,
+`clust` or the tooltip variables.}
 
-\item{sup_vars}{A character vectors of supplementary qualitative variables
+\item{sup_vars}{A character vector of supplementary qualitative variables
 to print (they don't need to be passed in \code{\link[FactoMineR]{MCA}} before).}
 
 \item{active_tables}{Should colored crosstables be added in interactive tooltips ?
@@ -152,7 +160,7 @@ For exemple, `color_groups = "^."`  makes the groups upon the first character
  \code{color_groups = "NB.+$"} takes anything between the `"NB"` and the end of levels
  names, etc.}
 
-\item{cah_color_groups}{Color groups for the `cah` variable (HCPC clusters).}
+\item{clust_color_groups}{Color groups for the `clust` variable (the clusters).}
 
 \item{keep_levels}{A character vector of variables levels to keep : others
 will be discarded.}
@@ -165,35 +173,34 @@ prefix numbers like \code{"1-"}, and text in parentheses.}
 \item{profiles}{When set to \code{TRUE}, profiles of answers are drawn in the back
 of the graph with light-grey points. When hovering with mouse in the interactive
 version (passed in \code{\link{ggi}}), the answers of individuals to active variables
-will appears. If \code{cah} is provided, to hover near one point will color all the
+will appears. If \code{clust} is provided, to hover near one point will color all the
 points of the same \code{\link[FactoMineR]{HCPC}} class.}
 
 \item{profiles_tooltip_discard}{A regex pattern to remove useless levels
 among interactive tooltips for profiles of answers (ex. : levels expressing
 "no" answers).}
 
-\item{cah}{The NAME of a column of `data` holding HCPC clusters, as a single
-string, to link the answers-profiles points who share the same HCPC class (they
-are colored alike and linked at mouse hover). Add the clusters to `data` first:
-`data$clust <- FactoMineR::HCPC(res.mca, graph = FALSE)$data.clust$clust`, then
-pass `cah = "clust"`. Only has an effect together with `profiles = TRUE`.}
+\item{clust}{The variable of `data` holding the clusters, typically made with
+\code{\link{hierarchical_clust}}, as a bare name (`clust = cah_culture`) or a string. The
+clusters are drawn as a supplementary variable and, with `profiles = TRUE`, the answer profiles
+of one cluster are coloured alike and linked at mouse hover.}
 
 \item{max_profiles}{The maximum number of profiles points to print. Default to 5000.}
 
 \item{alpha_profiles}{The alpha (transparency, between 0 and 1) for profiles of answer.}
 
-\item{color_profiles}{By default, if \code{cah} is provided, profiles are
-colored based on cah levels (HCPC clusters). Set do \code{FALSE} to avoid this behaviour.
+\item{color_profiles}{By default, if \code{clust} is provided, profiles are
+colored based on clust levels (HCPC clusters). Set do \code{FALSE} to avoid this behaviour.
 You can also give a character vector with only some of the levels of
-the `cah` variable .}
+the `clust` variable .}
 
 \item{base_profiles_color}{The base color for answers profiles. Default to gray.
 Set to `NULL` to discard profiles. With `color_profiles`, set to `NULL` to discard the
 non-colored profiles.}
 
-\item{text_repel}{When \code{TRUE} the graph is not interactive anymore,
-but the resulting image is better to print because points and labels don't
-overlaps. It uses \code{ggrepel::\link[ggrepel]{geom_text_repel}}.}
+\item{text_repel}{By default, labels are moved so that they do not overlap, with
+\code{ggrepel::\link[ggrepel]{geom_text_repel}}. Set to \code{FALSE} to print each label
+exactly at its point, which is faster to draw.}
 
 \item{title}{The title of the graph.}
 
@@ -243,6 +250,8 @@ Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 \item{dat}{Deprecated former name of `data`. Still accepted, with a warning;
 use `data` instead.}
 
+\item{cah, cah_color_groups}{Deprecated former names of `clust` and `clust_color_groups`.}
+
 \item{plot_data}{A list of data frames made with \link{ggmca_data}.}
 }
 \value{
@@ -280,29 +289,27 @@ to draw the graph.
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")
-res.mca <- MCA2(tea, active_vars = 1:18)
+res.mca <- multiple_correspondence_analysis(tea, 1:18)
 
 # Interactive graph for multiple correspondence analysis :
-res.mca |>
-  ggmca(tea, sup_vars = c("SPC"), ylim = c(NA, 1.2), text_repel = TRUE) |>
-  ggi() #to make the graph interactive
+ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2)) |>
+  ggi() # to make the graph interactive
 
 # Interactive graph with access to all crosstables between active variables (burt table).
 #  Spread from mean are colored and, usually, points near the middle will have less
 #  colors, and points at the edges will have plenty. It may takes time to print, but
 #  helps to interpret the MCA in close proximity with the underlying data.
-res.mca |>
-  ggmca(tea, ylim = c(NA, 1.2), active_tables = "active", text_repel = TRUE) |>
+ggmca(res.mca, ylim = c(NA, 1.2), active_tables = "active") |>
   ggi()
 
-# Graph with colored HCPC clusters
-cah <- FactoMineR::HCPC(res.mca, nb.clust = 6, graph = FALSE)
-tea$clust <- cah$data.clust$clust
-ggmca(res.mca, tea, cah = "clust", profiles = TRUE, text_repel = TRUE)
+# Graph with colored clusters (hierarchical clustering on the first three axes)
+tea <- tea |>
+  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+ggmca(res.mca, tea, clust = clust, profiles = TRUE)
 
 # Concentration ellipses for each levels of a supplementary variable :
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),
-  ellipses = 0.5, text_repel = TRUE, profiles = TRUE)
+  ellipses = 0.5, profiles = TRUE)
 
 # Graph of profiles of answer for each levels of a supplementary variable :
 ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2),

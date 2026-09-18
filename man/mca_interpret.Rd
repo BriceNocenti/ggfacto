@@ -63,7 +63,7 @@ The eigenvalues of the axes travel under the table, Benzecri's modified rate bes
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")
-res.mca <- MCA2(tea, active_vars = 1:18)
+res.mca <- multiple_correspondence_analysis(tea, 1:18)
 
 # ONE option decides how every tabxplor table prints, an interpretation table included.
 # In a script it goes once, at the top, beside the library() calls.

@@ -7,7 +7,7 @@
 ggmca_3d(
   res.mca,
   data,
-  cah,
+  clust,
   axes = 1:3,
   base_zoom = 1,
   remove_buttons = FALSE,
@@ -19,17 +19,19 @@ ggmca_3d(
   ind_name.size = 10,
   max_point_size = 30,
   ...,
-  dat
+  dat,
+  cah
 )
 }
 \arguments{
-\item{res.mca}{An object created with \code{FactoMineR::\link[FactoMineR]{MCA}}.}
+\item{res.mca}{An object created with \code{\link{multiple_correspondence_analysis}} or
+\code{FactoMineR::\link[FactoMineR]{MCA}}.}
 
-\item{data}{The data in which to find the cah variable, etc.}
+\item{data}{The data frame the analysis was made on, in which to find the clusters.}
 
-\item{cah}{A variable made with \code{\link[FactoMineR]{HCPC}}, to link
-the answers-profiles points who share the same HCPC class (will be colored
-the same color and linked at mouse hover).}
+\item{clust}{The variable of `data` holding the clusters, typically made with
+\code{\link{hierarchical_clust}}, as a bare name or a string: the answer profiles of one
+cluster are coloured alike and linked at mouse hover.}
 
 \item{axes}{The axes to print, as a numeric vector of length 3.}
 
@@ -62,6 +64,8 @@ eigenvalues.}
 
 \item{dat}{Deprecated former name of `data`. Still accepted, with a warning;
 use `data` instead.}
+
+\item{cah}{Deprecated former name of `clust`.}
 }
 \value{
 A \code{\link[plotly]{plotly}} html interactive 3d (or 2d) graph.
@@ -72,13 +76,12 @@ Interactive 3D Plot for Multiple Correspondence Analyses (plotly::)
 \examples{
 \donttest{
 data(tea, package = "FactoMineR")
-res.mca <- MCA2(tea, active_vars = 1:18)
+res.mca <- multiple_correspondence_analysis(tea, 1:18)
 ggmca_3d(res.mca)
 
-# 3D graph with colored HCPC clusters (cah)
-res.mca_3axes <- MCA2(tea, active_vars = 1:18, ncp = 3)
-cah <- FactoMineR::HCPC(res.mca_3axes, nb.clust = 6, graph = FALSE)
-tea$clust <- cah$data.clust$clust
-ggmca_3d(res.mca, data = tea, cah = "clust")
+# 3D graph with colored clusters
+tea <- tea |>
+  dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb.clust = 6))
+ggmca_3d(res.mca, tea, clust = clust)
 }
 }
