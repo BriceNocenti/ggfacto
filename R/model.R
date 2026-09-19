@@ -1,10 +1,11 @@
-# PURPOSE: The one reader of a fitted MCA -- mca_model() -- the units the MCA consumers aggregate
+# PURPOSE: The readers of a fitted analysis -- mca_model(), the one reader of an MCA, and
+#   pca_model(), a PCA's individuals as a cloud of points -- the units their consumers aggregate
 #   over, and what an analysis gives back to the data frame: axis_coord(), and the write-back it
-#   shares with hierarchical_clust().
+#   shares with hierarchical_clust(). A CA's reader, ca_model(), lives with it in R/ca.R.
 # ROLE: Every consumer of an MCA (the plot model, the tooltips, the clusters, the interpretation
 #   table, the teaching plots, the alignment in R/ingress.R) reads the model, never the fitted
 #   object's slots. Its unit is the ANSWER PROFILE, a distinct combination of active answers, whose
-#   individuals share one point.
+#   individuals share one point; a PCA's graph reads its distinct individuals the same way.
 # KEY CONSTRAINTS:
 #   - mca_model() is the only code that knows how each engine stores an MCA: a ggfacto fit
 #     (FactoMineR fed the profiles, `source$key` mapping the individuals to them), a
@@ -16,6 +17,7 @@
 #     the profile tables, in the order the fit saw them.
 #   - A unit is a (profile x non-active answers) cell, with its `..n` and `..wn`: every crosstab,
 #     supplementary coordinate and cluster plurality is a rowsum() over the units, never over
+#     individuals. cloud_units() serves the PCA's model too, whose points are its distinct
 #     individuals.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract.
 
@@ -113,10 +115,47 @@ mca_model <- function(res) {
   ), class = c("ggfacto_mca_model", "ggfacto_fit_view"))
 }
 
-# The distinct (profile x non-active answers) cells of the fitted individuals -- `data` holds their
-# non-active variables, in the fitted order -- with each cell's count and weighted count. With no
-# such variable, the units are the profiles themselves.
-mca_units <- function(m, data = NULL) {
+# The reader of a PCA for its graph: its active individuals as a cloud of distinct points, the way
+# mca_model() gives an MCA's -- `key` maps each individual to its point, `count`/`wn` count them --
+# with each point's active values, the user's row numbers and, when the data had them, its name.
+# WARNING: FactoMineR names the axes `Dim.k`; they are renamed `Dim k`, the model's one naming.
+#' @keywords internal
+#' @noRd
+pca_model <- function(res) {
+  vars <- rownames(res$var$coord)
+  X    <- as.data.frame(res$call$X)[vars]
+  rows <- seq_len(nrow(X))
+  sup  <- res$call$ind.sup
+  if (length(sup) != 0) {
+    X    <- X[-sup, , drop = FALSE]
+    rows <- rows[-sup]
+  }
+  if (!is.null(res$source$rows)) rows <- res$source$rows[rows]
+  names <- rownames(X)
+  if (is.null(names) || all(grepl("^[0-9]+$", names))) names <- NULL
+
+  key   <- as.integer(vctrs::vec_group_id(X))
+  first <- which(!duplicated(key))
+  w     <- fit_weights(res)
+  if (all(w == w[1])) w <- NULL
+  count <- tabulate(key, length(first))
+  wn    <- if (is.null(w)) as.numeric(count) else as.vector(rowsum(w, key, reorder = TRUE))
+  coord <- as.matrix(res$ind$coord)[first, , drop = FALSE]
+  colnames(coord) <- paste("Dim", seq_len(ncol(coord)))
+  rownames(X) <- NULL
+
+  structure(list(
+    X = X[first, , drop = FALSE], key = key, w = w, count = count, wn = wn, coord = coord,
+    n = length(key), W = sum(wn), vars = vars, rows = rows[first], names = names[first],
+    eig = eig_table(res)
+  ), class = "ggfacto_pca_model")
+}
+
+# The distinct (point x non-active answers) cells of the fitted individuals -- an MCA's answer
+# profiles, a PCA's distinct individuals -- `data` holding their non-active variables in the fitted
+# order, with each cell's count and weighted count. With no such variable, the units are the
+# points themselves.
+cloud_units <- function(m, data = NULL) {
   if (length(data) == 0) {
     return(tibble::tibble(..profile = seq_along(m$count), ..n = m$count, ..wn = m$wn))
   }
@@ -141,25 +180,6 @@ active_factors <- function(m, profile) {
     x
   })
 }
-
-# A supplementary level is the weighted barycentre of its individuals over the square root of the
-# eigenvalue (Le Roux and Rouanet; FactoMineR's quali.sup, GDAtools' varsup(), which rounds it).
-# Within a profile the individuals share one point, so it is an aggregation over the units.
-sup_levels <- function(m, units, v) {
-  x   <- as.factor(units[[v]])
-  ok  <- !is.na(x)
-  p   <- units$..profile[ok]
-  agg <- rowsum(cbind(units$..n[ok], units$..wn[ok], units$..wn[ok] * m$coord[p, , drop = FALSE]),
-                as.integer(x)[ok], reorder = TRUE)
-  a     <- seq_len(ncol(m$coord))
-  coord <- t(t(agg[, 2L + a, drop = FALSE] / agg[, 2]) / m$vs[a])
-  colnames(coord) <- colnames(m$coord)
-  dplyr::bind_cols(
-    tibble::tibble(vars = v, lvs = levels(x)[as.integer(rownames(agg))], wcount = agg[, 2]),
-    tibble::as_tibble(coord)
-  )
-}
-
 
 # === SECTION: what an analysis gives back to the data frame =======================================
 

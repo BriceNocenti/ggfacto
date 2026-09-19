@@ -85,3 +85,63 @@ test_that("... and in French, with the course's words", {
     "axes 1 \u00e0 3"))
   expect_identical(words[["title"]], "Classification ascendante hi\u00e9rarchique")
 })
+
+# --- the graphs speak the language they are asked in ---------------------------------------------
+
+fx_graph_words <- function(lang) {
+  pd <- md(fx_mca(), fx_tea_clust(), clust = clust, lang = lang)
+  p  <- quietly(ggmca_plot(pd, get_data = TRUE))
+  list(model = pd, tips = c(p$vars_data$interactive_text, p$mean_point_data$interactive_text),
+       points = pd$ind_data$interactive_text,
+       title = axis_title(list(eig = fx_mca()$eig), 1))
+}
+
+test_that("a graph's words are English when asked in English", {
+  local_null_device()
+  w <- fx_graph_words("en")
+  expect_identical(w$model$lang, "en")
+  expect_true(any(grepl("Frequency (n=", w$tips, fixed = TRUE)))
+  expect_true(any(grepl("Contrib axe 1:", w$tips, fixed = TRUE)))
+  expect_true(any(grepl("Active variables:", w$tips, fixed = TRUE)))
+  expect_true(any(startsWith(w$tips, "<b>Central point</b>")))
+  expect_match(w$points[1], "^<b>Cluster: .+</b>\n<b>Answer profile n\u00b0")
+  p <- quietly(ggmca(fx_mca(), lang = "en"))
+  expect_match(p$labels$x, "^Axe 1 \\([0-9.]+%\\)$")
+})
+
+test_that("a graph built in French keeps its French when drawn, and leaves LANGUAGE as it was", {
+  skip_if_no_gettext()
+  local_null_device()
+  before <- Sys.getenv("LANGUAGE", unset = NA_character_)
+  w <- fx_graph_words("fr")
+  expect_identical(w$model$lang, "fr")
+  expect_true(any(grepl("Fr\u00e9quence (n=", w$tips, fixed = TRUE)))
+  expect_true(any(grepl("Contrib axe 1\u202f:", w$tips, fixed = TRUE)))
+  expect_true(any(grepl("Variables actives\u202f:", w$tips, fixed = TRUE)))
+  expect_true(any(startsWith(w$tips, "<b>Point moyen</b>")))
+  expect_match(w$points[1], "^<b>Classe\u202f: .+</b>\n<b>Profil de r\u00e9ponses n\u00b0")
+  p <- quietly(ggmca(fx_mca(), lang = "fr"))
+  expect_match(p$labels$x, "^Axe 1 \\([0-9]+,[0-9]\u202f%\\)$")          # the decimal comma
+  expect_identical(Sys.getenv("LANGUAGE", unset = NA_character_), before)
+})
+
+test_that("the CA, the PCA and the eigenvalues are English when asked in English", {
+  local_null_device()
+  ca <- ggca(fx_ca_multi(), get_data = TRUE, lang = "en")$vars_data$interactive_text
+  expect_true(any(grepl("race (supplementary):", ca, fixed = TRUE)))
+  pc <- ggpca(fx_pca2(), fx_cars(), sup_vars = cyl, get_data = TRUE, lang = "en")
+  expect_true(any(grepl("Active variables:", pc$vars_data$interactive_text, fixed = TRUE)))
+  expect_match(as.character(eigenvalues(fx_mca(), n_axes = 2, lang = "en")$Axe)[3], "of 6")
+  expect_match(ggpca_cor_circle(fx_pca2(), lang = "en")$labels$x, "^Axe 1 \\([0-9.]+%\\)$")
+})
+
+test_that("the CA, the PCA and the eigenvalues speak French when asked in French", {
+  skip_if_no_gettext()
+  local_null_device()
+  ca <- ggca(fx_ca_multi(), get_data = TRUE, lang = "fr")$vars_data$interactive_text
+  expect_true(any(grepl("race (suppl\u00e9mentaire)\u202f:", ca, fixed = TRUE)))
+  pc <- ggpca(fx_pca2(), fx_cars(), sup_vars = cyl, get_data = TRUE, lang = "fr")
+  expect_true(any(grepl("Variables actives\u202f:", pc$vars_data$interactive_text, fixed = TRUE)))
+  expect_match(as.character(eigenvalues(fx_mca(), n_axes = 2, lang = "fr")$Axe)[3], "sur 6")
+  expect_match(ggpca_cor_circle(fx_pca2(), lang = "fr")$labels$x, "^Axe 1 \\([0-9]+,[0-9]\u202f%\\)$")
+})

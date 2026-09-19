@@ -16,6 +16,7 @@
 test_that("the short names are the same functions as the long ones", {
   expect_identical(MCA2, multiple_correspondence_analysis)
   expect_identical(PCA2, principal_component_analysis)
+  expect_identical(CA2, correspondence_analysis)
 })
 
 # --- active_vars accepts what tidyselect accepts ------------------------------------------------
@@ -68,6 +69,13 @@ test_that("PCA2 accepts wt and reaches row.w", {
   res <- PCA2(d, active_vars = 1:7, wt = "w")
   expect_length(res$call$row.w, nrow(d))
   expect_equal(res$call$row.w / sum(res$call$row.w), d$w / sum(d$w))
+
+  # wt and ind_name are selected as in tab(): a bare name works like the string
+  bare <- PCA2(d, active_vars = 1:7, wt = w)
+  expect_equal(bare$call$row.w, res$call$row.w)
+  d$car <- rownames(d)
+  named <- PCA2(d, active_vars = 1:7, wt = w, ind_name = car)
+  expect_identical(rownames(named$ind$coord), rownames(mtcars))
 })
 
 test_that("a zero weight leaves its row out, and the whole data frame still aligns", {

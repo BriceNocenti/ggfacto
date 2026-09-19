@@ -4,9 +4,9 @@
 \alias{ggfacto_widget}
 \title{Widgets written to their own file}
 \description{
-Every interactive graph \pkg{ggfacto} returns -- \link{ggi} (and so \link{ggpca_cor_circle}),
-\link{ggmca_3d}, \link{ggpca_3d} -- carries the class \code{ggfacto_widget}. In a \pkg{knitr}
-document, setting
+Every interactive graph \pkg{ggfacto} returns -- \link{ggi} (and so \code{ggfacto(interactive
+= TRUE)}), \link{ggmca_3d}, \link{ggpca_3d} -- carries the class \code{ggfacto_widget}. In a
+\pkg{knitr} document, setting
 }
 \details{
 \code{options(ggfacto.widget_dir = "auto")}

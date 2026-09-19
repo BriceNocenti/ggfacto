@@ -1,6 +1,7 @@
 # PURPOSE: the gettext plumbing -- the text domain, its cache flush, the language resolver, and the
 #   scope that makes `lang =` an argument rather than an accident of the session.
-# ROLE: everything ggfacto RENDERS in words goes through here. Its model is tabxplor's
+# ROLE: everything ggfacto RENDERS in words goes through here: the tables, and the tooltips and axis
+#   titles of the graphs, whose builders and renderer run inside with_gda_lang(). Its model is tabxplor's
 #   (R/fmt_class.R: legend_resolve_lang / flush_gettext_cache / with_legend_lang), deliberately, so
 #   two packages whose tables sit side by side speak with one voice.
 # KEY CONSTRAINTS:

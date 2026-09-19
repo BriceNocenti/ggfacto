@@ -105,3 +105,55 @@ test_that("an unlabelled chunk is refused rather than given a name that drifts",
   # Outside a chunk, opts_current$get("label") is NULL -- the same condition as an unlabelled one.
   expect_error(knit_print.ggfacto_widget(w), "needs a label")
 })
+
+
+# --- a graph knitted at its own aspect ratio ------------------------------------------------------
+
+# Knit a markdown text in a temporary directory, the plot `p` in reach, and return the markdown and
+# the figure files. knitr::knit() alone: no pandoc, so it runs everywhere.
+knit_graph <- function(chunks, p, .env = parent.frame()) {
+  skip_if_not_installed("knitr")
+  dir <- withr::local_tempdir(.local_envir = .env)
+  withr::local_dir(dir, .local_envir = .env)
+  env <- new.env()
+  env$p <- p
+  md <- knitr::knit(text = chunks, quiet = TRUE, envir = env)
+  list(md = paste(md, collapse = "\n"), files = list.files("figure", full.names = TRUE))
+}
+
+# A png's pixel size, read from its IHDR header: no png package needed.
+png_dim <- function(f) {
+  b <- as.integer(readBin(f, "raw", 24))
+  c(w = sum(b[17:20] * 256^(3:0)), h = sum(b[21:24] * 256^(3:0)))
+}
+
+test_that("a knitted graph takes its own ratio, and keeps its caption", {
+  local_null_device()
+  p   <- quietly(ggmca(fx_mca(), fx_tea()))
+  out <- knit_graph(c("```{r cloud, fig.cap = 'The cloud', fig.width = 6}", "p", "```"), p)
+  expect_match(out$md, "The cloud", fixed = TRUE)
+  d <- png_dim(grep("cloud", out$files, value = TRUE))
+  expect_equal(unname(d["h"] / d["w"]), attr(p, "height_width_ratio"), tolerance = 0.01)
+})
+
+test_that("a chunk that asks for its own height keeps it, and results = 'hide' still shows", {
+  local_null_device()
+  p   <- quietly(ggmca(fx_mca(), fx_tea()))
+  out <- knit_graph(c("```{r fixed, fig.height = 3}", "p", "```", "",
+                      "```{r hidden, results = 'hide'}", "p", "```"), p)
+  d <- png_dim(grep("fixed", out$files, value = TRUE))
+  expect_equal(unname(d["h"] / d["w"]), 3 / 7, tolerance = 0.01)
+  # knitr drops an include_graphics() under results = 'hide' but keeps a plot: so is this one kept
+  expect_match(out$md, "hidden-1.png", fixed = TRUE)
+})
+
+test_that("the class leaves a graph a plain ggplot everywhere else", {
+  local_null_device()
+  p <- quietly(ggmca(fx_mca(), fx_tea()))
+  expect_s3_class(p, c("ggfacto_plot", "ggplot"))
+  q <- p + ggplot2::labs(title = "t")
+  expect_s3_class(q, "ggfacto_plot")
+  expect_identical(attr(q, "height_width_ratio"), attr(p, "height_width_ratio"))
+  expect_output(print(q), NA)
+  expect_s3_class(ggplot2::ggplot_build(q), "ggplot_built")
+})

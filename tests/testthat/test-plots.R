@@ -41,6 +41,24 @@ test_that("the teaching graphs build when FactoMineR renames levels (y/n, shared
   expect_no_error(ggplot2::ggplot_build(quietly(ggmca_with_base_ref(res, d))))
 })
 
+test_that("the base reference draws any pair of axes", {
+  local_null_device()
+  p <- quietly(ggmca_with_base_ref(fx_mca(), axes = c(1, 3)))
+  expect_no_error(ggplot2::ggplot_build(p))
+  expect_match(p$labels$y, "^Axe 3")
+})
+
+test_that("every 2D graph is a ggfacto_plot, and stays one after `+`", {
+  local_null_device()
+  graphs <- list(quietly(ggmca(fx_mca(), fx_tea())), quietly(ggca(fx_ca())),
+                 quietly(ggmca_initial_dims(fx_mca(), fx_tea())),
+                 quietly(ggmca_with_base_ref(fx_mca())))
+  for (p in graphs) {
+    expect_s3_class(p, c("ggfacto_plot", "ggplot"))
+    expect_s3_class(p + ggplot2::labs(caption = "c"), "ggfacto_plot")
+  }
+})
+
 test_that("keep = selects a few variables on both teaching graphs", {
   # `keep` on ggmca_initial_dims() called purrr::keep() unqualified and died with
   # "could not find function keep" -- a hard error on a documented argument.
@@ -84,7 +102,48 @@ test_that("every documented type builds, and an undocumented one errors", {
   # The `type` vocabulary is the user-facing contract; "numbers" was removed because it mapped an
   # aesthetic to a column nothing ever created and so failed in every configuration.
   local_null_device()
+  for (type in c("text", "labels", "points", "active_vars_only")) {
+    expect_no_error(ggplot2::ggplot_build(
+      quietly(ggmca(fx_mca(), fx_tea_clust(), sup_vars = SPC, clust = clust, type = type))))
+  }
   expect_error(quietly(ggmca(fx_mca(), fx_tea(), type = "numbers")), "unknown type")
+})
+
+test_that("type = 'active_vars_only' draws the active levels alone, and keeps the cloud", {
+  local_null_device()
+  p <- quietly(ggmca(fx_mca(), fx_tea_clust(), sup_vars = SPC, clust = clust,
+                     type = "active_vars_only"))
+  drawn <- unlist(lapply(ggplot2::ggplot_build(p)$data, function(d) as.character(d$label)))
+  expect_false(any(c("employee", levels(fx_tea_clust()$clust)) %in% drawn))
+  expect_true(all(c("breakfast", "Not.breakfast") %in% drawn))
+})
+
+test_that("out_lims_move moves the levels outside the limits to the edges", {
+  local_null_device()
+  lim   <- c(-0.3, 0.3)
+  moved <- quietly(ggmca(fx_mca(), fx_tea(), xlim = lim, out_lims_move = TRUE, get_data = TRUE))
+  kept  <- quietly(ggmca(fx_mca(), fx_tea(), xlim = lim, get_data = TRUE))
+  expect_equal(nrow(moved$vars_data), nrow(fx_pd_plain()$vars_data) - 1L)   # the central point
+  expect_true(all(moved$vars_data$`Dim 1` >= lim[1] & moved$vars_data$`Dim 1` <= lim[2]))
+  expect_lt(nrow(kept$vars_data), nrow(moved$vars_data))
+})
+
+test_that("the largest point is sized from the drawn points' weights, unless a size is given", {
+  expect_identical(auto_size_max(c(1, 1, 1)), 1.5)                  # equal weights
+  expect_identical(auto_size_max(c(1, 1, 2, 9)), 4)                 # a mild spread keeps 4
+  expect_equal(auto_size_max(c(rep(1, 99), 196)), 14)               # sqrt(max / median)
+  expect_identical(auto_size_max(c(rep(1, 99), 1e4)), 20)           # capped
+  local_null_device()
+  p <- quietly(ggmca(fx_mca(), fx_tea(), profiles = TRUE, size_scale_max = 7))
+  sizes <- unlist(lapply(ggplot2::ggplot_build(p)$data, function(d) d$size))
+  expect_equal(max(sizes, na.rm = TRUE), 7)
+})
+
+test_that("the colour groups are announced only when asked for", {
+  local_null_device()
+  expect_no_message(ggmca(fx_mca(), fx_tea(), sup_vars = c(SPC, sex)))
+  withr::local_options(ggfacto.verbose = TRUE)
+  expect_message(ggmca(fx_mca(), fx_tea(), sup_vars = c(SPC, sex)), "colornames_recode")
 })
 
 test_that("type = 'facets' builds with the arguments its example passes", {
@@ -190,10 +249,10 @@ test_that("the render hints ride as attributes and survive `+`", {
   expect_false(is.null(attr(p + ggplot2::labs(title = "x"), "height_width_ratio", exact = TRUE)))
 })
 
-test_that("ggca carries its own css_tooltip", {
+test_that("ggca carries the ratio of its axes", {
   local_null_device()
   pc <- quietly(ggca(fx_ca()))
-  expect_false(is.null(attr(pc, "css_tooltip", exact = TRUE)))
+  expect_gt(attr(pc, "height_width_ratio", exact = TRUE), 0)
 })
 
 test_that("printing a graph draws it without printing anything", {
@@ -220,6 +279,12 @@ test_that("the ggfacto_widget tag sits where neither dispatch nor htmlwidgets is
   expect_s3_class(w, "ggfacto_widget")
 })
 
+test_that("ggi passes a graph that is already interactive through unchanged", {
+  local_null_device()
+  w <- quietly(ggi(quietly(ggmca(fx_mca(), fx_tea()))))
+  expect_identical(ggi(w), w)
+})
+
 test_that("ggsave2 writes a non-empty file", {
   # Broken before the hints became attributes: grid.draw() could not dispatch on the flattened list.
   local_null_device()
@@ -244,7 +309,7 @@ test_that("hover ids are banded so a whole cluster lights up together", {
   # Active variables from 1000, HCPC clusters and answer profiles from 10000: every point of one
   # cluster shares an id, which is what makes hovering any of them highlight them all.
   plot_data <- fx_pd_clust()
-  actives <- plot_data$vars_data$id[plot_data$vars_data$color_group == "active_vars"]
+  actives <- plot_data$vars_data$id[plot_data$vars_data$role == "active"]
   expect_true(all(actives >= 1000L))
   clust_ids <- plot_data$vars_data$id[plot_data$vars_data$vars == "clust"]
   expect_true(all(clust_ids >= 10000L))

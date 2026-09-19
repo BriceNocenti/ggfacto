@@ -465,6 +465,16 @@ test_that("the eigenvalue table totals the whole cloud, truncation included", {
     tabxplor::get_footer_tabs(mca_interpret(fx_mca(), axes = 1, color = FALSE))[[1]]))
 })
 
+test_that("eigenvalues() is the table interpret() hangs under its own, alone", {
+  under <- function(x, ...) tabxplor::get_footer_tabs(interpret(x, ...))[[1]]
+  expect_identical(eigenvalues(fx_mca()), under(fx_mca()))
+  expect_identical(eigenvalues(fx_ca()),  under(fx_ca()))
+  expect_identical(eigenvalues(fx_pca()), under(fx_pca()))
+  expect_identical(eigenvalues(fx_mca(), n_axes = 2, color = FALSE),
+                   under(fx_mca(), n_axes = 2, color = FALSE))
+  expect_error(eigenvalues(lm(mpg ~ hp, mtcars)), "reads a multiple correspondence")
+})
+
 test_that("the data bar reaches the RENDERED html, on the data rows alone", {
   # A VALUE test, not a shape one: the bar was once set, documented and tested, and displayed never --
   # `% variance` has a space in its name, and anything keyed by column name goes stale silently. Only

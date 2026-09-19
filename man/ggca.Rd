@@ -2,12 +2,12 @@
 % Please edit documentation in R/ca.R
 \name{ggca}
 \alias{ggca}
-\title{Readable and Interactive graph for simple correspondence analysis}
+\title{Readable and Interactive Graph for Simple Correspondence Analysis}
 \usage{
 ggca(
   res.ca,
   axes = c(1, 2),
-  show_sup = FALSE,
+  show_sup = TRUE,
   xlim,
   ylim,
   out_lims_move = FALSE,
@@ -15,101 +15,137 @@ ggca(
   text_repel = TRUE,
   uppercase = "col",
   tooltips = c("row", "col"),
-  rowtips_subtitle = "Row pct",
-  coltips_subtitle = "Column pct",
-  rowcolor_numbers = 0,
-  colcolor_numbers = 0,
+  rowtips_subtitle,
+  coltips_subtitle,
+  rowcolor_numbers,
+  colcolor_numbers,
   cleannames = TRUE,
-  filter = "",
+  filter,
   title,
   text_size = 3.5,
   dist_labels = c("auto", 0.12),
   right_margin = 0,
-  size_scale_max = 8,
-  use_theme = TRUE
+  size_scale_max = NULL,
+  use_theme = TRUE,
+  clust,
+  color_groups = "^.{0}",
+  clust_color_groups = "^.+$",
+  keep_levels,
+  discard_levels,
+  axes_names = NULL,
+  axes_reverse = NULL,
+  actives_in_bold = TRUE,
+  sup_in_italic = TRUE,
+  shift_colors = 0,
+  colornames_recode,
+  scale_color_light = material_colors_light(),
+  scale_color_dark = material_colors_dark(),
+  get_data = FALSE,
+  lang = NULL
 )
 }
 \arguments{
-\item{res.ca}{An object created with \code{\link{correspondence_analysis}} or
+\item{res.ca}{An analysis made with \code{\link{correspondence_analysis}} or
 \code{FactoMineR::\link[FactoMineR]{CA}}.}
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 
-\item{show_sup}{When \code{TRUE} show supplementary rows and cols.}
+\item{show_sup}{Set to \code{FALSE} to leave the supplementary rows and columns out.}
 
-\item{xlim, ylim}{Horizontal and vertical axes limits,
-as double vectors of length 2.}
+\item{xlim, ylim}{Horizontal and vertical axes limits, as double vectors of length 2.}
 
-\item{out_lims_move}{When \code{TRUE}, the points out of \code{xlim} or
-\code{ylim} are not removed, but moved at the edges of the graph.}
+\item{out_lims_move}{When \code{TRUE}, the levels outside \code{xlim} or \code{ylim} are moved
+to the edges of the graph rather than left out.}
 
-\item{type}{Determines the way the two variables of the table are printed.
-  \itemize{
-  \item \code{"points"} : colored points with text legends
-  \item \code{"text"} : colored text
-  \item \code{"labels"} : colored labels
-}}
+\item{type}{How the levels are printed: \code{"points"} (coloured points with their names),
+\code{"text"} (coloured names) or \code{"labels"} (coloured labels).}
 
-\item{text_repel}{By default, labels are moved so that they do not overlap, with
-\code{ggrepel::\link[ggrepel]{geom_text_repel}}. Set to \code{FALSE} to print each label
-exactly at its point, which is faster to draw.}
+\item{text_repel}{By default, labels are moved so that they do not overlap. Set to
+\code{FALSE} to print each label exactly at its point.}
 
-\item{uppercase}{Print \code{"row"} var or \code{"col"} var labels with
-uppercase.}
+\item{uppercase}{Print the levels of the column variables (\code{"col"}, the default), of the row
+variables (\code{"row"}), of both or none (\code{NULL}) in uppercase.}
 
-\item{tooltips}{Choose the content of interactive tooltips at mouse hover :
-\code{"col"} for the table of columns percentages, \code{"row"} for line
-percentages, default to \code{c("row", "col")} for both.}
+\item{tooltips}{The tooltips to build: \code{"row"} for the profiles of the row levels,
+\code{"col"} for those of the column levels, both by default.}
 
-\item{rowtips_subtitle, coltips_subtitle}{The subtitles used before the table
-in interactive tooltips.}
+\item{rowtips_subtitle, coltips_subtitle, rowcolor_numbers, colcolor_numbers, filter}{Deprecated.
+A tooltip is headed by its variables' names; \code{color_groups = "^.{2}"} replaces
+\code{rowcolor_numbers = 2}, and \code{discard_levels} replaces \code{filter}.}
 
-\item{rowcolor_numbers, colcolor_numbers}{If row var or col var levels are
-prefixed with numbers(ex. : \code{"1-"} ), the number of digits to use
-to create classes that will be used to add colors to points.}
-
-\item{cleannames}{Set to \code{TRUE} to clean levels names, by removing
-prefix numbers like \code{"1-"}, and text in parentheses.}
-
-\item{filter}{Regex patterns to discard levels of row or col variables.}
+\item{cleannames}{Set to \code{TRUE} to clean levels names, by removing prefix numbers like
+\code{"1-"}, and text in parentheses.}
 
 \item{title}{The title of the graph.}
 
 \item{text_size}{Size of text.}
 
-\item{dist_labels}{When \code{type = "points"}, the distance of text and
-labels from points.}
+\item{dist_labels}{When \code{type = "points"}, the distance of the names from the points.}
 
-\item{right_margin}{A margin at the right, in cm. Useful to read tooltips
-over points placed at the right of the graph without formatting problems.}
+\item{right_margin}{A margin at the right, in cm.}
 
-\item{size_scale_max}{Size of points.}
+\item{size_scale_max}{The size of the largest point. By default, computed from the spread of the
+levels' weights.}
 
-\item{use_theme}{By default, a specific \code{ggplot2} theme is used.
-Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
+\item{use_theme}{By default, a specific \code{ggplot2} theme is used. Set to \code{FALSE} to
+customize your own \code{\link[ggplot2:theme]{theme}}.}
+
+\item{clust}{The clusters of the levels of one margin, as \code{\link{hierarchical_clust}}
+returns them outside \code{mutate()}: `clust = hierarchical_clust(res.ca, ncp = 2, nb_clust = 4)`.
+The levels of a cluster take its colour, and the cluster is drawn at their barycentre.}
+
+\item{color_groups}{One colour per variable by default. A regex matched against each level name
+makes colour groups within the variables (\code{"^.{1}"}: upon their first character).}
+
+\item{clust_color_groups}{Color groups for the clusters.}
+
+\item{keep_levels, discard_levels}{Regexes (or vectors of them) of the levels to keep, or to leave
+out.}
+
+\item{axes_names}{Names of all the axes (not just the two selected ones), as a character vector.}
+
+\item{axes_reverse}{`1` to invert left and right, `2` to invert up and down, `1:2` for both.}
+
+\item{actives_in_bold}{Set the active levels in bold font.}
+
+\item{sup_in_italic}{Set the supplementary levels in italics.}
+
+\item{shift_colors}{Change the colors of the variables.}
+
+\item{colornames_recode}{A named character vector, in \code{forcats::fct_recode()} style, to
+rename the colour groups (printed with `options(ggfacto.verbose = TRUE)`).}
+
+\item{scale_color_light, scale_color_dark}{The colours of the points and of the names.}
+
+\item{get_data}{Returns the data frames the graph is drawn from, instead of the graph.}
+
+\item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
 }
 \value{
-A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
-`RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
-Sending the result  through \code{\link{ggi}} will draw the
-interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
+A \code{\link[ggplot2:ggplot]{ggplot}} object, to which elements can be added with
+\code{+}. Sending it through \code{\link{ggi}} draws the interactive graph.
 }
 \description{
-A readable, complete and beautiful graph for simple
-correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{CA}}.
-Interactive tooltips, appearing when hovering on  points with mouse, allow to
-keep in mind all the content of the table while reading the graph. Since it is
-made in the spirit of \code{\link[ggplot2]{ggplot2}}, it is possible to change
-theme or add another plot elements with +. Then, interactive
-tooltips won't appear until you pass the result through \code{\link{ggi}}.
+A readable, complete and beautiful graph of a correspondence analysis. Hovering a
+level shows its profile --- its distribution over the levels of the other variable, each
+percentage coloured by its difference from the average profile, as in
+\code{tabxplor::tab(color = "diff")} --- so the graph is read with the table it draws. The
+supplementary variables of the table (see \code{\link{correspondence_analysis}}) are drawn in
+their own colours, and the clusters of one margin, made with \code{\link{hierarchical_clust}},
+can colour its levels. It is a \pkg{ggplot2} graph, to which elements can be added with `+`;
+pass it to \code{\link{ggi}} for the interactive version. \code{\link{ggfacto}} is the same
+graph, for any analysis.
 }
 \examples{
 \donttest{
-tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
-res.ca  <- correspondence_analysis(tableau)
+gss <- forcats::gss_cat |>
+  dplyr::filter(!relig \%in\% c("No answer", "Don't know", "Not applicable"),
+                !partyid \%in\% c("No answer", "Don't know"))
+res.ca <- correspondence_analysis(tabxplor::tab(gss, relig, partyid))
+ggca(res.ca) |>
+  ggi()
 
-# Interactive plot :
-graph.ca <- ggca(res.ca, title = "Race by marital status: correspondence analysis")
-ggi(graph.ca) # to make the plot interactive
+# the clusters of the religions, drawn among them
+ggca(res.ca, clust = hierarchical_clust(res.ca, ncp = 2, nb_clust = 4))
 }
 }

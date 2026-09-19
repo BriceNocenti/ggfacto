@@ -2,7 +2,7 @@
 #   clusters -- hierarchical_clust(), clust_tab(), and HCPC_tab(), the former form of the table.
 # ROLE: The last step of the workflow. hierarchical_clust() clusters the individuals of an MCA or a
 #   PCA, or the levels of one margin of a CA, and returns the clusters as a factor, to be written
-#   into the data frame with mutate(); clust_tab() and ggmca(clust =) read that column back.
+#   into the data frame with mutate(); clust_tab() and ggfacto(clust =) read that column back.
 #   resolve_clust() is the one reader of a `clust =` argument, shared with R/mca-data.R.
 # KEY CONSTRAINTS:
 #   - The clusters are FactoMineR::HCPC()'s, computed here for their memory: Ward's tree is built on
@@ -36,7 +36,7 @@
 #' To choose the number of clusters, look at the tree first: `hierarchical_clust(res, ncp = 3)`.
 #' The tree is built once: cutting it again, into another number of clusters or with names, is
 #' instant. Name the clusters with `names`, then describe them with \code{\link{clust_tab}} and
-#' draw them with \code{\link{ggmca}(clust = )}.
+#' draw them with \code{\link{ggfacto}(clust = )}.
 #'
 #' @param res An analysis made with \code{\link{multiple_correspondence_analysis}},
 #' \code{\link{principal_component_analysis}} or \code{\link{correspondence_analysis}} (or with
@@ -90,7 +90,7 @@
 #'   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 #'
 #' clust_tab(res.mca, tea, clust)
-#' ggmca(res.mca, tea, clust = clust)
+#' ggfacto(res.mca, tea, clust = clust)
 #'
 #' # Named, in the order of your choice (the tree is not built again)
 #' tea <- tea |>

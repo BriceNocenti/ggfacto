@@ -39,12 +39,13 @@ then remembers which rows it used, for \code{\link{hierarchical_clust}}.}
 \item{active_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The names
 of the active variables.}
 
-\item{wt}{The name of the row weight variable}
+\item{wt}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The weight variable, if any.}
 
 \item{col.w}{The weights of the columns, as a numeric vector of the same
 length than `active_vars.`}
 
-\item{ind_name}{Possibly, a variable with the names of the individuals.}
+\item{ind_name}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> Possibly, the variable holding the
+names of the individuals.}
 
 \item{scale.unit}{A boolean, if `TRUE` (value set by default) then data are
 scaled to unit variance.}

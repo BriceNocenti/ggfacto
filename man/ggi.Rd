@@ -2,7 +2,7 @@
 % Please edit documentation in R/render.R
 \name{ggi}
 \alias{ggi}
-\title{Pass a MCA plot into a html interactive plot}
+\title{Make a graph interactive}
 \usage{
 ggi(
   plot = ggplot2::last_plot(),
@@ -18,7 +18,10 @@ ggi(
 )
 }
 \arguments{
-\item{plot}{The plot, created with \link{ggmca} or \link{ggca}.}
+\item{plot}{The graph, made with \code{\link{ggfacto}} (or \code{\link{ggmca}},
+\code{\link{ggca}}, \code{\link{ggpca}}, \code{\link{ggpca_cor_circle}}), with or without
+\pkg{ggplot2} elements added with \code{+}. A graph that is already interactive is returned as it
+is.}
 
 \item{width}{The width in centimeters. Default to printing device's size.}
 
@@ -49,5 +52,5 @@ setting option \code{"ggfacto.widget_dir"} writes it to its own file and embeds 
 \code{<iframe>} instead of the widget itself: see \link{ggfacto_widget}.
 }
 \description{
-Pass a MCA plot into a html interactive plot
+Make a graph interactive
 }

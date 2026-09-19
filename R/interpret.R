@@ -1,7 +1,7 @@
 # PURPOSE: the interpretation tables -- interpret() and its three builders, mca_interpret(),
-#   ca_interpret() and pca_interpret() -- and the contract they share with clust_tab() and
-#   mean_sd_tab(). interpret() dispatches on the analysis; an MCA is read through its model
-#   (R/model.R), whatever engine made it.
+#   ca_interpret() and pca_interpret(), and eigenvalues(), the table they hang under theirs -- and
+#   the contract they share with clust_tab() and mean_sd_tab(). interpret() dispatches on the
+#   analysis; an MCA is read through its model (R/model.R), whatever engine made it.
 # ROLE: reading a factorial analysis WITHOUT the cloud: which points build an axis, on which side,
 #   and how well the axis represents them. One family, one output contract.
 # KEY CONSTRAINTS:
@@ -331,6 +331,61 @@ gda_eig_tab <- function(eig, n_ind, mrv = NULL, n_axes = 8L, n_total = NULL, col
   out <- tabxplor::new_tab(out, meta = list(render_extras = list(n = "no")))
   if (color) out <- tabxplor::set_bars(out, "% variance")
   out
+}
+
+# The eigenvalue table of any analysis -- the one interpret() hangs under its table and
+# eigenvalues() prints alone: the individuals it counts, Benzecri's rate for an MCA, and the cloud's
+# axis count, which `ncp` does not touch.
+#' @keywords internal
+#' @noRd
+eig_tab_of <- function(res, n_axes = 8L, color = TRUE, model = NULL) {
+  if (is_mca(res)) {
+    m <- if (is.null(model)) mca_model(res) else model
+    # an MCA has (active levels - questions) axes, read off `$var$coord`'s ROWS, which `ncp` keeps
+    return(gda_eig_tab(m$eig, n_ind = m$n, mrv = benzecri_mrv(res), n_axes = n_axes,
+                       n_total = nrow(m$var$coord) - m$Q, color = color))
+  }
+  if (inherits(res, "CA")) {
+    # a correspondence analysis has min(rows, columns) - 1 axes, counted on its ACTIVE table
+    return(gda_eig_tab(res$eig, n_ind = round(sum(res$call$X)), n_axes = n_axes,
+                       n_total = min(dim(res$call$X)) - 1L, color = color))
+  }
+  if (inherits(res, "PCA")) {
+    # a PCA has min(active variables, individuals - 1) axes
+    n <- nrow(res$ind$coord)
+    return(gda_eig_tab(res$eig, n_ind = n, n_axes = n_axes,
+                       n_total = min(nrow(res$var$coord), n - 1L), color = color))
+  }
+  stop("eigenvalues() reads a multiple correspondence, correspondence or principal component ",
+       "analysis.", call. = FALSE)
+}
+
+#' The Eigenvalues of an Analysis
+#'
+#' @description The table of the eigenvalues of the axes, the one \code{\link{interpret}} prints
+#' under its table: the variance of each axis, its percentage and the cumulated percentage, and for
+#' a multiple correspondence analysis Benzecri's modified rate, which corrects the raw percentages.
+#' It is read to choose how many axes to interpret.
+#'
+#' @param res An analysis made with \code{\link{multiple_correspondence_analysis}},
+#' \code{\link{correspondence_analysis}} or \code{\link{principal_component_analysis}} (or with
+#' \code{FactoMineR::MCA()}, \code{CA()} or \code{PCA()}, or \code{GDAtools::speMCA()} or
+#' \code{csMCA()}).
+#' @param n_axes How many axes to print. When some are left out, a last row states how many the
+#' cloud has.
+#' @param color Set to \code{FALSE} to draw no data bar behind the percentages.
+#' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
+#'
+#' @return A \pkg{tabxplor} table, printed as \code{options(tabxplor.print)} says.
+#' @export
+#' @seealso [interpret()], [benzecri_mrv()].
+#'
+#' @examples
+#' data(tea, package = "FactoMineR")
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
+#' eigenvalues(res.mca)
+eigenvalues <- function(res, n_axes = 8L, color = TRUE, lang = NULL) {
+  with_gda_lang(lang, function(lg) eig_tab_of(res, n_axes = n_axes, color = color))
 }
 
 
@@ -730,10 +785,7 @@ mca_interpret <- function(res.mca,
   packed <- gda_poles(long, min_contrib)
 
   mrv     <- benzecri_mrv(res.mca)
-  # The cloud's axis count, which `ncp` does not touch: an MCA has (active levels - questions) axes.
-  # Read off `$var$coord`, whose ROWS are the levels (only its columns are truncated by `ncp`).
-  eig_tab <- gda_eig_tab(model$eig, n_ind = model$n, mrv = mrv, n_axes = n_axes,
-                         n_total = nrow(model$var$coord) - model$Q, color = color)
+  eig_tab <- eig_tab_of(res.mca, n_axes = n_axes, color = color, model = model)
 
   # The axis heading states the raw eigenvalue percentage AND Benzecri's modified rate, which is the
   # number that corrects it -- an MCA's raw percentages understate the first axes badly. An axis
@@ -793,10 +845,9 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
   long   <- ca_interpret_data(res.ca, axes, nm)
   packed <- gda_poles(long, min_contrib)
 
-  n_ind   <- round(sum(res.ca$call$Xtot))
-  # a correspondence analysis has min(rows, columns) - 1 axes
-  eig_tab <- gda_eig_tab(res.ca$eig, n_ind = n_ind, n_axes = n_axes,
-                         n_total = min(dim(res.ca$call$X)) - 1L, color = color)
+  # the ACTIVE table: `Xtot` also holds the supplementary rows and columns
+  n_ind   <- round(sum(res.ca$call$X))
+  eig_tab <- eig_tab_of(res.ca, n_axes = n_axes, color = color)
   label   <- gettextf("Axe %s: %s%% of variance", packed$axis, gda_num(packed$pct, lg))
 
   gda_poles_tab(packed, axis_label = label, group_name = "Variable", n_ind = n_ind,
@@ -887,9 +938,7 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
       col_var = cv, color = "no")
   }
 
-  # a PCA has min(active variables, individuals - 1) axes
-  eig_tab <- gda_eig_tab(res.pca$eig, n_ind = n_acp, n_axes = n_axes,
-                         n_total = min(n_var, n_acp - 1L), color = color)
+  eig_tab <- eig_tab_of(res.pca, n_axes = n_axes, color = color)
 
   # The generated legend names `coord`, the only column it grades; the glossary names the rest.
   glossary <- c(

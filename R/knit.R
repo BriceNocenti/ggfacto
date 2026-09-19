@@ -1,7 +1,8 @@
-# PURPOSE: Keep a knitted widget's payload out of the markdown pandoc has to read.
-# ROLE: The seam between ggfacto's htmlwidgets and knitr. as_ggfacto_widget() tags every widget
-#   the package returns; knit_print.ggfacto_widget() writes it to its own file and emits an
-#   <iframe> instead, when the document asks for it.
+# PURPOSE: The seams between ggfacto's graphs and knitr: a widget's payload kept out of the markdown
+#   pandoc has to read, and a static graph drawn at its own aspect ratio.
+# ROLE: as_ggfacto_widget() tags every widget the package returns; knit_print.ggfacto_widget()
+#   writes it to its own file and emits an <iframe> instead, when the document asks for it.
+#   knit_print.ggfacto_plot() draws a ggfacto ggplot at the chunk's width and its own height.
 # KEY CONSTRAINTS:
 #   - Tagging PREPENDS the class, so print.girafe / print.plotly still dispatch by inheritance and
 #     interactive display is untouched. Never put the method on `girafe` or `htmlwidget`: that
@@ -15,9 +16,9 @@
 
 #' Widgets written to their own file
 #'
-#' Every interactive graph \pkg{ggfacto} returns -- \link{ggi} (and so \link{ggpca_cor_circle}),
-#' \link{ggmca_3d}, \link{ggpca_3d} -- carries the class \code{ggfacto_widget}. In a \pkg{knitr}
-#' document, setting
+#' Every interactive graph \pkg{ggfacto} returns -- \link{ggi} (and so \code{ggfacto(interactive
+#' = TRUE)}), \link{ggmca_3d}, \link{ggpca_3d} -- carries the class \code{ggfacto_widget}. In a
+#' \pkg{knitr} document, setting
 #'
 #' \code{options(ggfacto.widget_dir = "auto")}
 #'
@@ -212,4 +213,76 @@ widget_iframe <- function(x, src, label) {
     "style=\"width:", width, "; max-width:100%; aspect-ratio:1/",
     format(ratio, digits = 6), "; border:0; display:block;\"></iframe>"
   )
+}
+
+
+#' Graphs knitted at their own aspect ratio
+#'
+#' Every graph \pkg{ggfacto} draws with \pkg{ggplot2} (\link{ggfacto}, \link{ggmca}, \link{ggca},
+#' \link{ggpca}, \link{ggpca_cor_circle}...) carries the class \code{ggfacto_plot}, and knows the
+#' ratio of its axes: an axis twice as long as the other is drawn twice as long, so the cloud keeps
+#' the scale it is interpreted with. In a \pkg{knitr} or Quarto document, such a graph is drawn at
+#' the chunk's \code{fig.width} and at the height this ratio gives: no \code{fig.height} to compute
+#' by hand. Captions (\code{fig.cap}), alignment, \code{out.width} and cross-references work as for
+#' any figure.
+#'
+#' A chunk that sets its own \code{fig.height} or \code{fig.asp} (different from the document's
+#' default) keeps it. The class changes nothing else: the object is still a ggplot, to which
+#' \pkg{ggplot2} elements can be added with \code{+}, and \link{ggi} still makes it interactive.
+#'
+#' @name ggfacto_plot
+NULL
+
+# DESIGN: the graph writes its own figure file under the chunk's fig.path and hands it back through
+#   include_graphics(), so it passes the plot hook like any figure (captions, fig.align, out.width,
+#   Quarto cross-references). The device is the chunk's first `dev`.
+# WARNING: an explicit size is detected against the DOCUMENT default (opts_chunk), since the chunk's
+#   resolved options cannot tell a default from a choice: a chunk asking for its own fig.height or
+#   fig.asp keeps it, and so does anything this method cannot honour, through NextMethod().
+#   `results = "hide"` is one: knitr drops an include_graphics() there, where it keeps a plot.
+knit_print.ggfacto_plot <- function(x, options = knitr::opts_current$get(), ...) {
+  ratio <- attr(x, "height_width_ratio", exact = TRUE)
+  doc   <- knitr::opts_chunk$get()
+  asked <- !identical(options$fig.asp, doc$fig.asp) ||
+    (is.null(options$fig.asp) && !identical(options$fig.height, doc$fig.height))
+  dev   <- knit_device(options$dev)
+  if (is.null(ratio) || asked || is.null(dev) || is.null(options$fig.width) ||
+      options$fig.show %in% "hide" || options$results %in% "hide") {
+    return(NextMethod())
+  }
+
+  file <- knitr::fig_path(paste0(".", dev$ext), options,
+                          number = paste0("ggfacto-", knit_counter(options$label)))
+  dir.create(dirname(file), recursive = TRUE, showWarnings = FALSE)
+  dev_args <- options$dev.args
+  if (!is.list(dev_args) || any(names(dev_args) %in% options$dev)) dev_args <- list()
+  do.call(ggplot2::ggsave, c(list(filename = file, plot = x, device = dev$fun,
+                                  width = options$fig.width, height = options$fig.width * ratio,
+                                  units = "in", dpi = if (is.null(options$dpi)) 72 else options$dpi),
+                             dev_args))
+  knitr::include_graphics(file)
+}
+
+# The devices a knitted graph can be written with, from knitr's `dev` names.
+knit_device <- function(dev) {
+  dev <- if (is.character(dev) && length(dev) != 0) dev[1] else ""
+  switch(dev,
+         png = , ragg_png = list(ext = "png", fun = "png"),
+         jpeg = list(ext = "jpeg", fun = "jpeg"),
+         tiff = list(ext = "tiff", fun = "tiff"),
+         svg = , svglite = list(ext = "svg", fun = "svg"),
+         pdf = list(ext = "pdf", fun = "pdf"),
+         cairo_pdf = list(ext = "pdf", fun = grDevices::cairo_pdf),
+         NULL)
+}
+
+# A figure number per chunk, so two graphs of one chunk never share a file.
+knit_state <- new.env(parent = emptyenv())
+knit_counter <- function(label) {
+  if (!identical(knit_state$label, label)) {
+    knit_state$label <- label
+    knit_state$n     <- 0L
+  }
+  knit_state$n <- knit_state$n + 1L
+  knit_state$n
 }

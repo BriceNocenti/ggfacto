@@ -18,10 +18,19 @@
 
 # --- the plot model -----------------------------------------------------------------------------
 
-test_that("ggmca_data returns the five-element plot model", {
+test_that("ggmca_data returns the six-element plot model", {
   plot_data <- md(fx_mca(), fx_tea())
   expect_type(plot_data, "list")
-  expect_named(plot_data, c("vars_data", "ind_data", "individuals", "res.mca", "clust"))
+  expect_named(plot_data, c("vars_data", "ind_data", "individuals", "res", "clust", "lang"))
+  expect_identical(plot_data$lang, gda_resolve_lang(NULL))
+})
+
+test_that("each level row says what it is, and only a coloured one has a colour group", {
+  vd <- md(fx_mca(), fx_tea_clust(), sup_vars = SPC, clust = clust)$vars_data
+  expect_setequal(unique(vd$role), c("active", "sup", "clust", "central"))
+  expect_true(all(is.na(vd$color_group[vd$role %in% c("active", "central")])))
+  expect_false(anyNA(vd$color_group[vd$role %in% c("sup", "clust")]))
+  expect_identical(sum(vd$role == "central"), 1L)
 })
 
 test_that("the plot model is flat: no list-column in any of its tables", {
@@ -34,9 +43,9 @@ test_that("the plot model is flat: no list-column in any of its tables", {
   }
 })
 
-test_that("the model carries a STRIPPED res.mca, not the FactoMineR object", {
+test_that("the model carries a STRIPPED res, not the FactoMineR object", {
   # The rendering half must not be able to recompute anything: it gets eigenvalues and axis names.
-  res <- fx_pd_plain()$res.mca
+  res <- fx_pd_plain()$res
   expect_named(res, c("eig", "axes_names"))
   expect_false("call" %in% names(res))
   expect_false("var"  %in% names(res))
@@ -116,8 +125,13 @@ test_that("sup_vars adds supplementary rows in their own colour group", {
   sup   <- md(fx_mca(), fx_tea(), sup_vars = c("SPC", "sex"))
 
   expect_gt(nrow(sup$vars_data), nrow(plain$vars_data))
-  expect_true(any(!sup$vars_data$color_group %in% c("active_vars", "Central point")))
+  expect_true(any(sup$vars_data$role == "sup"))
   expect_true(all(c("SPC", "sex") %in% as.character(sup$vars_data$vars)))
+})
+
+test_that("a call that needs the data frame says so, naming the function called", {
+  expect_error(ggmca_data(fx_mca(), sup_vars = SPC), "ggmca_data\\(\\) needs the data frame")
+  expect_error(ggmca(fx_mca(), sup_vars = SPC), "ggmca\\(\\) needs the data frame")
 })
 
 test_that("sup_vars are read from `data`, so a column absent there is an error", {
@@ -179,7 +193,7 @@ test_that("wcount is present on every path, and agrees with the crosstabs where 
 
 test_that("wcount sums to the population within each variable", {
   vd <- fx_pd_plain()$vars_data
-  vd <- vd[vd$color_group == "active_vars", ]
+  vd <- vd[vd$role == "active", ]
   per_var <- tapply(vd$wcount, as.character(vd$vars), sum)
   expect_true(all(abs(per_var - nrow(fx_tea())) < 1e-6))
 })
@@ -234,6 +248,12 @@ test_that("keep_levels keeps only the matching supplementary levels", {
   expect_lt(nrow(kept$vars_data), nrow(sup$vars_data))
   spc_levels <- kept$vars_data$lvs[as.character(kept$vars_data$vars) == "SPC"]
   expect_true(all(grepl("employee", as.character(spc_levels))))
+})
+
+test_that("keep_levels keeps every level any of its patterns matches", {
+  kept <- md(fx_mca(), fx_tea(), sup_vars = "SPC", keep_levels = c("student", "employee"))
+  expect_setequal(as.character(kept$vars_data$lvs[kept$vars_data$vars == "SPC"]),
+                  c("student", "employee"))
 })
 
 test_that("keep_levels without sup_vars does nothing at all", {

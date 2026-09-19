@@ -142,7 +142,7 @@ expect_cells_equal_tab <- function(res, data, rows, cols) {
   data  <- align_to_fit(m, data)
   extra <- setdiff(c(rows, cols), m$vars)
   xtra  <- tibble::as_tibble(purrr::map(data[extra], \(x) forcats::fct_drop(as.factor(x))))
-  units <- mca_units(m, if (length(extra) != 0) xtra)
+  units <- cloud_units(m, if (length(extra) != 0) xtra)
   units[m$vars] <- active_factors(m, units$..profile)
   ind   <- tibble::as_tibble(active_factors(m, m$key))
   ind[extra] <- xtra

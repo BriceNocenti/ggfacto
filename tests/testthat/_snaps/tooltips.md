@@ -8,8 +8,8 @@
       <b>breakfast</b>
       breakfast
       Frequency (n=144):  48%
-      Contrib axe 1 :  7%
-      Contrib axe 2 : 14%
+      Contrib axe 1:  7%
+      Contrib axe 2: 14%
       
       <b>Active variables:</b>
       breakfast: (+52%) <font color="#300DFD"><b>100%</b></font>
@@ -23,8 +23,8 @@
       <b>Not.breakfast</b>
       breakfast
       Frequency (n=156):  52%
-      Contrib axe 1 :  7%
-      Contrib axe 2 : 13%
+      Contrib axe 1:  7%
+      Contrib axe 2: 13%
       
       <b>Active variables:</b>
       breakfast: (  -48%) <font color="#D60103"><b>  0%</b></font>

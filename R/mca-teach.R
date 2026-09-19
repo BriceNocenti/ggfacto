@@ -10,6 +10,7 @@
 #     the branch rather than inside one of them.
 #   - Both read the analysis through its model (R/model.R): the levels, their counts and their
 #     order are the data's, whatever engine made the fit.
+#   - Both leave through as_ggfacto_plot() (R/render.R), so they knit at their own ratio.
 #   - Both take `data` in second position for consistency with the rest of the ggmca_* family; they
 #     draw only active variables, so the argument changes no output. A bare numeric there is routed
 #     to `axes` for back-compatibility (ggmca_with_base_ref()).
@@ -163,7 +164,7 @@ ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
   # never produces an x2 -- and both branches below plot x2 against x1. Default it before branching.
   if (! "x2" %in% names(disj)) disj <- disj |> dplyr::mutate(x2 = 0, mean_x2 = 0)
 
-  if (length(unique(disj$vars_group)) > 1) {
+  p <- if (length(unique(disj$vars_group)) > 1) {
     #(
     disj |>
       ggplot2::ggplot(
@@ -299,6 +300,7 @@ ggmca_initial_dims <- function(res.mca, data, proj_just = c(1.5, 2),
       ggplot2::theme_minimal()
 
   }
+  as_ggfacto_plot(p)
 
 }
 
@@ -356,8 +358,10 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
   }
   if (missing(data)) data <- NULL
 
-  dim1 <- rlang::sym(str_c("Dim ", axes[1]))
-  dim2 <- rlang::sym(str_c("Dim ", axes[2]))
+  # the geometry below is written for the first two columns: the axes drawn are renamed to them,
+  # and theme_facto() titles them after `axes`
+  dim1 <- rlang::sym("Dim 1")
+  dim2 <- rlang::sym("Dim 2")
 
   m     <- mca_model(res.mca)
   freqs <- m$levels |>
@@ -366,8 +370,11 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
                      freq = .data$wn / m$W)
 
   vars_data <- ggmca_data(res.mca, active_tables = NULL)$vars_data
+  drawn     <- vars_data[paste("Dim", axes[1:2])]
+  vars_data <- dplyr::select(vars_data, -tidyselect::starts_with("Dim "))
+  vars_data[c("Dim 1", "Dim 2")] <- drawn
   acm_orga_from_base_ref <- vars_data |>
-    dplyr::filter(.data$color_group == "active_vars")
+    dplyr::filter(.data$role == "active")
 
   if(length(keep) > 0) acm_orga_from_base_ref <- acm_orga_from_base_ref |>
     dplyr::filter(.data$vars %in% keep)
@@ -495,7 +502,8 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
       "vars", "lvs", "freq", #"wcount",
       "Dim 1", "Dim 2", "start_Dim 1", "start_Dim 2", "proj1", "proj2",
       tidyselect::everything() &
-        -tidyselect::any_of(c("color_group", "id", "begin_text", "interactive_text", "face")) &
+        -tidyselect::any_of(c("role", "color_group", "id", "begin_text", "interactive_text",
+                              "face")) &
         -tidyselect::starts_with("contrib")
     )
 
@@ -517,7 +525,7 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
   }
 
 
-  acm_orga_from_base_ref |>
+  p <- acm_orga_from_base_ref |>
     ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
     theme_facto(list(eig = m$eig, axes_names = res.mca$axes_names), axes = axes,
                 no_color_scale = TRUE) +
@@ -580,4 +588,6 @@ ggmca_with_base_ref <- function(res.mca, data, axes = c(1, 2),
     ) +
     color_scale
 
+  as_ggfacto_plot(p, plot_ratio(c(0, acm_orga_from_base_ref[["Dim 1"]]),
+                                c(0, acm_orga_from_base_ref[["Dim 2"]])))
 }

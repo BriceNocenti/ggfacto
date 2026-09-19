@@ -76,13 +76,40 @@ fx_pca <- function() fx("pca", function() {
   FactoMineR::PCA(d, graph = FALSE)
 })
 
+# mtcars with two factors to project and a weight: the PCA a graph of individuals is drawn from.
+fx_cars <- function() fx("cars", function() {
+  d <- mtcars
+  d$cyl  <- factor(d$cyl)
+  d$gear <- factor(d$gear)
+  d$w    <- rep(c(0.5, 1.5), length.out = nrow(d))
+  d
+})
+fx_pca_vars <- function() c("mpg", "disp", "hp", "drat", "wt", "qsec")
+fx_pca2 <- function() fx("pca2", function() {
+  PCA2(fx_cars(), tidyselect::all_of(fx_pca_vars()), wt = w)
+})
+
+# gss_cat without its non-answers, with a weight that is not exact in binary: the CA's data.
+fx_gss_wt <- function() fx("gss_wt", function() {
+  d <- forcats::gss_cat |>
+    dplyr::filter(!relig %in% c("No answer", "Don't know", "Not applicable"),
+                  !partyid %in% c("No answer", "Don't know"))
+  d$w <- rep(c(0.7, 1.3, 1.1), length.out = nrow(d))
+  d
+})
+# A table of two row and two column variables: the first of each active, the others supplementary.
+fx_tab_multi <- function() fx("tab_multi", function() {
+  tabxplor::tab(fx_gss_wt(), c(relig, marital), c(partyid, race), wt = w)
+})
+fx_ca_multi <- function() fx("ca_multi", function() correspondence_analysis(fx_tab_multi()))
+
 fx_ca <- function() fx("ca", function() {
   FactoMineR::CA(as.matrix(tabxplor::tab(forcats::gss_cat, race, marital)), graph = FALSE)
 })
 
 # --- plot models -------------------------------------------------------------------------------
 
-# ggmca_data() messages the colour groups it found on every call; that is not what is under test.
+# A plot model, the messages of a zero-weight or deprecated call aside.
 md <- function(...) suppressMessages(ggmca_data(...))
 
 # The handful of ggmca_data() calls the suite makes over and over, cached rather than rebuilt.
@@ -108,8 +135,8 @@ local_null_device <- function(.env = parent.frame()) {
   withr::defer(grDevices::dev.off(), envir = .env)
 }
 
-# ggmca_plot() and ggca() print the saved file path with writeLines(), and ggmca_data() messages the
-# colour groups it found. Neither is under test; this keeps the reporter readable.
+# ggsave2() and ggi(savewidget = TRUE) print the saved file path with writeLines(), which is not
+# under test; this keeps the reporter readable.
 quietly <- function(expr) {
   utils::capture.output(out <- suppressMessages(force(expr)))
   out

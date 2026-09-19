@@ -4,6 +4,7 @@
 # KEY CONSTRAINTS:
 #   - plotly is a Suggests: the entry point is guarded with requireNamespace().
 #   - profiles = TRUE is forced -- a 3D cloud with no individuals in it has nothing to show.
+#   - It reads the plot model's rows by `role` (R/plot-model.R), never by a colour group's name.
 # See: CLAUDE.md section Repository Map.
 
 #'  Interactive 3D Plot for Multiple Correspondence Analyses (plotly::)
@@ -91,11 +92,11 @@ ggmca_3d <- function(res.mca, data, clust, axes = 1:3, # color_groups,
   }
 
   acm_clust <- acm$vars_data |>
-    dplyr::filter(str_detect(.data$color_group, paste0("^", clust_name)))
+    dplyr::filter(.data$role == "clust")
   # a plain plotting tibble: no fmt column, so the tab class bought nothing
   acm_vars <- acm$vars_data |>
     dplyr::filter(!.data$vars %in% clust_name) |>
-    dplyr::mutate(face = dplyr::if_else(.data$color_group != "active_vars", "italic", "bold") )
+    dplyr::mutate(face = dplyr::if_else(.data$role != "active", "italic", "bold") )
   acm_profiles <- acm$profiles_coord
 
   if(length(clust_name) > 0) {

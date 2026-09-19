@@ -1,8 +1,8 @@
-# PURPOSE: The MCA entry point and the data half of its graph -- multiple_correspondence_analysis()
-#   (alias MCA2()), ggmca(), ggmca_data().
+# PURPOSE: The MCA entry point and the MCA's graph -- multiple_correspondence_analysis() (alias
+#   MCA2()), ggmca(), ggmca_data(), and mca_plot_data(), the MCA's builder of the shared plot model.
 # ROLE: Fits the MCA on the answer profiles, then turns the analysis plus its microdata into the
-#   plot model R/mca-plot.R draws: list(vars_data, ind_data, individuals, res.mca, clust), flat
-#   tables with no list-column. ggmca() itself is pure orchestration of the two halves.
+#   plot model (R/plot-model.R) the one renderer draws (R/plot-render.R). ggmca() is pure
+#   orchestration of the two halves.
 # KEY CONSTRAINTS:
 #   - Everything is read through the analysis's model (R/model.R), never its slots: the levels by
 #     position, the weights from `source$w`, so a tooltip always describes the population the
@@ -11,11 +11,11 @@
 #     it.
 #   - ggmca()'s signature is exactly ggmca_data()'s plus ggmca_plot()'s, with zero overlap. A new
 #     argument belongs to one half and must be routed to that half only. That is why the model is
-#     `plot_data` and the microdata is `data`: one name each, no collision.
+#     `plot_data` and the microdata is `data`: one name each, no collision. `lang` is the data
+#     half's: the model carries it, so an edited model renders in the language it was built in.
 #   - Every number of a supplementary level, a tooltip or a profile is an aggregation over the
 #     units (profile x non-active answers), never a loop over profiles or individuals. Only
 #     `individuals` keeps one row per individual, for the ellipses.
-#   - A cluster's hover id is matched by its NAME, for its label and its profiles alike.
 #   - Several arguments are inert on their own and only act alongside an enabling one --
 #     keep_levels/discard_levels need sup_vars, tooltip_vars/tooltip_vars_1lv need a table to be
 #     built at all. tests/testthat/test-ggmca-data.R pins both halves.
@@ -119,12 +119,13 @@ MCA2 <- multiple_correspondence_analysis
 
 #' Readable and Interactive graph for multiple correspondence analysis
 #' @description A readable, complete and beautiful graph for multiple
-#' correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{MCA}}.
+#' correspondence analysis made with \code{\link{multiple_correspondence_analysis}}.
+#' \code{\link{ggfacto}} is the same graph, for any analysis.
 #' Interactive tooltips, appearing when hovering near points with mouse,
 #' allow to keep in mind many important data (tables of active variables,
 #' and additional chosen variables) while reading the graph.
 #' Profiles of answers (from the graph of "individuals") are drawn in the back,
-#' and can be linked to \code{FactoMineR::\link[FactoMineR]{HCPC}} classes.
+#' and can be coloured by the clusters of \code{\link{hierarchical_clust}}.
 #' Since it is made in the spirit of \code{\link[ggplot2]{ggplot2}}, it is possible to
 #' change theme or add another plot elements with \code{+}. Then, interactive
 #' tooltips won't appear until you pass the result through \code{\link{ggi}}.
@@ -163,22 +164,23 @@ MCA2 <- multiple_correspondence_analysis
 #' @param text_repel By default, labels are moved so that they do not overlap, with
 #'  \code{ggrepel::\link[ggrepel]{geom_text_repel}}. Set to \code{FALSE} to print each label
 #'  exactly at its point, which is faster to draw.
-#' @param out_lims_move When \code{TRUE}, the points out of \code{xlim} or
-#'  \code{ylim} are not removed, but moved at the edges of the graph.
+#' @param out_lims_move When \code{TRUE}, the levels out of \code{xlim} or
+#'  \code{ylim} are not removed, but moved to the edges of the graph.
 #' @param title The title of the graph.
 #' @param type Determines the way \code{sup_vars} are printed.
 #'    \itemize{
 #'    \item \code{"text"} : colored text
 #'    \item \code{"points"} : colored points with text legends
 #'    \item \code{"labels"} : colored labels
-#'    \item \code{"active_vars_only"} : no \code{sup_vars}
+#'    \item \code{"active_vars_only"} : the active levels alone, and the answer profiles
 #'    \item \code{"facets"} : one graph of profiles of answer for each levels of the
 #'    first \code{sup_vars} (`profiles = TRUE` is not needed). A different color is used for
 #'    each.
 #'  }
-#' @param keep_levels A character vector of variables levels to keep : others
-#' will be discarded.
-#' @param discard_levels A character vector of variables levels to discard.
+#' @param keep_levels A regex, or a vector of them, matching the supplementary levels to keep:
+#' the others are discarded.
+#' @param discard_levels A regex, or a vector of them, matching the supplementary levels to
+#' discard.
 #' @param profiles When set to \code{TRUE}, profiles of answers are drawn in the back
 #' of the graph with light-grey points. When hovering with mouse in the interactive
 #' version (passed in \code{\link{ggi}}), the answers of individuals to active variables
@@ -197,7 +199,8 @@ MCA2 <- multiple_correspondence_analysis
 #' use `data` instead.
 #' @param color_groups By default, there is one color group for all the levels
 #' of each `sup_vars`. It is  possible to color `sup_vars` with groups created
-#' upon their levels, with a regex matched against each level name.
+#' upon their levels, with a regex matched against each level name (the groups are printed in the
+#' console with `options(ggfacto.verbose = TRUE)`).
 #' For exemple, `color_groups = "^."`  makes the groups upon the first character
 #'  of each levels (uselful when their begin by numbers).
 #'  \code{color_groups = "^.{3}"} upon the first three characters.
@@ -206,11 +209,11 @@ MCA2 <- multiple_correspondence_analysis
 #' @param clust_color_groups Color groups for the `clust` variable (the clusters).
 #' @param shift_colors Change colors of the \code{sup_vars} points.
 #' @param colornames_recode A named character vector with
-#' \code{\link[forcats]{fct_recode}} style to rename the levels of the color
-#' variable if needed (levels used for colors are printed in console message
-#' whenever the function is used).
+#' \code{\link[forcats]{fct_recode}} style to rename the colour groups. They are printed in the
+#' console with `options(ggfacto.verbose = TRUE)`.
 #' @param text_size Size of text.
-#' @param size_scale_max Size of points.
+#' @param size_scale_max The size of the largest point. By default, computed from the spread of
+#' the weights of the points drawn, so that the median answer profile stays visible.
 #' @param dist_labels When \code{type = points}, the distance of labels
 #' from points.
 #' @param right_margin A margin at the right, in cm. Useful to read tooltips
@@ -236,6 +239,8 @@ MCA2 <- multiple_correspondence_analysis
 #' @param use_theme By default, a specific \code{ggplot2} theme is used.
 #' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
 #' @param get_data Returns the data frame to create the plot instead of the plot itself.
+#' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}: the language of
+#' the tooltips and of the axis titles.
 #'
 #' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
 #' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
@@ -289,8 +294,8 @@ ggmca <-
            shift_colors = 0, colornames_recode,
            scale_color_light = material_colors_light(),
            scale_color_dark  = material_colors_dark(),
-           text_size = 3.5, size_scale_max = 4, dist_labels = c("auto", 0.04),
-           right_margin = 0, use_theme = TRUE, get_data = FALSE,
+           text_size = 3.5, size_scale_max = NULL, dist_labels = c("auto", 0.04),
+           right_margin = 0, use_theme = TRUE, get_data = FALSE, lang = NULL,
            dat, cah, cah_color_groups
   ) {
     # Renamed in 0.4.0; they sit last so no positional call can reach them.
@@ -303,16 +308,13 @@ ggmca <-
     if (!missing(cah_color_groups)) clust_color_groups <-
       renamed_arg(cah_color_groups, "cah_color_groups", "clust_color_groups", "ggmca")
 
-    plot_data <- ggmca_data(
-      data = data,
-      res.mca = res.mca, sup_vars = {{ sup_vars }},
-      active_tables = active_tables, tooltip_vars_1lv = {{ tooltip_vars_1lv }},
-      tooltip_vars = {{ tooltip_vars }},
-      cleannames = cleannames,
-      keep_levels = keep_levels, discard_levels = discard_levels,
+    plot_data <- mca_plot_data(
+      res.mca, data, sup_vars = rlang::enquo(sup_vars), active_tables = active_tables,
+      tooltip_vars_1lv = rlang::enquo(tooltip_vars_1lv), tooltip_vars = rlang::enquo(tooltip_vars),
+      color_groups = color_groups, clust_color_groups = clust_color_groups,
+      keep_levels = keep_levels, discard_levels = discard_levels, cleannames = cleannames,
       profiles = profiles, profiles_tooltip_discard = profiles_tooltip_discard,
-      clust = !!clust, max_profiles = max_profiles,
-      color_groups = color_groups, clust_color_groups = clust_color_groups
+      clust = clust, max_profiles = max_profiles, lang = lang, fn = "ggmca"
     )
 
     ggmca_plot(plot_data = plot_data,
@@ -331,14 +333,13 @@ ggmca <-
                dist_labels = dist_labels, right_margin = right_margin,
                use_theme = use_theme, get_data = get_data
     )
-
   }
 
 #' @describeIn ggmca get the data frames with all parameters to print a MCA graph
 # @inheritParams ggmca
 #' @return A list to pass to \link{ggmca_plot}: `vars_data` (one row per level), `ind_data`
 #'  (one row per answer profile, with `profiles = TRUE`), `individuals` (one row per individual,
-#'  with `sup_vars`), `res.mca` and `clust`.
+#'  with `sup_vars`), `res`, `clust` and `lang`.
 #' @export
 ggmca_data <-
   function(res.mca, data, sup_vars, active_tables = "active", tooltip_vars_1lv, tooltip_vars,
@@ -347,7 +348,7 @@ ggmca_data <-
            keep_levels, discard_levels, cleannames = TRUE,
 
            profiles = NULL, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-           clust, max_profiles = 5000,
+           clust, max_profiles = 5000, lang = NULL,
            dat, cah, cah_color_groups
   ) {
     # Renamed in 0.4.0; they sit last so no positional call can reach them.
@@ -359,302 +360,146 @@ ggmca_data <-
     }
     if (!missing(cah_color_groups)) clust_color_groups <-
       renamed_arg(cah_color_groups, "cah_color_groups", "clust_color_groups", "ggmca_data")
-    selected <- list(sup = rlang::enquo(sup_vars), lv1 = rlang::enquo(tooltip_vars_1lv),
-                     all = rlang::enquo(tooltip_vars))
-    if (missing(keep_levels))    keep_levels    <- character()
-    if (missing(discard_levels)) discard_levels <- character()
-    active_tables <- if (isFALSE(active_tables)) character() else as.character(active_tables)
 
-    m           <- mca_model(res.mca)
-    active_vars <- m$vars
+    mca_plot_data(
+      res.mca, data, sup_vars = rlang::enquo(sup_vars), active_tables = active_tables,
+      tooltip_vars_1lv = rlang::enquo(tooltip_vars_1lv), tooltip_vars = rlang::enquo(tooltip_vars),
+      color_groups = color_groups, clust_color_groups = clust_color_groups,
+      keep_levels = keep_levels, discard_levels = discard_levels, cleannames = cleannames,
+      profiles = profiles, profiles_tooltip_discard = profiles_tooltip_discard,
+      clust = clust, max_profiles = max_profiles, lang = lang, fn = "ggmca_data"
+    )
+  }
 
-    # The microdata is needed for anything that is not an active variable. It is taken back through
-    # the one gate (R/ingress.R), which cuts it down to the fitted rows, in the fitted order.
-    if (quo_given(clust) || any(purrr::map_lgl(selected, quo_given))) {
-      need_data(missing(data), "the supplementary variables and the clusters", "ggmca")
-      clust <- resolve_clust(clust, data)
-      data  <- align_to_fit(m, clust$data)
-      clust <- clust$name
-    } else {
-      data  <- NULL
-      clust <- character()
-    }
-    selected <- purrr::map(selected, select_vars, data = data)
-    sup_vars         <- setdiff(selected$sup, active_vars)
-    tooltip_vars_1lv <- setdiff(selected$lv1, active_vars)
-    tooltip_vars     <- setdiff(selected$all, c(active_vars, tooltip_vars_1lv))
-    if (is.null(profiles)) profiles <- length(clust) != 0
-    if (length(clust) != 0 && !clust %in% sup_vars) sup_vars <- c(sup_vars, clust)
-    stopifnot(length(max_profiles) < 2)
+# The MCA's plot model, which ggmca() and ggmca_data() both return through: the active levels, the
+# supplementary and cluster levels, the answer profiles, the individuals. `fn` names the caller a
+# refusal speaks of.
+#' @keywords internal
+#' @noRd
+mca_plot_data <- function(res.mca, data, sup_vars, active_tables, tooltip_vars_1lv, tooltip_vars,
+                          color_groups, clust_color_groups, keep_levels, discard_levels,
+                          cleannames, profiles, profiles_tooltip_discard, clust, max_profiles,
+                          lang, fn) {
+  if (missing(keep_levels))    keep_levels    <- character()
+  if (missing(discard_levels)) discard_levels <- character()
+  active_tables <- if (isFALSE(active_tables)) character() else as.character(active_tables)
+  stopifnot(length(max_profiles) < 2)
+  selected <- list(sup = sup_vars, lv1 = tooltip_vars_1lv, all = tooltip_vars)
 
-    clean_lvs <- function(x) if (cleannames) str_remove_all(x, cleannames_condition()) else x
-    clean_fct <- function(x) {
-      if (is.factor(x) && cleannames) levels(x) <- clean_lvs(levels(x))
-      x
-    }
+  m           <- mca_model(res.mca)
+  active_vars <- m$vars
 
+  # The microdata is needed for anything that is not an active variable. It is taken back through
+  # the one gate (R/ingress.R), which cuts it down to the fitted rows, in the fitted order.
+  if (quo_given(clust) || any(purrr::map_lgl(selected, quo_given))) {
+    need_data(missing(data), "the supplementary variables and the clusters", fn)
+    cl    <- resolve_clust(clust, data)
+    data  <- align_to_fit(m, cl$data)
+    clust <- cl$name
+  } else {
+    data  <- NULL
+    clust <- character()
+  }
+  selected <- purrr::map(selected, select_vars, data = data)
+  sup_vars         <- setdiff(selected$sup, active_vars)
+  tooltip_vars_1lv <- setdiff(selected$lv1, active_vars)
+  tooltip_vars     <- setdiff(selected$all, c(active_vars, tooltip_vars_1lv))
+  if (is.null(profiles)) profiles <- length(clust) != 0
+  if (length(clust) != 0 && !clust %in% sup_vars) sup_vars <- c(sup_vars, clust)
+
+  with_gda_lang(lang, function(lg) {
     # The units: the answer profiles, crossed with the answers every non-active variable gives.
-    non_active <- c(sup_vars, tooltip_vars_1lv, tooltip_vars)
-    extra <- if (length(non_active) != 0) {
-      purrr::imap(data[non_active], function(x, v) {
-        if (is.numeric(x) && v %in% tooltip_vars_1lv) x else forcats::fct_drop(as.factor(x))
-      }) |> tibble::as_tibble()
-    }
-    units <- mca_units(m, extra)
+    extra <- extra_columns(data, c(sup_vars, tooltip_vars_1lv, tooltip_vars), tooltip_vars_1lv)
+    units <- cloud_units(m, extra)
 
-
-    # Active variables --------------------------------------------------------------------
     # WARNING: FactoMineR's rows are bound by POSITION (the model's levels): it renames levels.
     lv <- m$levels[m$levels$kept, ]
-    active_vars_data <- dplyr::bind_cols(
-      tibble::tibble(vars = lv$vars,
-                     lvs  = if (cleannames) forcats::fct_relabel(lv$lvs, clean_lvs) else lv$lvs,
-                     freq = round(lv$wn / m$W * 100, 0)),
-      tibble::as_tibble(m$var$coord),
-      tibble::as_tibble(m$var$contrib) |> dplyr::rename_with(~ str_replace(., "^Dim ", "contrib")),
-      tibble::tibble(wcount = lv$wn)
-    ) |>
-      dplyr::mutate(color_group = factor("active_vars"),
-                    id = as.integer(forcats::as_factor(.data$vars)) + 1000L)
+    vars_data <- dplyr::bind_rows(
+      vars_rows(lv$vars, clean_levels(lv$lvs, cleannames), "active",
+                id = as.integer(forcats::as_factor(lv$vars)) + 1000L, wcount = lv$wn,
+                coord = m$var$coord, contrib = m$var$contrib),
+      sup_rows(units, m$coord[units$..profile, , drop = FALSE], sup_vars, m$vs, clust,
+               color_groups, clust_color_groups, keep_levels, discard_levels, cleannames),
+      central_row(m$W, ncol(m$var$coord))
+    )
 
-
-    # Supplementary variables -------------------------------------------------------------
-    if (length(sup_vars) != 0) {
-      sup_vars_data <- purrr::map(sup_vars, \(v) sup_levels(m, units, v))
-
-      # color_group depending on nb of supplementary variables and nb of characters
-      #  indicated in color_groups
-      if (length(clust) > 0 & length(color_groups) != 1 &
-          length(color_groups) == length(sup_vars) - 1L) {
-
-        color_groups_base <- rep(NA_character_, length(sup_vars))
-        color_groups_base[sup_vars != clust] <-
-          vctrs::vec_recycle(color_groups, length(sup_vars) - 1L)
-
-        color_groups <- color_groups_base
-
-      } else {
-        color_groups <- vctrs::vec_recycle(color_groups, length(sup_vars))
-      }
-
-      if (length(clust) > 0 ) {
-        color_groups[sup_vars == clust] <- clust_color_groups
-      }
-
-      sup_vars_data <- sup_vars_data |>
-        purrr::map2(color_groups,
-                    ~ dplyr::mutate(.x, color_group = forcats::as_factor(str_c(
-                      .data$vars, "_", str_extract(.data$lvs, .y)
-                    ) |>
-                      str_remove("_$")
-                    ))
-        )
-
-      if (length(keep_levels   ) >= 1L) sup_vars_data <- sup_vars_data |>
-        purrr::map(~ dplyr::filter(., str_detect(.data$lvs, keep_levels)))
-      if (length(discard_levels) >= 1L) sup_vars_data <- sup_vars_data |>
-        purrr::map(~ dplyr::filter(., !str_detect(.data$lvs, str_c(discard_levels, collapse = "|"))))
-
-      if (cleannames) sup_vars_data <- sup_vars_data |>
-        purrr::map(~ dplyr::mutate(., lvs = forcats::fct_relabel(.data$lvs, clean_lvs)))
-
-      sup_vars_data <- sup_vars_data |>
-        dplyr::bind_rows() |>
-        dplyr::mutate(id = dplyr::row_number())
-
-      # WARNING: a cluster's hover id is matched by NAME, the same way for its label here and for
-      #   its profiles below -- never as.integer(lvs): a factor's codes follow its level order, which
-      #   cleannames re-sorts alphabetically ("1", "10", "11", "2", ...), and the label then lit up
-      #   another cluster's profiles. Clusters share one id, so hovering any point lights them all.
-      if (length(clust) != 0) {
-        clust_levels <- clean_lvs(levels(units[[clust]]))
-        is_clust <- sup_vars_data$vars == clust
-        sup_vars_data$id[is_clust] <- 10000L +
-          match(as.character(sup_vars_data$lvs[is_clust]), clust_levels)
-      }
-
-      vars_data <- dplyr::bind_rows(active_vars_data, sup_vars_data)
-
-    } else {
-      vars_data <- active_vars_data
-    }
-
-    # The central point stands for the whole population, so that is its weight.
-    vars_data <- vars_data |>
-      dplyr::add_row(vars        = "All",
-                     lvs         = factor("Central point"),
-                     color_group = factor("Central point"),
-                     wcount      = m$W) |>
-      dplyr::mutate(dplyr::across(
-        tidyselect::starts_with("Dim "),
-        ~ dplyr::if_else(.data$lvs == "Central point", 0, .)
-      ))
-
-    vars_data <- vars_data |>
-      dplyr::relocate(tidyselect::starts_with("Dim "), tidyselect::starts_with("contrib"),
-                      .after = dplyr::last_col())
-
-
-    # Interactive tooltips (sup/active) ----
+    # The tooltips: the Burt table's blocks for the crossed levels, a header for every level.
     crossed <- unique(c(if ("active" %in% active_tables) active_vars,
                         if ("sup"    %in% active_tables) sup_vars,
                         intersect(active_tables, c(active_vars, sup_vars))))
-    counted <- setdiff(sup_vars, crossed)
+    counted <- setdiff(c(active_vars, sup_vars), crossed)
+    tip_units <- units
+    tip_units[active_vars] <- active_factors(m, units$..profile)
+    shown <- c(active_vars, names(extra))
+    tip_units[shown] <- purrr::map(tip_units[shown], clean_factor, cleannames = cleannames)
+    blocks <- c(list(tip_block(active_vars, gettext("Active variables:"), binary = TRUE)),
+                purrr::map(tooltip_vars, \(v) tip_block(v, gettextf("Distribution by %s:", v))))
+    tips <- interactive_tooltips(tip_units, crossed, counted, blocks, tooltip_vars_1lv)
+    central <- vars_data$role == "central"
+    i <- vctrs::vec_match(
+      data.frame(vars = ifelse(central, NA, vars_data$vars),
+                 lvs  = ifelse(central, NA, as.character(vars_data$lvs))),
+      data.frame(vars = tips$vars, lvs = tips$lvs))
+    vars_data$begin_text       <- tips$begin_text[i]
+    vars_data$interactive_text <- tips$interactive_text[i]
 
-    vars_data$begin_text <- vars_data$interactive_text <- NA_character_
-    if (length(c(crossed, counted)) != 0) {
-      tip_units <- units
-      tip_units[active_vars] <- active_factors(m, units$..profile)
-      tip_units[c(active_vars, non_active)] <- purrr::map(tip_units[c(active_vars, non_active)],
-                                                          clean_fct)
-      tips <- interactive_tooltips(tip_units, crossed, counted, active_vars,
-                                   tooltip_vars_1lv = tooltip_vars_1lv, tooltip_vars = tooltip_vars)
-      i <- vctrs::vec_match(
-        data.frame(vars = as.character(vars_data$vars), lvs = as.character(vars_data$lvs)),
-        data.frame(vars = tips$vars, lvs = as.character(tips$lvs)))
-      vars_data$begin_text       <- tips$begin_text[i]
-      vars_data$interactive_text <- tips$interactive_text[i]
-    }
-
-    active_vars_without_crosstables <- setdiff(active_vars, crossed)
-    if (length(active_vars_without_crosstables) != 0) {
-      vars_data <- vars_data |>
-        dplyr::mutate(begin_text = dplyr::if_else(
-          .data$vars %in% active_vars_without_crosstables,
-          true  = paste0("<b>", .data$lvs,"</b>\n", .data$vars,
-                         "\nFrequency: ", paste0(.data$freq, "%")),
-          false = .data$begin_text
-        ))
-    }
-
-    # With no crosstab at all, the central point lists the active levels' frequencies.
-    if (length(crossed) == 0) {
-      active_rows <- vars_data$color_group == "active_vars"
-      mean_point_interactive_text <-
-        str_c("<b>Central point</b>",
-              "\nFrequency: 100%",
-              "\n\n<b>Active variables :</b>",
-              str_c("\n", vars_data$lvs[active_rows], " : ", vars_data$freq[active_rows], "%",
-                    collapse = ""))
-
-      vars_data <- vars_data |>
-        dplyr::mutate(begin_text = dplyr::if_else(
-          .data$lvs == "Central point",
-          true  = mean_point_interactive_text,
-          false = .data$begin_text
-        ))
-    }
-
-    vars_data <- dplyr::select(vars_data, -tidyselect::any_of("freq"))
-
-
-    #  Profiles of answers ----
-    # The answer profiles are needed for their own points and, through `individuals`, for the
-    # ellipses and facets of the first supplementary variable.
-    ind_data    <- NULL
-    individuals <- NULL
+    # The answer profiles, drawn, and the individuals the ellipses and facets group.
+    ind_data <- individuals <- NULL
     if (profiles || length(sup_vars) != 0) {
-      pts <- answer_points(m, max_profiles)
-
-      # WARNING: one row per INDIVIDUAL, not per unit. ggplot2's ellipse sizes its radius on
-      #   nrow(data) - 1 degrees of freedom, and MASS::cov.trob() tests its convergence on absolute
-      #   weights: drawn from aggregated units, an ellipse would not be the individuals' one.
-      if (length(sup_vars) != 0) {
-        individuals <- dplyr::bind_cols(
-          tibble::tibble(nb    = pts$nb[pts$point[m$key]],
-                         row.w = if (is.null(m$w)) rep(1, m$n) else m$w),
-          tibble::as_tibble(m$coord[m$key, , drop = FALSE]),
-          purrr::map(extra[sup_vars], clean_fct) |> tibble::as_tibble()
-        )
-      }
+      pts <- cloud_points(mca_point_group(m), m$count, m$wn, max_profiles)
     }
-
+    if (length(sup_vars) != 0) {
+      individuals <- individuals_table(
+        pts$nb[pts$point[m$key]], if (is.null(m$w)) rep(1, m$n) else m$w,
+        m$coord[m$key, , drop = FALSE],
+        purrr::map(extra[sup_vars], clean_factor, cleannames = cleannames))
+    }
     if (profiles) {
-      drawn <- pts$drawn
-      first <- pts$first[drawn]
-      ind_data <- tibble::tibble(nb     = seq_along(drawn),
-                                 count  = pts$count[drawn],
-                                 wcount = pts$wcount[drawn])
-
-      # DESIGN: a profile's cluster is the weighted plurality of its individuals, missing ones
-      #   left out. Clusters made on the analysis are pure within a profile (its individuals share
-      #   one point), so the rule only decides for clusters made elsewhere or partly missing, and
-      #   every profile with one clustered individual is coloured.
-      if (length(clust) != 0) {
-        cl <- clean_fct(units[[clust]])
-        by_clust <- tapply(units$..wn,
-                           list(factor(pts$point[units$..profile], seq_along(pts$first)), cl),
-                           sum, default = 0)
-        plural <- max.col(by_clust, ties.method = "first")
-        plural[rowSums(by_clust) == 0] <- NA
-        ind_data$clust <- factor(levels(cl)[plural[drawn]], levels(cl))
-        ind_data$id    <- 10000L + as.integer(ind_data$clust)
-      } else {
-        ind_data$id    <- 10000L + ind_data$nb
+      clusters <- if (length(clust) != 0) {
+        point_clusters(pts$point[units$..profile], units$..wn,
+                       clean_factor(units[[clust]], cleannames), length(pts$first))
       }
+      ind_data <- points_table(pts, m$coord, clusters, vars_data[vars_data$role == "clust", ])
 
       # An excluded answer, or one matching profiles_tooltip_discard, is left out of the tooltip.
-      labels <- clean_lvs(m$levels$lvs)
+      labels <- clean_levels(m$levels$lvs, cleannames)
       labels[!m$levels$kept] <- NA_character_
       if (length(profiles_tooltip_discard) != 0) {
         labels[str_detect(labels, profiles_tooltip_discard) %in% TRUE] <- NA_character_
       }
+      first   <- pts$first[pts$drawn]
       answers <- purrr::map(seq_len(m$Q), \(q) labels[m$codes[first, q]])
-
-      counts <- tibble::tibble(
-        count  = str_c("n: ", format(round(ind_data$count, 0), trim = TRUE, big.mark = " ")),
-        wcount = dplyr::if_else(ind_data$count == ind_data$wcount,
-                                true  = "",
-                                false = str_c("weighted n: ",
-                                              format(round(ind_data$wcount, 0),
-                                                     trim = TRUE, big.mark = " "), "\n"))
-      )
-
-      heading <- if (length(clust) != 0) {
-        in_clust <- vctrs::vec_group_id(ind_data$clust)
-        tibble::tibble(
-          clust      = str_c("<b>Cluster: ", ind_data$clust, "</b>"),
-          profile_nb = str_c("<b>Answer profile n", "\u00b0",
-                             stats::ave(ind_data$nb, in_clust, FUN = seq_along), "/",
-                             stats::ave(ind_data$nb, in_clust, FUN = length), "</b>")
-        )
-      } else {
-        tibble::tibble(profile_nb = str_c("<b>Answer profile n", "\u00b0", ind_data$nb, "</b>"))
-      }
-
-      frags <- c(as.list(heading), as.list(counts), answers)
-      names(frags) <- paste0("f", seq_along(frags))
-      ind_data$interactive_text <- tidyr::unite(tibble::as_tibble(frags), "text",
-                                                tidyselect::everything(), sep = "\n",
-                                                na.rm = TRUE)$text
-
-      ind_data <- dplyr::bind_cols(ind_data, tibble::as_tibble(m$coord[first, , drop = FALSE]))
+      ind_data$interactive_text <- point_tooltips(profile_headings(ind_data), ind_data$count,
+                                                  ind_data$wcount, answers)
     }
 
+    plot_model(vars_data, ind_data, individuals,
+               res = list(eig = m$eig, axes_names = res.mca$axes_names), clust = clust,
+               lang = lg)
+  })
+}
 
-    list("vars_data"   = vars_data,
-         "ind_data"    = ind_data,
-         "individuals" = individuals,
-         "res.mca"     = list(eig = m$eig, axes_names = res.mca$axes_names),
-         "clust"       = clust)
-  }
-
-
-# Why this exists: the points a graph draws are the answer profiles whose KEPT answers differ --
-# answers that differ only in an excluded level share one point -- each one aggregated over its
-# profiles. `nb` ranks them by weighted count; `drawn` holds the first `max_profiles` of them.
-answer_points <- function(m, max_profiles) {
-  kept  <- m$codes
+# Why this exists: the points an MCA draws are the answer profiles whose KEPT answers differ --
+# answers that differ only in an excluded level share one point.
+#' @keywords internal
+#' @noRd
+mca_point_group <- function(m) {
+  kept <- m$codes
   kept[!m$levels$kept[m$codes]] <- 0L
-  point <- as.integer(vctrs::vec_group_id(as.data.frame(kept)))
-  first <- which(!duplicated(point))
-  wcount <- as.vector(rowsum(m$wn, point, reorder = TRUE))
+  as.integer(vctrs::vec_group_id(as.data.frame(kept)))
+}
 
-  drawn <- order(-wcount)
-  if (length(max_profiles) != 0) drawn <- drawn[seq_len(min(max_profiles, length(drawn)))]
-  nb <- rep(NA_integer_, length(first))
-  nb[drawn] <- seq_along(drawn)
-
-  list(point = point, first = first, count = as.vector(rowsum(m$count, point, reorder = TRUE)),
-       wcount = wcount, drawn = drawn, nb = nb)
+# The first lines of a profile's tooltip: its cluster, and its rank (within its cluster).
+#' @keywords internal
+#' @noRd
+profile_headings <- function(ind_data) {
+  bold <- function(x) paste0("<b>", x, "</b>")
+  if (!"clust" %in% names(ind_data)) {
+    return(list(bold(gettextf("Answer profile n\u00b0%s", ind_data$nb))))
+  }
+  in_clust <- vctrs::vec_group_id(ind_data$clust)
+  rank <- paste0(stats::ave(ind_data$nb, in_clust, FUN = seq_along), "/",
+                 stats::ave(ind_data$nb, in_clust, FUN = length))
+  list(bold(gettextf("Cluster: %s", ind_data$clust)),
+       bold(gettextf("Answer profile n\u00b0%s", rank)))
 }

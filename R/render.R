@@ -1,7 +1,8 @@
-# PURPOSE: The shared rendering and export layer -- theme_facto(), the material palettes, ggi(),
-#   ggsave2(), and the internals plot_path() and outlims().
-# ROLE: What every 2D graph ends in. theme_facto() supplies the axis titles carrying eigenvalue
-#   percentages, ggi() turns a ggfacto ggplot into a girafe widget, ggsave2() writes an image.
+# PURPOSE: The shared rendering and export layer -- theme_facto() and its axis titles, the material
+#   palettes, ggi(), ggsave2(), as_ggfacto_plot(), and the internal plot_path().
+# ROLE: What every 2D graph ends in. as_ggfacto_plot() makes it a ggfacto graph (its class, its
+#   render hints), theme_facto() supplies the axis titles carrying eigenvalue percentages, ggi()
+#   turns it into a girafe widget (a widget passes through), ggsave2() writes an image.
 # KEY CONSTRAINTS:
 #   - theme_facto() returns a LIST of ggplot objects, not a theme: it is `+`-ed as a whole.
 #   - "Jaune 800" is commented out of both palettes on purpose. It is reserved for the ggiraph
@@ -31,30 +32,8 @@
 theme_facto <- function(res, axes = c(1,2), # res = res.mca
                         legend.position = c("none", "left", "right", "bottom", "top"),
                         no_color_scale = FALSE, size_scale_max = 8, xlim, ylim) {  #no_size_scale = FALSE
-  pct <- eig_table(res)[, 2]
-  if (exists("axes_names", where = res)) {
-    first_axe_title  <-
-      str_c(
-        "Axe ", axes[1]," (", round(pct[axes[1]], 1),
-        "%)",
-        if (!is.null(res$axes_names[axes[1]]) ) paste0(" : ", res$axes_names[axes[1]])
-      )
-    second_axe_title <-
-      str_c(
-        "Axe ", axes[2]," (", round(pct[axes[2]], 1),
-        "%)",
-        if (!is.null(res$axes_names[axes[2]]) ) paste0(" : ", res$axes_names[axes[2]])
-      )
-  } else {
-    first_axe_title  <-
-      str_c("Axe ", axes[1]," (",
-                     round(pct[axes[1]], 1), "%)")
-    second_axe_title <-
-      str_c("Axe ", axes[2]," (",
-                     round(pct[axes[2]], 1), "%)")
-  }
-
-
+  first_axe_title  <- axis_title(res, axes[1])
+  second_axe_title <- axis_title(res, axes[2])
 
   if (no_color_scale == FALSE) {
     scale_color_acm <- ggplot2::scale_color_brewer(palette = "Dark2") #material_colors_light() ?
@@ -64,10 +43,9 @@ theme_facto <- function(res, axes = c(1,2), # res = res.mca
     scale_fill_acm <- NULL
   }
 
-  if (!missing(xlim) & !missing(ylim)) {coord_graph <- ggplot2::coord_fixed(xlim = xlim, ylim = ylim) }
-  else if (!missing(xlim) ) { coord_graph <- ggplot2::coord_fixed(xlim = xlim ) }
-  else if (!missing(ylim) ) { coord_graph <- ggplot2::coord_fixed(ylim = ylim ) }
-  else { coord_graph <- ggplot2::coord_fixed() }
+  # the axes keep their proportions, whatever the limits
+  coord_graph <- ggplot2::coord_fixed(xlim = if (!missing(xlim)) xlim,
+                                      ylim = if (!missing(ylim)) ylim)
 
   #if (no_size_scale == FALSE) {
   scale_size <- ggplot2::scale_size_area(max_size = size_scale_max)
@@ -93,6 +71,20 @@ theme_facto <- function(res, axes = c(1,2), # res = res.mca
                    text = ggplot2::element_text(family = "sans") #"DejaVu Sans Condensed"
     )
   )
+}
+
+# The title of an axis: its number, its percentage of variance, and the name the user gave it in
+# `res$axes_names`, in the language in effect.
+#' @keywords internal
+#' @noRd
+axis_title <- function(res, a) {
+  pct <- gda_num(round(eig_table(res)[a, 2], 1), gda_resolve_lang(NULL))
+  nm  <- res$axes_names[a]
+  if (length(nm) == 1 && !is.na(nm) && nzchar(nm)) {
+    gettextf("Axe %s (%s%%): %s", a, pct, nm)
+  } else {
+    gettextf("Axe %s (%s%%)", a, pct)
+  }
 }
 
 #' Light Material palette for MCA points
@@ -153,8 +145,11 @@ material_colors_dark <- function() {
 
 
 
-#' Pass a MCA plot into a html interactive plot
-#' @param plot The plot, created with \link{ggmca} or \link{ggca}.
+#' Make a graph interactive
+#' @param plot The graph, made with \code{\link{ggfacto}} (or \code{\link{ggmca}},
+#' \code{\link{ggca}}, \code{\link{ggpca}}, \code{\link{ggpca_cor_circle}}), with or without
+#' \pkg{ggplot2} elements added with \code{+}. A graph that is already interactive is returned as it
+#' is.
 #' @param width The width in centimeters. Default to printing device's size.
 #' @param height The height in centimeters. Default to printing device's size.
 #' @param keep_ratio By default, the height is forced based of the relative
@@ -182,74 +177,10 @@ ggi <- function(plot = ggplot2::last_plot(),
                 open = rlang::is_interactive(), ...
 ) {
 
-  # Render hints are attributes set by ggmca_plot()/ggca(); a plain ggplot carries none, so every
-  # read below must tolerate NULL.
-  if (!is.null(attr(plot, "css_hover", exact = TRUE))) {
-    css_hover <- attr(plot, "css_hover", exact = TRUE)
-  } else {
-    css_hover <- ggiraph::girafe_css("fill:#d2b200;stroke:orange;",
-                                     text  = "color:gold4;stroke:none;",
-                                     point = "fill:gold;stroke:orange;",
-                                     area  = "fill:#ffe348")
-  }
-
-
-  if (!is.null(attr(plot, "css_tooltip", exact = TRUE))) {
-    css_tooltip <- attr(plot, "css_tooltip", exact = TRUE)
-  } else {
-    css_tooltip <- "color:#000000;text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;"
-  }
-
-  # if(.Platform$OS.type == "windows") {
-  #   css_tooltip <-
-  #     paste0(css_tooltip, "font-family:", grDevices::windowsFonts("sans"), ";") #%>%
-  #   #str_replace("DejaVu Sans Condensed", "DejaVu Sans")
-  # }
-
-  if (is.null(width)) { #   if (missing(width)) {
-    width <- grDevices::dev.size("in")[1]
-
-  } else {
-    width <- width/2.54
-  }
-
-  if (keep_ratio == TRUE & !is.null(attr(plot, "height_width_ratio", exact = TRUE))) {
-    height <- width * attr(plot, "height_width_ratio", exact = TRUE)
-
-  } else {
-    if (is.null(height)) { #     if (missing(height)) {
-      height <- grDevices::dev.size("in")[2]
-    } else {
-      height = height/2.54
-    }
-  }
-
-  # if (is.null(plot$height_width_ratio)) height <- NULL
-
-  widget <-
-    ggiraph::girafe(ggobj = plot,
-                    width_svg = width,
-                    height_svg = height , #if_else(missing(height), width/2.563 * plot$height_width_ratio, height/2.563)
-                    # fonts = ifelse(.Platform$OS.type == "windows",
-                    #                grDevices::windowsFonts("sans") %>%
-                    #                  purrr::map(~str_replace(., "DejaVu Sans Condensed",
-                    #                                                   "DejaVu Sans")),
-                    #                NULL
-                    # ),  #list(sans = "DejaVu Sans Condensed") #grDevices::windowsFonts("sans")
-                    ...
-    ) |>
-    ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip), #, use_fill = TRUE, #use_stroke = FALSE, # = border color of the tooltip #color:white; border-color:black; opacity:1 ; background-color:transparent
-                            ggiraph::opts_hover(css = css_hover)
-                            # ggiraph::opts_zoom(max = 5) # bugue pas mal
-                            # ggiraph::opts_hover(css = girafe_css(css = "fill:purple;stroke:black;", text = "stroke:none;fill:red;font-style:bold;")) #    point = NULL, line, area, image
-                            # ggiraph::opts_hover_inv(css = "opacity:0.1;"),
-                            # ggiraph::opts_sizing(rescale = FALSE)
-                            # ggiraph::opts_sizing(rescale = TRUE, width = 0.7), #between 0 and 1
-                            # ggiraph::opts_toolbar(saveaspng = FALSE)
-    )
-
-
-  widget <- as_ggfacto_widget(widget, ratio = height / width)
+  # DESIGN: a widget passes through, so `ggpca_cor_circle(interactive = TRUE) |> ggi()` and a
+  #   second ggi() cost nothing; it can still be saved.
+  widget <- if (inherits(plot, "htmlwidget")) plot else girafe_widget(plot, width, height,
+                                                                        keep_ratio, ...)
 
   if (savewidget == FALSE) {
     return(widget)
@@ -266,6 +197,42 @@ ggi <- function(plot = ggplot2::last_plot(),
 
     return(invisible(widget))
   }
+}
+
+
+
+# The girafe of a ggplot, sized from its own ratio when it has one. Render hints are attributes set
+# by the graph builders; a plain ggplot carries none, so every read tolerates NULL.
+#' @keywords internal
+#' @noRd
+girafe_widget <- function(plot, width, height, keep_ratio, ...) {
+  css_hover <- attr(plot, "css_hover", exact = TRUE)
+  if (is.null(css_hover)) {
+    css_hover <- ggiraph::girafe_css("fill:#d2b200;stroke:orange;",
+                                     text  = "color:gold4;stroke:none;",
+                                     point = "fill:gold;stroke:orange;",
+                                     area  = "fill:#ffe348")
+  }
+  css_tooltip <- attr(plot, "css_tooltip", exact = TRUE)
+  if (is.null(css_tooltip)) {
+    css_tooltip <- str_c("color:#000000;text-align:right;padding:4px;border-radius:5px;",
+                         "background-color:#eeeeee;")
+  }
+
+  width <- if (is.null(width)) grDevices::dev.size("in")[1] else width / 2.54
+  ratio <- attr(plot, "height_width_ratio", exact = TRUE)
+  height <- if (keep_ratio && !is.null(ratio)) {
+    width * ratio
+  } else if (is.null(height)) {
+    grDevices::dev.size("in")[2]
+  } else {
+    height / 2.54
+  }
+
+  widget <- ggiraph::girafe(ggobj = plot, width_svg = width, height_svg = height, ...) |>
+    ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip),
+                            ggiraph::opts_hover(css = css_hover))
+  as_ggfacto_widget(widget, ratio = height / width)
 }
 
 
@@ -356,13 +323,18 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
   return(path)
 }
 
-# Why this exists: shared by ggmca_plot() and ggca(), which both drop the points falling outside
-# xlim/ylim before drawing -- but only when the labels are not repelled, since a repelled label
-# needs its anchor point to exist.
+# Why this exists: every 2D graph ends here, so that it is a ggplot that knows what it is -- its
+# class for knit_print() (R/knit.R), its render hints for ggi() and ggsave2().
+# DESIGN: the class is PREPENDED and the hints ride as ATTRIBUTES, which both survive `+`. Never list
+#   slots, and never an append(): that flattens the S7 ggplot into a plain list, and ggplot_build(),
+#   grid.draw() and so ggsave2() stop dispatching on it. `ratio` is height / width, NULL when the
+#   graph has no opinion.
 #' @keywords internal
-outlims <- function(data, lim, dim) {
-  dim <- rlang::enquo(dim)
-  if (!is.na(lim[1])) data <- data |> dplyr::filter(!!dim > lim[1])
-  if (!is.na(lim[2])) data <- data |> dplyr::filter(!!dim < lim[2])
-  return(data)
+#' @noRd
+as_ggfacto_plot <- function(p, ratio = NULL, css_hover = NULL) {
+  if (!is.null(ratio) && (length(ratio) != 1 || !is.finite(ratio) || ratio <= 0)) ratio <- NULL
+  attr(p, "height_width_ratio") <- ratio
+  if (!is.null(css_hover)) attr(p, "css_hover") <- css_hover
+  class(p) <- unique(c("ggfacto_plot", class(p)))
+  p
 }

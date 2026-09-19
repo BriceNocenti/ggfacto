@@ -69,7 +69,7 @@ clustering, cut into `nb_clust` clusters, then consolidated by k-means. Use it i
 To choose the number of clusters, look at the tree first: `hierarchical_clust(res, ncp = 3)`.
 The tree is built once: cutting it again, into another number of clusters or with names, is
 instant. Name the clusters with `names`, then describe them with \code{\link{clust_tab}} and
-draw them with \code{\link{ggmca}(clust = )}.
+draw them with \code{\link{ggfacto}(clust = )}.
 }
 \details{
 The tree is kept in memory for the session, under a key made of everything it is built from ---
@@ -87,7 +87,7 @@ tea <- tea |>
   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 
 clust_tab(res.mca, tea, clust)
-ggmca(res.mca, tea, clust = clust)
+ggfacto(res.mca, tea, clust = clust)
 
 # Named, in the order of your choice (the tree is not built again)
 tea <- tea |>

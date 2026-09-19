@@ -56,6 +56,8 @@ globalVariables(c(":="))
                      envir = asNamespace("knitr"))
     registerS3method("knit_print", "ggfacto_summary", knit_print.ggfacto_summary,
                      envir = asNamespace("knitr"))
+    registerS3method("knit_print", "ggfacto_plot", knit_print.ggfacto_plot,
+                     envir = asNamespace("knitr"))
   }
 
   invisible()

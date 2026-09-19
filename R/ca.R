@@ -1,552 +1,446 @@
-# PURPOSE: The CA entry point and its graph -- correspondence_analysis(), ggca().
+# PURPOSE: The CA entry point and its graph -- correspondence_analysis() (alias CA2()), ggca(), and
+#   ca_plot_data(), the CA's builder of the shared plot model (R/plot-model.R).
 # ROLE: correspondence_analysis() is the ingress normaliser of a crosstab: it takes the table the
-#   student made with tabxplor::tab(), and gives FactoMineR the counts it needs. ggca() is the CA
-#   counterpart of ggmca(), but a single function: it rebuilds coordinates, tooltips and its colour
-#   vector inline rather than going through a data/plot split.
+#   student made with tabxplor::tab() and gives FactoMineR the counts it needs. ggca() draws the
+#   analysis through the one renderer (R/plot-render.R).
 # KEY CONSTRAINTS:
 #   - A CA reads COUNTS, whatever the table displays: a tab() in percentages still gives its
-#     weighted counts, and its Total row and column are dropped.
-#   - Its tooltips are the row and column percentages of the source table, computed here. It does
-#     NOT go through interactive_tooltips(), which is shaped for the MCA's Burt-table crosstabs.
-#   - Like ggmca_plot(), it carries css_tooltip and height_width_ratio on the returned object as
-#     ATTRIBUTES, so the object stays a real ggplot and the ggplot generics keep dispatching.
-# See: CLAUDE.md section ggfacto architecture > How a graph is built, for why this is not split.
+#     weighted counts, and its Total rows and column are dropped.
+#   - Its supplementary variables ride the table: in a tab() of several row or column variables,
+#     the first row variable and the first column variable are the active table, and every other
+#     variable gives supplementary rows or columns, passed to FactoMineR as POSITIONS.
+#   - Every level is read by POSITION in `call$Xtot`, which holds the whole table in its order:
+#     FactoMineR make.unique()s level names. `res$source` records each level's variable and name.
+#   - A level's tooltip is its profile against each variable of the other margin, each block against
+#     its own Total, computed on the table's cells as the MCA's crosstabs are (R/tooltips.R). Its
+#     frequency comes from the margins, never from the stacked blocks, which would count a level
+#     once per block.
+#   - Clusters are the named factor hierarchical_clust() returns for the levels of one margin. A
+#     cluster's label is the mass-weighted barycentre of its levels: the supplementary projection
+#     of the merged category.
+# See: CLAUDE.md section ggfacto architecture > The FactoMineR contract.
 
 #' Correspondence Analysis of a Crosstab
 #'
 #' @description Makes the correspondence analysis of a crosstab with
 #' \code{FactoMineR::\link[FactoMineR]{CA}}: first make the table with \code{tabxplor::tab()},
 #' then analyse it. The analysis reads the (weighted) counts of the table, whatever it displays,
-#' without its Total row and column. To leave out some rows or columns, filter the table before, with
-#' \code{dplyr::filter()} and \code{dplyr::select()}.
+#' without its Total rows and columns. To leave out some rows or columns, filter the table before,
+#' with \code{dplyr::filter()} and \code{dplyr::select()}. `CA2()` is a shorter name for the same
+#' function.
 #'
-#' @param table A crosstab made with \code{tabxplor::tab()}, with one row variable and one column
-#' variable. A matrix or a \code{table} of counts works too.
+#' \strong{Supplementary variables} are given in the table itself: in a `tab()` of several row
+#' variables, or several column variables, the first row variable and the first column variable
+#' make the active table, and the other variables are supplementary, placed on the axes without
+#' taking part in them. `tab(data, c(relig, marital), c(partyid, race))` analyses `relig` by
+#' `partyid`, and places the levels of `marital` by their profile over `partyid`, and the levels of
+#' `race` by their profile over `relig`.
+#'
+#' @param table A crosstab made with \code{tabxplor::tab()}, with one or several row variables and
+#' one or several column variables. A matrix or a \code{table} of counts works too, with its
+#' supplementary rows and columns given as in \code{FactoMineR::CA()} (`row.sup`, `col.sup`).
 #' @param ncp The number of axes to keep. All of them by default.
 #' @param ... Additional arguments to pass to \code{\link[FactoMineR]{CA}}.
 #'
-#' @return A `CA` object from \pkg{FactoMineR}, which remembers the names of the two variables, so
-#' that \code{\link{interpret}} can print them.
+#' @return A `CA` object from \pkg{FactoMineR}, which remembers the names of the two active
+#' variables, so that \code{\link{interpret}} can print them, and, in `source`, the variable and the
+#' name of every row and column of the table.
 #' @export
 #'
 #' @examples
-#' tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
+#' gss <- forcats::gss_cat |>
+#'   dplyr::filter(!relig %in% c("No answer", "Don't know", "Not applicable"),
+#'                 !partyid %in% c("No answer", "Don't know"))
+#' tableau <- tabxplor::tab(gss, relig, partyid)
 #' res.ca <- correspondence_analysis(tableau)
 #' interpret(res.ca)
-#' ggca(res.ca) |> ggi()
+#'
+#' # marital (rows) and race (columns) are supplementary
+#' res.ca2 <- tabxplor::tab(gss, c(relig, marital), c(partyid, race)) |>
+#'   correspondence_analysis()
+#' ggca(res.ca2) |> ggi()
 correspondence_analysis <- function(table, ncp = Inf, ...) {
+  dots <- list(...)
+  tb   <- NULL
   if (inherits(table, "tabxplor_tab")) {
-    cols <- names(table)[purrr::map_lgl(table, tabxplor::is_fmt) & !tabxplor::is_totcol(table)]
-    rows <- !tabxplor::is_totrow(table)
-    X <- vapply(cols, function(col) {
-      x <- table[[col]]
-      dplyr::coalesce(vctrs::field(x, "wn"), as.numeric(vctrs::field(x, "n")))
-    }, numeric(nrow(table)))
-    X <- X[rows, , drop = FALSE]
-    rownames(X) <- as.character(table[[1]][rows])
-    col_var <- unique(tabxplor::get_col_var(table)[cols])
-    if (length(col_var) != 1L || !nzchar(col_var)) stop(
-      "correspondence_analysis() needs a crosstab of ONE row variable and ONE column variable.",
-      call. = FALSE)
-    names(dimnames(X)) <- c(names(table)[1], col_var)
+    tb <- ca_table(table)
+    X  <- tb$wn
+    rs <- union(tb$row_sup, dots$row.sup)
+    cs <- union(tb$col_sup, dots$col.sup)
   } else {
-    X <- as.matrix(table)
+    X  <- as.matrix(table)
+    rs <- dots$row.sup
+    cs <- dots$col.sup
   }
+  dots$row.sup <- dots$col.sup <- NULL
+  sup_or_null <- function(x) if (length(x) != 0) sort(as.integer(x))
+  res <- do.call(ca_fit, c(list(X, ncp, sup_or_null(rs), sup_or_null(cs)), dots))
 
-  res <- FactoMineR::CA(X, ncp = ncp, graph = FALSE, ...)
   # WARNING: FactoMineR::CA() drops `names(dimnames())` from every matrix it keeps; they are written
-  #   back on `call$X`, where interpret() reads the names of the two variables.
-  names(dimnames(res$call$X)) <- names(dimnames(X))
+  #   back on `call$X`, where interpret(), hierarchical_clust() and axis_coord() read them.
+  names(dimnames(res$call$X)) <- if (!is.null(tb)) tb$vars else names(dimnames(X))
+  if (!is.null(tb)) res$source <- list(rows = tb$rows, cols = tb$cols, counts = tb$n)
   res
 }
 
+#' @rdname correspondence_analysis
+#' @export
+CA2 <- correspondence_analysis
 
-#' Readable and Interactive graph for simple correspondence analysis
-#' @description A readable, complete and beautiful graph for simple
-#' correspondence analysis made with \code{FactoMineR::\link[FactoMineR]{CA}}.
-#' Interactive tooltips, appearing when hovering on  points with mouse, allow to
-#' keep in mind all the content of the table while reading the graph. Since it is
-#' made in the spirit of \code{\link[ggplot2]{ggplot2}}, it is possible to change
-#' theme or add another plot elements with +. Then, interactive
-#' tooltips won't appear until you pass the result through \code{\link{ggi}}.
+# The one call of FactoMineR::CA(): the matrix travels as a symbol, not inlined into the call.
+#' @keywords internal
+#' @noRd
+ca_fit <- function(X, ncp, row.sup, col.sup, ...) {
+  FactoMineR::CA(X, ncp = ncp, row.sup = row.sup, col.sup = col.sup, graph = FALSE, ...)
+}
+
+# A tabxplor crosstab as the matrices a CA needs -- weighted and unweighted counts, Totals dropped --
+# with the variable and the name of each row and column, and the supplementary positions.
+#' @keywords internal
+#' @noRd
+ca_table <- function(table) {
+  s <- tabxplor::tab_structure(table)
+  if (length(s$tab_vars) != 0) stop(
+    "correspondence_analysis() analyses one table of rows by columns: make it without `tab_vars`.",
+    call. = FALSE)
+  table <- dplyr::ungroup(table)
+  keep  <- !tabxplor::is_totrow(table)
+  cols  <- names(table)[purrr::map_lgl(table, tabxplor::is_fmt) & !tabxplor::is_totcol(table)]
+  cvar  <- unname(tabxplor::get_col_var(table)[cols])
+  if (length(cols) == 0 || any(!nzchar(cvar))) stop(
+    "correspondence_analysis() needs a crosstab, with at least one column variable.",
+    call. = FALSE)
+  if (isTRUE(s$merged)) {
+    rvar <- as.character(table$row_var)
+    rlv  <- as.character(table$levels)
+  } else {
+    rvar <- rep(names(table)[1], nrow(table))
+    rlv  <- as.character(table[[1]])
+  }
+  rvar <- rvar[keep]
+  rlv  <- rlv[keep]
+  # tabxplor names a level two column variables share `<level>_<variable>`
+  suffix <- paste0("_", cvar)
+  strip  <- endsWith(cols, suffix) & nchar(cols) > nchar(suffix)
+  clv    <- ifelse(strip, substr(cols, 1L, nchar(cols) - nchar(suffix)), cols)
+
+  field <- function(f) vapply(cols, function(col) as.numeric(vctrs::field(table[[col]], f)),
+                              numeric(nrow(table)))[keep, , drop = FALSE]
+  n  <- field("n")
+  wn <- field("wn")
+  wn[is.na(wn)] <- n[is.na(wn)]
+  # a supplementary level named like another one says its variable, as a tooltip line does
+  unique_names <- function(lv, var) {
+    shared <- lv %in% lv[duplicated(lv)] & var != var[1]
+    ifelse(shared, paste0(lv, " (", var, ")"), lv)
+  }
+  dimnames(wn) <- dimnames(n) <- list(unique_names(rlv, rvar), unique_names(clv, cvar))
+  list(wn = wn, n = if (!isTRUE(all.equal(wn, n))) n, vars = c(rvar[1], cvar[1]),
+       rows = tibble::tibble(var = rvar, lvs = rlv), cols = tibble::tibble(var = cvar, lvs = clv),
+       row_sup = which(rvar != rvar[1]), col_sup = which(cvar != cvar[1]))
+}
+
+# The reader of a CA for its graph: each margin's levels by position in `call$Xtot` -- variable,
+# name, supplementary or not, coordinates, contributions, counts -- and the active total.
+#' @keywords internal
+#' @noRd
+ca_model <- function(res) {
+  Xt  <- as.matrix(res$call$Xtot)
+  src <- res$source
+  N   <- if (!is.null(src$counts)) src$counts else Xt
+  rs  <- as.integer(res$call$row.sup)
+  cs  <- as.integer(res$call$col.sup)
+  ra  <- setdiff(seq_len(nrow(Xt)), rs)
+  ka  <- setdiff(seq_len(ncol(Xt)), cs)
+  nm  <- names(dimnames(res$call$X))
+  if (length(nm) != 2L || anyNA(nm) || !all(nzchar(nm))) {
+    nm <- c(gettext("Rows"), gettext("Columns"))
+  }
+
+  margin <- function(side) {
+    rows <- side == "row"
+    size <- if (rows) nrow(Xt) else ncol(Xt)
+    sup  <- if (rows) rs else cs
+    act  <- setdiff(seq_len(size), sup)
+    lv   <- if (rows) src$rows else src$cols
+    var  <- if (!is.null(lv)) lv$var else ifelse(seq_len(size) %in% sup,
+      if (rows) gettext("Supplementary rows") else gettext("Supplementary columns"),
+      nm[if (rows) 1L else 2L])
+    lvs  <- if (!is.null(lv)) lv$lvs else if (rows) rownames(Xt) else colnames(Xt)
+    K     <- ncol(as.matrix(res[[side]]$coord))          # a one-axis CA gives vectors
+    coord <- contrib <- matrix(NA_real_, size, K)
+    coord[act, ]   <- as.matrix(res[[side]]$coord)
+    contrib[act, ] <- as.matrix(res[[side]]$contrib)
+    if (length(sup) != 0) {
+      coord[sup, ] <- as.matrix(res[[paste0(side, ".sup")]]$coord)[, seq_len(K), drop = FALSE]
+    }
+    wn <- if (rows) rowSums(Xt[, ka, drop = FALSE]) else colSums(Xt[ra, , drop = FALSE])
+    n  <- if (rows) rowSums(N[, ka, drop = FALSE])  else colSums(N[ra, , drop = FALSE])
+    list(var = var, lvs = lvs, sup = seq_len(size) %in% sup, coord = coord, contrib = contrib,
+         n = n, wn = wn, W = stats::ave(wn, var, FUN = sum), vars = unique(var))
+  }
+  list(Xt = Xt, N = N, rows = margin("row"), cols = margin("col"),
+       W = sum(Xt[ra, ka]), n = sum(N[ra, ka]), vars = nm, eig = eig_table(res))
+}
+
+# The table's cells as units, one per (row level, column level), each variable a factor NA outside
+# its own block: the CA's crosstabs are rowsum()s over them, as the MCA's are over its units.
+#' @keywords internal
+#' @noRd
+ca_units <- function(m, row_lvs, col_lvs) {
+  i <- rep(seq_len(nrow(m$Xt)), times = ncol(m$Xt))
+  j <- rep(seq_len(ncol(m$Xt)), each  = nrow(m$Xt))
+  units <- tibble::tibble(..n = m$N[cbind(i, j)], ..wn = m$Xt[cbind(i, j)])
+  add <- function(units, var, lvs, at) {
+    for (v in unique(var)) {
+      in_v <- var == v
+      units[[v]] <- factor(ifelse(in_v[at], lvs[at], NA_character_), unique(lvs[in_v]))
+    }
+    units
+  }
+  units <- add(units, m$rows$var, row_lvs, i)
+  add(units, m$cols$var, col_lvs, j)
+}
+
+# The CA's plot model: both margins' levels (active in their variable's colour, supplementary
+# ones too), the clusters of a margin, the central point; no individuals.
+#' @keywords internal
+#' @noRd
+ca_plot_data <- function(res.ca, tooltips, cleannames, color_groups, clust, clust_color_groups,
+                         keep_levels, discard_levels, show_sup, uppercase, lang) {
+  if (!inherits(res.ca, "CA")) stop(
+    "ggca() draws a correspondence analysis, made with correspondence_analysis() or ",
+    "FactoMineR::CA().", call. = FALSE)
+  clust_name <- if (quo_given(clust)) {
+    if (rlang::quo_is_symbol(clust)) rlang::as_name(clust) else "clust"
+  }
+  clust <- if (quo_given(clust)) rlang::eval_tidy(clust)
+
+  with_gda_lang(lang, function(lg) {
+    m    <- ca_model(res.ca)
+    rows <- m$rows
+    cols <- m$cols
+    level <- function(mg, side) {
+      tibble::tibble(vars = mg$var, raw = mg$lvs, lvs = clean_levels(mg$lvs, cleannames),
+                     role = ifelse(mg$sup, "sup", "active"), side = side, n = mg$n,
+                     wcount = mg$wn, W = mg$W)
+    }
+    lv      <- dplyr::bind_rows(level(rows, "row"), level(cols, "col"))
+    coord   <- rbind(rows$coord, cols$coord)
+    contrib <- rbind(rows$contrib, cols$contrib)
+
+    # A margin's clusters: its levels take their cluster's colour; the cluster sits at the
+    # barycentre of its levels, weighted by their masses.
+    cl <- NULL
+    if (!is.null(clust)) {
+      cl  <- ca_clusters(clust, lv)
+      at  <- which(lv$side == cl$side & lv$role == "active")[
+        match(cl$lvs, lv$raw[lv$side == cl$side & lv$role == "active"])]
+      k   <- clean_factor(factor(cl$clust), cleannames)
+      b   <- barycentres(coord[at, , drop = FALSE], lv$wcount[at], k)
+      agg <- rowsum(cbind(lv$n[at], lv$wcount[at]), as.integer(k), reorder = TRUE)
+      lv  <- dplyr::bind_rows(lv, tibble::tibble(
+        vars = clust_name, raw = b$lvs, lvs = b$lvs, role = "clust", side = cl$side,
+        n = agg[, 1], wcount = agg[, 2], W = m$W))
+      coord   <- rbind(coord, b$coord)
+      contrib <- rbind(contrib, matrix(NA_real_, nrow(b$coord), ncol(contrib)))
+    }
+
+    vars_data <- vars_rows(lv$vars, lv$lvs, lv$role, wcount = lv$wcount, coord = coord,
+                           contrib = contrib)
+    vars_data$color_group <- assign_color_groups(
+      lv$vars, lv$raw, c(rows$vars, cols$vars, clust_name), color_groups,
+      if (!is.null(cl)) clust_name else character(), clust_color_groups)
+    sup <- lv$role == "sup"
+    vars_data$id <- as.integer(ifelse(sup, cumsum(sup), 1000L + cumsum(!sup)))
+    if (!is.null(cl)) {
+      is_cl <- lv$role == "clust"
+      vars_data$id[is_cl] <- clust_ids(lv$lvs[is_cl], levels(k))
+      vars_data$id[at]    <- clust_ids(k, levels(k))
+      vars_data$color_group[at] <- vars_data$color_group[is_cl][match(as.character(k),
+                                                                      lv$lvs[is_cl])]
+    }
+
+    # The tooltips: each level's profile over the other margin, then the central point's.
+    units <- ca_units(m, clean_levels(rows$lvs, cleannames), clean_levels(cols$lvs, cleannames))
+    if (!is.null(cl)) {
+      own <- units[[m$vars[if (cl$side == "row") 1L else 2L]]]
+      units[[clust_name]] <- k[match(as.character(own), clean_levels(cl$lvs, cleannames))]
+    }
+    passes <- list(row = list(crossed = rows$vars, blocks = cols$vars, pop = m$vars[1]),
+                   col = list(crossed = cols$vars, blocks = rows$vars, pop = m$vars[2]))
+    body <- purrr::imap(passes[intersect(names(passes), tooltips)], function(p, side) {
+      crossed <- c(p$crossed, if (!is.null(cl) && cl$side == side) clust_name)
+      blocks  <- purrr::map(p$blocks, function(v) tip_block(v, if (v %in% m$vars) {
+        gettextf("%s:", v)
+      } else {
+        gettextf("%s (supplementary):", v)
+      }))
+      tibble::tibble(
+        vars = c(rep(crossed, purrr::map_int(units[crossed], nlevels)), NA_character_),
+        lvs  = c(unlist(purrr::map(units[crossed], levels), use.names = FALSE), NA_character_),
+        text = tooltip_body(units, crossed, blocks, pop = !is.na(units[[p$pop]])))
+    }) |>
+      dplyr::bind_rows()
+
+    vars_data$begin_text <- tooltip_header(lv$lvs, lv$vars, lv$n, lv$wcount, lv$W)
+    vars_data$interactive_text <- body$text[vctrs::vec_match(
+      data.frame(vars = lv$vars, lvs = lv$lvs), data.frame(vars = body$vars, lvs = body$lvs))]
+    central <- central_row(m$W, ncol(coord))
+    central$begin_text <- tooltip_header(NA, NA, m$n, m$W, m$W)
+    central_body <- body$text[is.na(body$vars) & !is.na(body$text)]
+    if (length(central_body) != 0) central$interactive_text <- paste(central_body, collapse = "\n")
+
+    keep <- lv$role %in% c("active", "clust") | (show_sup & lv$role == "sup")
+    keep <- keep & (lv$role == "clust" | filter_levels(lv$raw, keep_levels, discard_levels))
+    up   <- lv$role != "clust" &
+      ((lv$side == "col" & "col" %in% uppercase) | (lv$side == "row" & "row" %in% uppercase))
+    vars_data$lvs[up] <- toupper(vars_data$lvs[up])
+
+    plot_model(dplyr::bind_rows(vars_data[keep, ], central),
+               res = list(eig = m$eig, axes_names = res.ca$axes_names),
+               clust = if (!is.null(cl)) clust_name else character(), lang = lg)
+  })
+}
+
+# The clusters of a CA's margin, from the named factor hierarchical_clust() returns outside mutate():
+# which margin its names are the levels of.
+#' @keywords internal
+#' @noRd
+ca_clusters <- function(clust, lv) {
+  nm <- names(clust)
+  if (is.null(nm) || length(clust) == 0) stop(
+    "In a correspondence analysis, `clust` is the clusters of the levels of one margin, named ",
+    "after them, as hierarchical_clust() returns them outside mutate(): `ggca(res, clust = ",
+    "hierarchical_clust(res, ncp = 2, nb_clust = 4))`.", call. = FALSE)
+  for (side in c("row", "col")) {
+    if (all(nm %in% lv$raw[lv$side == side & lv$role == "active"])) {
+      return(list(side = side, lvs = nm, clust = unname(clust)))
+    }
+  }
+  stop("The names of `clust` are not the levels of one margin of the analysis: ",
+       str_c(utils::head(setdiff(nm, lv$raw), 3), collapse = ", "), ".", call. = FALSE)
+}
+
+
+#' Readable and Interactive Graph for Simple Correspondence Analysis
 #'
-#' @param res.ca An object created with \code{\link{correspondence_analysis}} or
+#' @description A readable, complete and beautiful graph of a correspondence analysis. Hovering a
+#' level shows its profile --- its distribution over the levels of the other variable, each
+#' percentage coloured by its difference from the average profile, as in
+#' \code{tabxplor::tab(color = "diff")} --- so the graph is read with the table it draws. The
+#' supplementary variables of the table (see \code{\link{correspondence_analysis}}) are drawn in
+#' their own colours, and the clusters of one margin, made with \code{\link{hierarchical_clust}},
+#' can colour its levels. It is a \pkg{ggplot2} graph, to which elements can be added with `+`;
+#' pass it to \code{\link{ggi}} for the interactive version. \code{\link{ggfacto}} is the same
+#' graph, for any analysis.
+#'
+#' @param res.ca An analysis made with \code{\link{correspondence_analysis}} or
 #' \code{FactoMineR::\link[FactoMineR]{CA}}.
 #' @param axes The axes to print, as a numeric vector of length 2.
-#' @param show_sup When \code{TRUE} show supplementary rows and cols.
-#' @param xlim,ylim Horizontal and vertical axes limits,
-#' as double vectors of length 2.
-#' @param out_lims_move When \code{TRUE}, the points out of \code{xlim} or
-#'  \code{ylim} are not removed, but moved at the edges of the graph.
-#' @param type Determines the way the two variables of the table are printed.
-#'    \itemize{
-#'    \item \code{"points"} : colored points with text legends
-#'    \item \code{"text"} : colored text
-#'    \item \code{"labels"} : colored labels
-#'  }
-#' @param text_repel By default, labels are moved so that they do not overlap, with
-#'  \code{ggrepel::\link[ggrepel]{geom_text_repel}}. Set to \code{FALSE} to print each label
-#'  exactly at its point, which is faster to draw.
-#' @param uppercase Print \code{"row"} var or \code{"col"} var labels with
-#' uppercase.
-#' @param tooltips Choose the content of interactive tooltips at mouse hover :
-#'  \code{"col"} for the table of columns percentages, \code{"row"} for line
-#'  percentages, default to \code{c("row", "col")} for both.
-#' @param rowtips_subtitle,coltips_subtitle The subtitles used before the table
-#' in interactive tooltips.
-#' @param rowcolor_numbers,colcolor_numbers If row var or col var levels are
-#' prefixed with numbers(ex. : \code{"1-"} ), the number of digits to use
-#' to create classes that will be used to add colors to points.
-#' @param cleannames Set to \code{TRUE} to clean levels names, by removing
-#' prefix numbers like \code{"1-"}, and text in parentheses.
-#' @param filter Regex patterns to discard levels of row or col variables.
+#' @param show_sup Set to \code{FALSE} to leave the supplementary rows and columns out.
+#' @param xlim,ylim Horizontal and vertical axes limits, as double vectors of length 2.
+#' @param out_lims_move When \code{TRUE}, the levels outside \code{xlim} or \code{ylim} are moved
+#' to the edges of the graph rather than left out.
+#' @param type How the levels are printed: \code{"points"} (coloured points with their names),
+#' \code{"text"} (coloured names) or \code{"labels"} (coloured labels).
+#' @param text_repel By default, labels are moved so that they do not overlap. Set to
+#' \code{FALSE} to print each label exactly at its point.
+#' @param uppercase Print the levels of the column variables (\code{"col"}, the default), of the row
+#' variables (\code{"row"}), of both or none (\code{NULL}) in uppercase.
+#' @param tooltips The tooltips to build: \code{"row"} for the profiles of the row levels,
+#' \code{"col"} for those of the column levels, both by default.
+#' @param cleannames Set to \code{TRUE} to clean levels names, by removing prefix numbers like
+#' \code{"1-"}, and text in parentheses.
 #' @param title The title of the graph.
 #' @param text_size Size of text.
-#' @param dist_labels When \code{type = "points"}, the distance of text and
-#' labels from points.
-#' @param right_margin A margin at the right, in cm. Useful to read tooltips
-#'  over points placed at the right of the graph without formatting problems.
-#' @param size_scale_max Size of points.
-#' @param use_theme By default, a specific \code{ggplot2} theme is used.
-#' Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.
+#' @param dist_labels When \code{type = "points"}, the distance of the names from the points.
+#' @param right_margin A margin at the right, in cm.
+#' @param size_scale_max The size of the largest point. By default, computed from the spread of the
+#' levels' weights.
+#' @param use_theme By default, a specific \code{ggplot2} theme is used. Set to \code{FALSE} to
+#' customize your own \code{\link[ggplot2:theme]{theme}}.
+#' @param clust The clusters of the levels of one margin, as \code{\link{hierarchical_clust}}
+#' returns them outside \code{mutate()}: `clust = hierarchical_clust(res.ca, ncp = 2, nb_clust = 4)`.
+#' The levels of a cluster take its colour, and the cluster is drawn at their barycentre.
+#' @param color_groups One colour per variable by default. A regex matched against each level name
+#' makes colour groups within the variables (\code{"^.{1}"}: upon their first character).
+#' @param clust_color_groups Color groups for the clusters.
+#' @param keep_levels,discard_levels Regexes (or vectors of them) of the levels to keep, or to leave
+#' out.
+#' @param axes_names Names of all the axes (not just the two selected ones), as a character vector.
+#' @param axes_reverse `1` to invert left and right, `2` to invert up and down, `1:2` for both.
+#' @param actives_in_bold Set the active levels in bold font.
+#' @param sup_in_italic Set the supplementary levels in italics.
+#' @param shift_colors Change the colors of the variables.
+#' @param colornames_recode A named character vector, in \code{forcats::fct_recode()} style, to
+#' rename the colour groups (printed with `options(ggfacto.verbose = TRUE)`).
+#' @param scale_color_light,scale_color_dark The colours of the points and of the names.
+#' @param get_data Returns the data frames the graph is drawn from, instead of the graph.
+#' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
+#' @param rowtips_subtitle,coltips_subtitle,rowcolor_numbers,colcolor_numbers,filter Deprecated.
+#' A tooltip is headed by its variables' names; \code{color_groups = "^.{2}"} replaces
+#' \code{rowcolor_numbers = 2}, and \code{discard_levels} replaces \code{filter}.
 #'
-#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object to be printed in the
-#' `RStudio` Plots pane. Possibility to add other gg objects with \code{+}.
-#' Sending the result  through \code{\link{ggi}} will draw the
-#' interactive graph in the Viewer pane using \code{\link[ggiraph]{girafe}}.
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object, to which elements can be added with
+#' \code{+}. Sending it through \code{\link{ggi}} draws the interactive graph.
 #' @export
 #'
 #' @examples
 #' \donttest{
-#' tableau <- tabxplor::tab(forcats::gss_cat, race, marital)
-#' res.ca  <- correspondence_analysis(tableau)
+#' gss <- forcats::gss_cat |>
+#'   dplyr::filter(!relig %in% c("No answer", "Don't know", "Not applicable"),
+#'                 !partyid %in% c("No answer", "Don't know"))
+#' res.ca <- correspondence_analysis(tabxplor::tab(gss, relig, partyid))
+#' ggca(res.ca) |>
+#'   ggi()
 #'
-#' # Interactive plot :
-#' graph.ca <- ggca(res.ca, title = "Race by marital status: correspondence analysis")
-#' ggi(graph.ca) # to make the plot interactive
+#' # the clusters of the religions, drawn among them
+#' ggca(res.ca, clust = hierarchical_clust(res.ca, ncp = 2, nb_clust = 4))
 #' }
-ggca <-
-  function(res.ca, axes = c(1,2), show_sup = FALSE, xlim, ylim,
-           out_lims_move = FALSE,
-           type = c("points", "text", "labels"), text_repel = TRUE, uppercase = "col",
-           tooltips = c("row", "col"),
-           rowtips_subtitle = "Row pct", coltips_subtitle = "Column pct",
-           rowcolor_numbers = 0, colcolor_numbers = 0, cleannames = TRUE, filter = "",
-           title,
-           text_size = 3.5, dist_labels = c("auto", 0.12), right_margin = 0,
-           size_scale_max = 8, use_theme = TRUE) {  #, repel_max_iter = 10000
-
-    dim1 <- rlang::sym(str_c("Dim ", axes[1])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[1],"`"))))
-    dim2 <- rlang::sym(str_c("Dim ", axes[2])) #rlang::expr(eval(parse(text = paste0("`Dim ", axes[2],"`"))))
-
-
-    #Lignes :
-    row_coord <- res.ca$row$coord |> tibble::as_tibble(rownames = "lvs") |>
-      dplyr::mutate(colorvar = "Active_row") |>
-      dplyr::bind_rows(res.ca$row.sup$coord |>
-                         tibble::as_tibble(rownames = "lvs") |>
-                         dplyr::mutate(colorvar = "Sup_row") )
-    row_coord <- row_coord  |>
-      dplyr::bind_cols(freq = rowSums(res.ca$call$Xtot) / sum(rowSums(res.ca$call$Xtot))) |>
-      dplyr::mutate(numbers = dplyr::case_when(
-        str_detect(.data$lvs, "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-")
-        ~ str_extract(.data$lvs, "^[^- ]+"),
-        TRUE ~ "" ))
-
-    # Remove words in parenthesis and numbers
-    if (cleannames == TRUE) row_coord <- row_coord |>
-      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition()))
-
-    # Variable de couleur (colorvar) selon nb de caracteres indiques
-    row_coord <- row_coord  |>
-      dplyr::mutate(row_colorvar = as.factor(str_sub(.data$numbers, 1,
-                                                              rowcolor_numbers)))
-    row_colorvar_recode <- levels(row_coord$row_colorvar)
-    names(row_colorvar_recode) <- str_c(1:nlevels(row_coord$row_colorvar))
-    row_coord <- row_coord |>
-      dplyr::mutate(row_colorvar = forcats::fct_recode(.data$row_colorvar,
-                                                       !!!row_colorvar_recode)) |>
-      dplyr::mutate(colorvar = ifelse(.data$colorvar == "Sup_row", .data$colorvar,
-                                      str_c(.data$colorvar,
-                                                     .data$row_colorvar))) |>
-      dplyr::select(-"row_colorvar") |>
-      # Afficher informations interactives au survol d'un point
-      dplyr::mutate(interactive_text = str_c("<b>", .data$lvs, "</b>", "\n",
-                                                      "Frequency: ",
-                                                      round(.data$freq*100, 0), "%"),
-                    lvs = str_replace_all(.data$lvs, "[^[:alnum:][:punct:]]",
-                                                   " ") |> str_squish()  )
-
-    if ("row" %in% tooltips) {
-      #Calculer les % par ligne (de la variable colonne)
-      row_frequencies <- res.ca$call$Xtot |> tibble::as_tibble() |>
-        tibble::add_row(!!!colSums(res.ca$call$Xtot))
-      row_frequencies <- row_frequencies |>
-        dplyr::mutate_all(~ ./rowSums(row_frequencies)) |>
-        dplyr::rename_all(~ str_remove_all(., cleannames_condition()))
-      row_residuals <- row_frequencies |>
-        dplyr::mutate_all(~ . - .[nrow(row_frequencies)]) |>
-        dplyr::mutate_all(~ dplyr::case_when(
-          round(.*100,0) >= 0 ~ str_c("+", round(.*100, 0), "%"),
-          . < 0 ~ str_c(unbrk, #Unbreakable space
-                                 "-", round(abs(.)*100, 0), "%")
-        )) |> dplyr::slice(-nrow(row_frequencies))
-      row_frequencies <- row_frequencies |>
-        dplyr::slice(-nrow(row_frequencies)) |>
-        dplyr::mutate_all(~ str_c(round(.*100, 0), "%")) |>
-        dplyr::mutate_all(~dplyr::case_when(
-          str_length(.) >= 3 ~ .,
-          str_length(.) < 3 ~ str_c(
-            unbrk, unbrk, . #2 unbreakable spaces
-          ),
-        ))
-      row_frequencies <- row_frequencies |>
-        dplyr::bind_rows(row_residuals) |>
-        dplyr::mutate(number_of_rows = dplyr::row_number())
-      row_frequencies <- row_frequencies |>
-        dplyr::mutate_at(dplyr::vars(-"number_of_rows"), ~dplyr::case_when(
-          number_of_rows > nrow(row_frequencies)/2 ~ NA_character_,
-          TRUE ~ str_c("(",.[number_of_rows + nrow(row_frequencies)/2],") ", .),
-        )) |>
-        dplyr::slice(1:(nrow(row_frequencies)/2)) |> dplyr::select(-"number_of_rows")
-      row_frequencies <- purrr::map_dfc(1:ncol(row_frequencies),
-                                        ~dplyr::mutate_all(row_frequencies[.x],
-                                                           function(.) str_c(colnames(row_frequencies)[.x], " : ", .)
-                                        ))
-      row_frequencies <- row_frequencies |>
-        tidyr::unite("row_text", sep = "\n") |> dplyr::pull("row_text")
-      row_coord <- row_coord |>
-        dplyr::mutate(interactive_text = str_c(
-          .data$interactive_text, "\n\n", rowtips_subtitle, " :\n", row_frequencies))
-    }
-
-
-
-    #Colonnes :
-    col_coord <- res.ca$col$coord |> tibble::as_tibble (rownames = "lvs") |>
-      dplyr::mutate(colorvar = "Active_col") |>
-      dplyr::bind_rows(res.ca$col.sup$coord |>
-                         tibble::as_tibble(rownames = "lvs") |>
-                         dplyr::mutate(colorvar = "Sup_col") ) |>
-      dplyr::bind_cols(freq = rowSums(t(res.ca$call$Xtot)) / sum(rowSums(t(res.ca$call$Xtot))))
-    col_coord <- col_coord |>
-      dplyr::mutate(numbers = dplyr::case_when(
-        str_detect(.data$lvs, "^[^- ]+-(?![[:lower:]])|^[^- ]+(?<![[:lower:]])-")
-        ~ str_extract(.data$lvs, "^[^- ]+"),
-        TRUE ~ "" ))
-
-    # Enlever les mots entre parentheses et les nombres
-    if (cleannames == TRUE) col_coord <- col_coord |>
-      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition()))
-
-    # Variable de couleur (colorvar) selon nb de caracteres indiques
-    col_coord <- col_coord |>
-      dplyr::mutate(col_colorvar = as.factor(str_sub(.data$numbers, 1,
-                                                              colcolor_numbers)))
-    col_colorvar_recode <- levels(col_coord$col_colorvar)
-    names(col_colorvar_recode) <- str_c(1:nlevels(col_coord$col_colorvar))
-    col_coord <- col_coord |>
-      dplyr::mutate(col_colorvar = forcats::fct_recode(.data$col_colorvar,
-                                                       !!!col_colorvar_recode)) |>
-      dplyr::mutate(colorvar = ifelse(.data$colorvar == "Sup_col", .data$colorvar,
-                                      str_c(.data$colorvar, .data$col_colorvar))) |>
-      dplyr::select(-"col_colorvar") |>
-      # Afficher informations interactives au survol d'un point
-      dplyr::mutate(interactive_text = str_c("<b>", .data$lvs, "</b>", "\n",
-                                                      "Frequency: ",
-                                                      round(.data$freq*100, 0), "%"),
-                    lvs = str_replace_all(.data$lvs, "[^[:alnum:][:punct:]]",
-                                                   " ") |> str_squish()
-      )
-
-
-    if ("col" %in% tooltips) {
-      # Calculer les % par colonne (de la variable en ligne)
-      col_frequencies <- res.ca$call$Xtot |> t() |> tibble::as_tibble() |>
-        tibble::add_row(!!!rowSums(res.ca$call$Xtot))
-      col_frequencies <- col_frequencies |> dplyr::mutate_all(~ ./rowSums(col_frequencies)) |>
-        dplyr::rename_all(~ str_remove_all(., cleannames_condition()))
-      col_residuals <- col_frequencies |>
-        dplyr::mutate_all(~ . - .[nrow(col_frequencies)]) |>
-        dplyr::mutate_all(~ dplyr::case_when(
-          round(.*100,0) >= 0 ~ str_c("+", round(.*100, 0), "%"),
-          . < 0 ~ str_c(unbrk, #unbreakable space
-                                 "-", round(abs(.)*100, 0), "%")
-        )) |> dplyr::slice(-nrow(col_frequencies))
-      col_frequencies <- col_frequencies |>
-        dplyr::slice(-nrow(col_frequencies)) |>
-        dplyr::mutate_all(~ str_c(round(.*100, 0), "%")) |>
-        dplyr::mutate_all(~dplyr::case_when(
-          str_length(.) >= 3 ~ .,
-          str_length(.) < 3 ~ str_c(
-            unbrk, unbrk, .), #Two unbreakable spaces
-        ))
-      col_frequencies <- col_frequencies |>
-        dplyr::bind_rows(col_residuals) |>
-        dplyr::mutate(number_of_rows = dplyr::row_number())
-      col_frequencies <- col_frequencies |>
-        dplyr::mutate_at(dplyr::vars(-"number_of_rows"), ~dplyr::case_when(
-          number_of_rows > nrow(col_frequencies)/2 ~ NA_character_,
-          TRUE ~ str_c("(",.[.data$number_of_rows + nrow(col_frequencies)/2],") ", .),
-        )) |>
-        dplyr::slice(1:(nrow(col_frequencies)/2)) |> dplyr::select(-"number_of_rows")
-      col_frequencies <- purrr::map_dfc(1:ncol(col_frequencies),
-                                        ~ dplyr::mutate_all(col_frequencies[.x],
-                                                            function(.) str_c(colnames(col_frequencies)[.x], " : ", .)
-                                        ))
-      col_frequencies <- col_frequencies |>
-        tidyr::unite("col_text", sep = "\n") |> dplyr::pull("col_text")
-      col_coord <- col_coord |>
-        dplyr::mutate(interactive_text = str_c(
-          .data$interactive_text, "\n\n", coltips_subtitle, " :\n", col_frequencies))
-    }
-
-    if (show_sup == FALSE) {
-      row_coord <- row_coord  |>
-        dplyr::filter(!str_detect(.data$colorvar, "Sup"))
-      col_coord <- col_coord |>
-        dplyr::filter(!str_detect(.data$colorvar, "Sup"))
-    }
-
-
-    # Le Central point et son texte interactive :
-    col_freq_text <- rowSums(res.ca$call$Xtot) |>
-      tibble::enframe(name = "lvs", value = "freq") |>
-      dplyr::mutate(freq = str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) |>
-      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition())) |>
-      tidyr::unite("row_freq", sep = ": ") |>  dplyr::pull("row_freq") |>
-      str_c(collapse = "\n")
-
-    row_freq_text <- rowSums(t(res.ca$call$Xtot)) |>
-      tibble::enframe(name = "lvs", value = "freq") |>
-      dplyr::mutate(freq = str_c(round(.data$freq/sum(.data$freq)*100, 0), "%")) |>
-      dplyr::mutate(lvs = str_remove_all(.data$lvs, cleannames_condition())) |>
-      tidyr::unite("col_freq", sep = ": ") |> dplyr::pull("col_freq") |>
-      str_c(collapse = "\n")
-
-    mean_point_data <- row_coord |> dplyr::slice(1) |>
-      dplyr::mutate_at(dplyr::vars(tidyselect::starts_with("Dim")), ~ 0) |>
-      dplyr::mutate(lvs = NA_character_, freq = 1, colorvar = "Central_point",
-                    numbers = NA_character_) |>
-      dplyr::mutate(interactive_text = str_c(
-        "<b>Central point</b>\nFrequency: ", str_c(.data$freq*100, "%")))
-
-    #if ("row" %in% tooltips) {     }     if ("col" %in% tooltips) {        }
-    mean_point_data <- mean_point_data |>
-      dplyr::mutate(interactive_text = str_c(.data$interactive_text, "\n\n",
-                                                      rowtips_subtitle, " :\n",
-                                                      row_freq_text,
-                                                      "\n\n", coltips_subtitle, " :\n",
-                                                      col_freq_text))
-
-    # Option pour afficher les lvs en majuscule (colonnes ou lignes) :
-    if ("row" %in% uppercase) {
-      row_coord <- row_coord  |>
-        dplyr::mutate(lvs = str_to_upper(.data$lvs, locale = "en"))
-    }
-    if ("col" %in% uppercase) {
-      col_coord <- col_coord |>
-        dplyr::mutate(lvs = str_to_upper(.data$lvs, locale = "en"))
-    }
-
-
-    all_coord <- row_coord |>
-      dplyr::bind_rows(col_coord) |>
-      dplyr::mutate(colorvar = as.factor(.data$colorvar),
-                    colorvar_names = as.factor(str_c("names_", .data$colorvar)),
-                    id = dplyr::row_number()      )
-
-
-
-    #Calculer les limites du graphique (argument a passer dans ggi pour regler la taille du htmlwidget)
-    min_max_lims <- dplyr::select(all_coord, !!dim1, !!dim2)
-
-    if (!missing(xlim)) min_max_lims <- min_max_lims |>  tibble::add_row(!!dim1 := xlim[1]) |> tibble::add_row(!!dim1 := xlim[2])
-    if (!missing(ylim)) min_max_lims <- min_max_lims |>  tibble::add_row(!!dim2 := ylim[1]) |> tibble::add_row(!!dim2 := ylim[2])
-    height_width_ratio <- min_max_lims |> dplyr::summarise_all(~ max(., na.rm = TRUE) - min(., na.rm = TRUE), .groups = "drop")
-    min_max_lims <-
-      dplyr::bind_rows(dplyr::summarise_all(min_max_lims, ~ min(., na.rm = TRUE), .groups = "drop"),
-                       dplyr::summarise_all(min_max_lims, ~ max(., na.rm = TRUE), .groups = "drop"))
-    width_range <- dplyr::pull(height_width_ratio, 1)[1]
-    height_width_ratio <- height_width_ratio |> dplyr::summarise(height_width_ratio = !!dim2/!!dim1, .groups = "drop") |> tibble::deframe()
-    if (dist_labels[1] == "auto") dist_labels <- width_range/50
-
-    theme_acm_with_lims <-
-      if (use_theme) {
-        if (!missing(xlim) & !missing(ylim))  {
-
-          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                      xlim = c(xlim[1], xlim[2]), ylim = c(ylim[1], ylim[2]))
-        }
-        else if (!missing(xlim) ) {
-          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                      xlim = c(xlim[1], xlim[2]) )
-        }
-        else if (!missing(ylim) )  {
-          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max,  # legend.position = "bottom",
-                      ylim = c(ylim[1], ylim[2]))
-        }
-        else {
-          theme_facto(res = res.ca, axes = axes, no_color_scale = TRUE, size_scale_max = size_scale_max)  # legend.position = "bottom",
-        }
-      } else {
-        NULL
-      }
-
-
-
-    if (text_repel == FALSE | out_lims_move == FALSE) {
-      if (!missing(xlim)) all_coord <- all_coord |> outlims(xlim, !!dim1)
-      if (!missing(ylim)) all_coord <- all_coord |> outlims(ylim, !!dim2)
-    }
-
-
-    scale_color_named_vector <-
-      c("Central_point" = "black",   # Material colors :
-        "Active_col1" = "#3f51b5", # Indigo 500
-        "Active_col2" = "#673ab7", # Deep purple 500
-        "Active_col3" = "#1976d2", # Blue 700
-        "Active_col4" = "#7b1fa2", # Purple 700
-        "Active_row1" = "#43a047", # Green 600
-        "Active_row2" = "#f57c00", # Orange 700
-        "Active_row3" = "#c0ca33", # Lime 600
-        "Active_row4" = "#f4511e", # Deep orange 600
-        "Active_row5" = "#7cb342", # Light green 600
-        "Active_row6" = "#e53935", # Red 600
-        "Active_row7" = "#fbc02d", # Jaune 700
-        "Active_row8" = "#26a69a", # Teal 400
-
-        "Sup_col"    =  "#b0bec5", # Blue grey 200
-        "Sup_row"    =  "#bcaaa4", # Brown 200
-
-        "names_Point_moyen" = "black",
-        "names_Active_col1" = "#000051", # Indigo 900 Dark
-        "names_Active_col2" = "#000063", # Deep purple 900 Dark
-        "names_Active_col3" = "#002171", # Blue 900 Dark
-        "names_Active_col4" = "#12005e", # Purple 900 Dark
-        "names_Active_row1" = "#00600f", # Green 700 Dark
-        "names_Active_row2" = "#bb4d00", # Orange 700 Dark
-        "names_Active_row3" = "#7c8500", # Lime 700 Dark
-        "names_Active_row4" = "#ac0800", # Deep orange 700 Dark
-        "names_Active_row5" = "#4b830d", # Light green 600 Dark
-        "names_Active_row6" = "#ab000d", # Red 600 Dark
-        "names_Active_row7" = "#c49000", # Jaune 700 Dark
-        "names_Active_row8" = "#00766c", # Teal 400 Dark
-
-        "names_Sup_col" = "#808e95", # Blue grey 200 Dark
-        "names_Sup_row" = "#8c7b75" # Brown 200 Dark
-      )
-
-
-    if (!missing(title)) {
-      title_graph <- ggplot2::labs(title = title) #str_c("Les Active variables de l'ACM sur les axes ",axes[1], " et ", axes[2] )
-    } else {
-      title_graph <- NULL
-    }
-
-    graph_mean_point <-
-      ggiraph::geom_point_interactive(
-        data = mean_point_data,
-        ggplot2::aes(x = !!dim1, y = !!dim2, tooltip = .data$interactive_text),
-        color = "black", shape = 3, size = 5, stroke = 1.5, fill = "black", na.rm = TRUE
-      )
-
-    graph_theme_acm <-
-      list(theme_acm_with_lims,
-           ggplot2::scale_colour_manual(values = scale_color_named_vector,
-                                        aesthetics = c("colour", "fill")),
-           ggplot2::theme(plot.margin = ggplot2::margin(r = right_margin, unit = "cm")),
-           title_graph)
-
-
-    #Sorties :
-    if (type[1] == "points") {
-      plot_output <- ggplot2::ggplot() + graph_theme_acm +
-        ggrepel::geom_text_repel(
-          data = all_coord,
-          ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$lvs,
-                       color = .data$colorvar_names),
-          size = text_size, hjust = "left", nudge_x = dist_labels, direction = "y",
-          segment.colour = "black",
-          segment.alpha = 0.2, point.padding = 0.25, na.rm = TRUE
-        ) + #0.25, # min.segment.length = 0.8, max.iter = 10000 #repel_max_iter #fontface = "bold", max.iter = 50000
-        ggiraph::geom_point_interactive(
-          data = all_coord,
-          ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$freq,
-                       color = .data$colorvar, shape = .data$colorvar,
-                       tooltip = .data$interactive_text, #fill = .data$colorvar,
-                       data_id = .data$id),
-          stroke = 1.5, na.rm = TRUE
-        ) +
-        graph_mean_point +
-        ggplot2::scale_shape_manual(values = c(
-          #"Central_point" = 1,
-          "Active_col1" = 17,
-          "Active_col2" = 17,
-          "Active_col3" = 17,
-          "Active_col4" = 17,
-          "Active_row1" = 18,
-          "Active_row2" = 18,
-          "Active_row3" = 18,
-          "Active_row4" = 18,
-          "Sup_col"    = 17,
-          "Sup_row"    = 18  ))
-
-      css_hover <- ggiraph::girafe_css("fill:gold;stroke:orange;",
-                                       text = "color:gold4;stroke:none;")
-      attr(plot_output, "css_hover") <- css_hover
-
-    } else if (type[1] == "text") {
-      if (text_repel == FALSE) {
-        graph_text <-
-          ggiraph::geom_text_interactive(data = all_coord,
-                                         ggplot2::aes(x = !!dim1, y = !!dim2,
-                                                      label   = .data$lvs,
-                                                      color   = .data$colorvar,
-                                                      tooltip = .data$interactive_text,
-                                                      data_id = .data$id),
-                                         size = text_size, fontface = "bold",  na.rm = TRUE)
-      } else {
-        graph_text <-
-          ggrepel::geom_text_repel(data = all_coord,
-                                   ggplot2::aes(x = !!dim1, y = !!dim2,
-                                                label = .data$lvs,
-                                                color = .data$colorvar),
-                                   size = text_size, na.rm = TRUE, fontface = "bold",
-                                   direction = "both", # segment.alpha = 0.5,# point.padding = 0.25, segment.colour = "black",
-                                   min.segment.length = 0.4, arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")))
-      }
-      plot_output <- ggplot2::ggplot() + graph_theme_acm + graph_text + graph_mean_point
-
-
-    } else if (type[1] == "labels") {
-      if (text_repel == FALSE) {
-        graph_text <-
-          ggiraph::geom_label_interactive(data = all_coord,
-                                          ggplot2::aes(x = !!dim1, y = !!dim2,
-                                                       label   = .data$lvs,
-                                                       color   = .data$colorvar,
-                                                       tooltip = .data$interactive_text,
-                                                       data_id = .data$id),
-                                          size = text_size, fontface = "bold",  na.rm = TRUE)
-      } else {
-        graph_text <-
-          ggrepel::geom_label_repel(data = all_coord,
-                                    ggplot2::aes(x = !!dim1, y = !!dim2,
-                                                 label = .data$lvs,
-                                                 color = .data$colorvar),
-                                    size = text_size, na.rm = TRUE, fontface = "bold",
-                                    direction = "both", # segment.alpha = 0.5,# point.padding = 0.25, segment.colour = "black",
-                                    min.segment.length = 0.5, arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")))
-      }
-      plot_output <- ggplot2::ggplot() + graph_theme_acm + graph_text + graph_mean_point
-    }
-
-    # DESIGN: render hints ride on the ggplot object as attributes, read back by ggi() and
-    # ggsave2(). They must NOT be list slots: append() would flatten the S7 ggplot into a plain
-    # list and the ggplot generics would stop dispatching on it. See R/mca-plot.R for the twin.
-    css_tooltip <- "text-align:right;padding:4px;border-radius:5px;background-color:#eeeeee;color:black;" #
-    attr(plot_output, "css_tooltip")        <- css_tooltip
-    attr(plot_output, "height_width_ratio") <- height_width_ratio
-    return(plot_output)
+ggca <- function(res.ca, axes = c(1,2), show_sup = TRUE, xlim, ylim, out_lims_move = FALSE,
+                 type = c("points", "text", "labels"), text_repel = TRUE, uppercase = "col",
+                 tooltips = c("row", "col"), rowtips_subtitle, coltips_subtitle,
+                 rowcolor_numbers, colcolor_numbers, cleannames = TRUE, filter,
+                 title, text_size = 3.5, dist_labels = c("auto", 0.12), right_margin = 0,
+                 size_scale_max = NULL, use_theme = TRUE,
+                 clust, color_groups = "^.{0}", clust_color_groups = "^.+$",
+                 keep_levels, discard_levels, axes_names = NULL, axes_reverse = NULL,
+                 actives_in_bold = TRUE, sup_in_italic = TRUE, shift_colors = 0,
+                 colornames_recode, scale_color_light = material_colors_light(),
+                 scale_color_dark = material_colors_dark(), get_data = FALSE, lang = NULL) {
+  # The former arguments keep their places; each says once what replaces it.
+  if (!missing(rowtips_subtitle) || !missing(coltips_subtitle)) deprecated_notice(
+    "ggca::tips_subtitle", str_c("ggca(rowtips_subtitle =, coltips_subtitle =) are deprecated: ",
+                                 "a tooltip is headed by its variables."))
+  if (missing(keep_levels))    keep_levels    <- character()
+  if (missing(discard_levels)) discard_levels <- character()
+  if (!missing(filter)) {
+    discard_levels <- c(discard_levels, renamed_arg(filter[nzchar(filter)], "filter",
+                                                    "discard_levels", "ggca"))
   }
+  if (!missing(rowcolor_numbers) || !missing(colcolor_numbers)) {
+    k_row <- if (missing(rowcolor_numbers)) 0L else {
+      renamed_arg(rowcolor_numbers, "rowcolor_numbers", "color_groups", "ggca")
+    }
+    k_col <- if (missing(colcolor_numbers)) 0L else {
+      renamed_arg(colcolor_numbers, "colcolor_numbers", "color_groups", "ggca")
+    }
+    m <- ca_model(res.ca)
+    color_groups <- c(rep(paste0("^.{", k_row, "}"), length(m$rows$vars)),
+                      rep(paste0("^.{", k_col, "}"), length(m$cols$vars)))
+  }
+  plot_data <- ca_plot_data(
+    res.ca, tooltips = match.arg(tooltips, several.ok = TRUE), cleannames = cleannames,
+    color_groups = color_groups, clust = rlang::enquo(clust),
+    clust_color_groups = clust_color_groups, keep_levels = keep_levels,
+    discard_levels = discard_levels, show_sup = show_sup, uppercase = uppercase, lang = lang)
+  ggmca_plot(plot_data, axes = axes, axes_names = axes_names, axes_reverse = axes_reverse,
+             type = match.arg(type), text_repel = text_repel, title = title,
+             actives_in_bold = actives_in_bold, sup_in_italic = sup_in_italic,
+             xlim = xlim, ylim = ylim, out_lims_move = out_lims_move,
+             shift_colors = shift_colors, colornames_recode = colornames_recode,
+             scale_color_light = scale_color_light, scale_color_dark = scale_color_dark,
+             text_size = text_size, size_scale_max = size_scale_max, dist_labels = dist_labels,
+             right_margin = right_margin, use_theme = use_theme, get_data = get_data)
+}

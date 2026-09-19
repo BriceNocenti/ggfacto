@@ -8,33 +8,38 @@ ggpca_cor_circle(
   res.pca,
   axes = c(1, 2),
   proj = FALSE,
-  interactive = TRUE,
-  text_size = 3
+  interactive = FALSE,
+  text_size = 3,
+  lang = NULL
 )
 }
 \arguments{
-\item{res.pca}{The result of \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.}
+\item{res.pca}{An analysis made with \code{\link{principal_component_analysis}} or
+\code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.}
 
 \item{axes}{The axes to print, as a numeric vector of length 2.}
 
 \item{proj}{Set to `TRUE` to print projections of vectors over the two axes.}
 
-\item{interactive}{By default an html interactive plot is done. Set to `FALSE`
-to get a normal \code{\link[ggplot2]{ggplot}} graph.}
+\item{interactive}{Set to `TRUE` to get the interactive graph at once, as \code{\link{ggi}}
+would make it: hovering a variable shows its coordinates on the axes, and its projections.
+By default, a \code{\link[ggplot2]{ggplot}}, to which elements can be added with `+` before
+passing it to \code{\link{ggi}}.}
 
 \item{text_size}{Size of the texte.}
+
+\item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
 }
 \value{
-A \code{\link[ggplot2]{ggplot}}.
+A \code{\link[ggplot2]{ggplot}}, or an html widget with `interactive = TRUE`.
 }
 \description{
 Correlation Circle Plot for Principal Component Analysis
 }
 \examples{
-
 data(mtcars, package = "datasets")
 mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
-res.pca <- FactoMineR::PCA(mtcars, graph = FALSE)
-ggpca_cor_circle(res.pca, interactive = FALSE)
-
+res.pca <- principal_component_analysis(mtcars, 1:7)
+ggpca_cor_circle(res.pca)
+ggpca_cor_circle(res.pca) |> ggi()  # interactive
 }
