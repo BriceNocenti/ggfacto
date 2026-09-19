@@ -102,9 +102,9 @@ test_that("lvs stays a FACTOR", {
   expect_s3_class(fx_pd_plain()$vars_data$lvs, "factor")
 })
 
-test_that("ind_data is NULL unless profiles are asked for", {
-  expect_null(fx_pd_plain()$ind_data)
-  expect_s3_class(fx_pd_profiles()$ind_data, "data.frame")
+test_that("the answer profiles are drawn by default, and profiles = FALSE leaves them out", {
+  expect_s3_class(fx_pd_plain()$ind_data, "data.frame")
+  expect_null(md(fx_mca(), fx_tea(), profiles = FALSE)$ind_data)
 })
 
 test_that("clust draws the answer profiles by default, and profiles = FALSE still wins", {
@@ -340,7 +340,6 @@ test_that("a profile split between clusters takes the one weighing most", {
 test_that("individuals holds one row per fitted individual, with the rank of its profile", {
   plot_data <- md(fx_mca(), fx_tea(), sup_vars = "SPC", max_profiles = 5)
   ind <- plot_data$individuals
-  expect_null(plot_data$ind_data)
   expect_equal(nrow(ind), nrow(fx_tea()))
   expect_true(all(c("nb", "row.w", "Dim 1", "SPC") %in% names(ind)))
   # nb is missing exactly for the individuals whose profile max_profiles left out.

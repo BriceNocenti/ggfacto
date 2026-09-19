@@ -22,10 +22,10 @@ ggmca(
   keep_levels,
   discard_levels,
   cleannames = TRUE,
-  profiles = NULL,
+  profiles = TRUE,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   clust,
-  max_profiles = 5000,
+  max_profiles = 2000,
   alpha_profiles = 0.7,
   color_profiles = TRUE,
   base_profiles_color = "#aaaaaa",
@@ -65,10 +65,10 @@ ggmca_data(
   keep_levels,
   discard_levels,
   cleannames = TRUE,
-  profiles = NULL,
+  profiles = TRUE,
   profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
   clust,
-  max_profiles = 5000,
+  max_profiles = 2000,
   lang = NULL,
   dat,
   cah,
@@ -172,11 +172,10 @@ discard.}
 \item{cleannames}{Set to \code{TRUE} to clean levels names, by removing
 prefix numbers like \code{"1-"}, and text in parentheses.}
 
-\item{profiles}{When set to \code{TRUE}, profiles of answers are drawn in the back
-of the graph with light-grey points. When hovering with mouse in the interactive
-version (passed in \code{\link{ggi}}), the answers of individuals to active variables
-will appears. By default, they are drawn when \code{clust} is given: each profile takes the
-colour of its cluster, and to hover near one point lights all the points of its cluster.}
+\item{profiles}{By default, the answer profiles are drawn in the back of the graph, as
+light-grey points whose tooltips give their answers to the active variables. With \code{clust},
+each profile takes the colour of its cluster, and to hover near one point lights all the points
+of its cluster. `FALSE` draws the levels alone.}
 
 \item{profiles_tooltip_discard}{A regex pattern to remove useless levels
 among interactive tooltips for profiles of answers (ex. : levels expressing
@@ -187,7 +186,8 @@ among interactive tooltips for profiles of answers (ex. : levels expressing
 clusters are drawn as a supplementary variable, and the answer profiles of one cluster are
 coloured alike and linked at mouse hover (unless `profiles = FALSE`).}
 
-\item{max_profiles}{The maximum number of profiles points to print. Default to 5000.}
+\item{max_profiles}{The maximum number of profiles points to print, the heaviest first.
+Default to 2000.}
 
 \item{alpha_profiles}{The alpha (transparency, between 0 and 1) for profiles of answer.}
 

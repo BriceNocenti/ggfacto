@@ -24,10 +24,9 @@
 #'   cloud of its individuals as answer profiles (see \code{\link{ggmca}});
 #'   \item a \strong{correspondence analysis} draws the levels of its two variables, and of the
 #'   supplementary variables its table holds (see \code{\link{ggca}});
-#'   \item a \strong{principal component analysis} draws its circle of correlations (see
-#'   \code{\link{ggpca_cor_circle}}), and, given individuals, supplementary variables or clusters,
-#'   the biplot: the cloud of the individuals with the variables' arrows rescaled onto it (see
-#'   \code{\link{ggpca}}).
+#'   \item a \strong{principal component analysis} draws its biplot: the cloud of the individuals
+#'   with the variables' arrows rescaled onto it (see \code{\link{ggpca}}); `profiles = FALSE`
+#'   draws its circle of correlations (see \code{\link{ggpca_cor_circle}}).
 #' }
 #'
 #' Hovering a point shows the data behind it: a level's crosstabs, coloured by their deviations
@@ -53,8 +52,9 @@
 #' @param type How the levels are drawn: \code{"text"}, \code{"labels"} or \code{"points"}, and
 #' \code{"facets"} for one graph per level of the first supplementary variable (MCA, PCA). By
 #' default \code{"text"}, and \code{"points"} for a CA.
-#' @param profiles Should the cloud of the individuals be drawn? As answer profiles for an MCA. By
-#' default, when `clust` is given; `profiles = TRUE` turns a PCA's circle into its biplot.
+#' @param profiles Should the cloud of the individuals be drawn? As answer profiles for an MCA, as
+#' a biplot for a PCA. By default, yes; `FALSE` draws the levels alone, and a PCA's circle of
+#' correlations when nothing else is asked for.
 #' @param active_tables The crosstabs in the tooltips of an MCA: see \code{\link{ggmca}}.
 #' @param ellipses A number between 0 and 1 draws a concentration ellipse around the individuals of
 #' each level of the first supplementary variable: \code{0.5} holds half of them.
@@ -99,7 +99,7 @@
 #' ggfacto(res.pca, cars, sup_vars = cyl, ellipses = 0.5)
 #' }
 ggfacto <- function(res, data, sup_vars, clust, axes = c(1, 2), axes_reverse = NULL, type,
-                    profiles, active_tables, ellipses = NULL, title, xlim, ylim,
+                    profiles = TRUE, active_tables, ellipses = NULL, title, xlim, ylim,
                     text_size = 3.5, size_scale_max = NULL, lang = NULL, interactive = FALSE,
                     ...) {
   UseMethod("ggfacto")
@@ -108,7 +108,7 @@ ggfacto <- function(res, data, sup_vars, clust, axes = c(1, 2), axes_reverse = N
 #' @export
 #' @noRd
 ggfacto.MCA <- function(res, data, sup_vars, clust, axes = c(1, 2), axes_reverse = NULL,
-                        type = "text", profiles = NULL, active_tables = "active", ellipses = NULL,
+                        type = "text", profiles = TRUE, active_tables = "active", ellipses = NULL,
                         title, xlim, ylim, text_size = 3.5, size_scale_max = NULL, lang = NULL,
                         interactive = FALSE, ...) {
   graph_out(ggmca(res, data, sup_vars = {{ sup_vars }}, clust = {{ clust }},
@@ -149,21 +149,21 @@ ggfacto.CA <- function(res, data, sup_vars, clust, axes = c(1, 2), axes_reverse 
 #' @export
 #' @noRd
 ggfacto.PCA <- function(res, data, sup_vars, clust, axes = c(1, 2), axes_reverse = NULL,
-                        type = "text", profiles = NULL, active_tables, ellipses = NULL,
+                        type = "text", profiles = TRUE, active_tables, ellipses = NULL,
                         title, xlim, ylim, text_size = 3.5, size_scale_max = NULL, lang = NULL,
                         interactive = FALSE, ...) {
   if (!missing(active_tables)) stop(
     "`active_tables` is for a multiple correspondence analysis: a supplementary level of a ",
     "principal component analysis shows the means of the active variables.", call. = FALSE)
-  # DESIGN: a PCA is read on its circle of correlations; the individuals, supplementary levels and
-  #   clusters live in another space, drawn with the circle's arrows rescaled onto it (a biplot).
-  if (missing(sup_vars) && missing(clust) && !isTRUE(profiles) && is.null(ellipses)) {
+  # DESIGN: the individuals, supplementary levels and clusters live in another space than the
+  #   variables, drawn with the circle's arrows rescaled onto it (a biplot); with none of them,
+  #   the circle of correlations itself.
+  if (missing(sup_vars) && missing(clust) && isFALSE(profiles) && is.null(ellipses)) {
     return(graph_out(ggpca_cor_circle(res, axes = axes, axes_reverse = axes_reverse,
                                       title = title, xlim = xlim, ylim = ylim,
                                       text_size = text_size, lang = lang, ...),
                      interactive, ...names()))
   }
-  if (is.null(profiles)) profiles <- !missing(clust)
   graph_out(ggpca(res, data, sup_vars = {{ sup_vars }}, clust = {{ clust }}, axes = axes,
                   axes_reverse = axes_reverse, type = type, profiles = profiles,
                   ellipses = ellipses, title = title, xlim = xlim, ylim = ylim,

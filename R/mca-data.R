@@ -187,11 +187,10 @@ MCA2 <- multiple_correspondence_analysis
 #' the others are discarded.
 #' @param discard_levels A regex, or a vector of them, matching the supplementary levels to
 #' discard.
-#' @param profiles When set to \code{TRUE}, profiles of answers are drawn in the back
-#' of the graph with light-grey points. When hovering with mouse in the interactive
-#' version (passed in \code{\link{ggi}}), the answers of individuals to active variables
-#' will appears. By default, they are drawn when \code{clust} is given: each profile takes the
-#' colour of its cluster, and to hover near one point lights all the points of its cluster.
+#' @param profiles By default, the answer profiles are drawn in the back of the graph, as
+#' light-grey points whose tooltips give their answers to the active variables. With \code{clust},
+#' each profile takes the colour of its cluster, and to hover near one point lights all the points
+#' of its cluster. `FALSE` draws the levels alone.
 #' @param profiles_tooltip_discard A regex pattern to remove useless levels
 #' among interactive tooltips for profiles of answers (ex. : levels expressing
 #' "no" answers).
@@ -200,7 +199,8 @@ MCA2 <- multiple_correspondence_analysis
 #' clusters are drawn as a supplementary variable, and the answer profiles of one cluster are
 #' coloured alike and linked at mouse hover (unless `profiles = FALSE`).
 #' @param cah,cah_color_groups Deprecated former names of `clust` and `clust_color_groups`.
-#' @param max_profiles The maximum number of profiles points to print. Default to 5000.
+#' @param max_profiles The maximum number of profiles points to print, the heaviest first.
+#' Default to 2000.
 #' @param dat Deprecated former name of `data`. Still accepted, with a warning;
 #' use `data` instead.
 #' @param color_groups By default, there is one color group for all the levels
@@ -290,8 +290,8 @@ ggmca <-
            color_groups = "^.{0}", clust_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
 
-           profiles = NULL, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-           clust, max_profiles = 5000,
+           profiles = TRUE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+           clust, max_profiles = 2000,
            alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#aaaaaa",
 
            text_repel = TRUE, title, actives_in_bold = NULL, sup_in_italic = TRUE,
@@ -354,8 +354,8 @@ ggmca_data <-
            color_groups = "^.{0}", clust_color_groups =  "^.+$",
            keep_levels, discard_levels, cleannames = TRUE,
 
-           profiles = NULL, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
-           clust, max_profiles = 5000, lang = NULL,
+           profiles = TRUE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
+           clust, max_profiles = 2000, lang = NULL,
            dat, cah, cah_color_groups
   ) {
     # Renamed in 0.4.0; they sit last so no positional call can reach them.
@@ -411,7 +411,6 @@ mca_plot_data <- function(res.mca, data, sup_vars, active_tables, tooltip_vars_1
   sup_vars         <- setdiff(selected$sup, active_vars)
   tooltip_vars_1lv <- setdiff(selected$lv1, active_vars)
   tooltip_vars     <- setdiff(selected$all, c(active_vars, tooltip_vars_1lv))
-  if (is.null(profiles)) profiles <- length(clust) != 0
   if (length(clust) != 0 && !clust %in% sup_vars) sup_vars <- c(sup_vars, clust)
 
   with_gda_lang(lang, function(lg) {

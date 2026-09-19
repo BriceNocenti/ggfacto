@@ -12,16 +12,18 @@ test_that("ggfacto() draws each analysis as its own function does", {
                    dims_of(ggmca(fx_mca(), fx_tea_clust(), sup_vars = SPC, clust = clust)))
   expect_identical(dims_of(ggfacto(fx_ca_multi())), dims_of(ggca(fx_ca_multi())))
   expect_identical(dims_of(ggfacto(fx_pca2(), fx_cars(), sup_vars = cyl, ellipses = 0.5)),
-                   dims_of(ggpca(fx_pca2(), fx_cars(), sup_vars = cyl, ellipses = 0.5,
-                                 profiles = FALSE)))
+                   dims_of(ggpca(fx_pca2(), fx_cars(), sup_vars = cyl, ellipses = 0.5)))
 })
 
-test_that("a PCA alone is its circle; individuals, levels or clusters make it a biplot", {
+test_that("a PCA is its biplot; profiles = FALSE alone makes it its circle", {
   local_null_device()
-  expect_identical(dims_of(ggfacto(fx_pca2())), dims_of(ggpca_cor_circle(fx_pca2())))
-  expect_identical(dims_of(ggfacto(fx_pca2(), fx_cars())), dims_of(ggpca_cor_circle(fx_pca2())))
-  bi <- ggfacto(fx_pca2(), fx_cars(), profiles = TRUE)
-  expect_identical(dims_of(bi), dims_of(ggpca(fx_pca2(), fx_cars())))
+  expect_identical(dims_of(ggfacto(fx_pca2())), dims_of(ggpca(fx_pca2())))
+  expect_identical(dims_of(ggfacto(fx_pca2(), fx_cars())), dims_of(ggpca(fx_pca2(), fx_cars())))
+  expect_identical(dims_of(ggfacto(fx_pca2(), profiles = FALSE)),
+                   dims_of(ggpca_cor_circle(fx_pca2())))
+  # a supplementary variable keeps the biplot, the individuals left out
+  expect_identical(dims_of(ggfacto(fx_pca2(), fx_cars(), sup_vars = cyl, profiles = FALSE)),
+                   dims_of(ggpca(fx_pca2(), fx_cars(), sup_vars = cyl, profiles = FALSE)))
   d <- fx_cars()
   d$cah <- hierarchical_clust(fx_pca2(), ncp = 2, nb_clust = 3, tree = FALSE)
   expect_false(is.null(ggfacto(fx_pca2(), d, clust = cah, get_data = TRUE)$profiles_coord))

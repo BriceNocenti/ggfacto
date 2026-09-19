@@ -19,7 +19,7 @@ ggpca(
   cleannames = TRUE,
   profiles = TRUE,
   clust,
-  max_profiles = 5000,
+  max_profiles = 2000,
   alpha_profiles = 0.7,
   color_profiles = TRUE,
   base_profiles_color = "#aaaaaa",

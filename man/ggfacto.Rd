@@ -12,7 +12,7 @@ ggfacto(
   axes = c(1, 2),
   axes_reverse = NULL,
   type,
-  profiles,
+  profiles = TRUE,
   active_tables,
   ellipses = NULL,
   title,
@@ -51,8 +51,9 @@ margin (`clust = hierarchical_clust(res, ncp = 2, nb_clust = 4)`).}
 \code{"facets"} for one graph per level of the first supplementary variable (MCA, PCA). By
 default \code{"text"}, and \code{"points"} for a CA.}
 
-\item{profiles}{Should the cloud of the individuals be drawn? As answer profiles for an MCA. By
-default, when `clust` is given; `profiles = TRUE` turns a PCA's circle into its biplot.}
+\item{profiles}{Should the cloud of the individuals be drawn? As answer profiles for an MCA, as
+a biplot for a PCA. By default, yes; `FALSE` draws the levels alone, and a PCA's circle of
+correlations when nothing else is asked for.}
 
 \item{active_tables}{The crosstabs in the tooltips of an MCA: see \code{\link{ggmca}}.}
 
@@ -93,10 +94,9 @@ component analysis, in the plane of two axes --- one verb for the three, as
   cloud of its individuals as answer profiles (see \code{\link{ggmca}});
   \item a \strong{correspondence analysis} draws the levels of its two variables, and of the
   supplementary variables its table holds (see \code{\link{ggca}});
-  \item a \strong{principal component analysis} draws its circle of correlations (see
-  \code{\link{ggpca_cor_circle}}), and, given individuals, supplementary variables or clusters,
-  the biplot: the cloud of the individuals with the variables' arrows rescaled onto it (see
-  \code{\link{ggpca}}).
+  \item a \strong{principal component analysis} draws its biplot: the cloud of the individuals
+  with the variables' arrows rescaled onto it (see \code{\link{ggpca}}); `profiles = FALSE`
+  draws its circle of correlations (see \code{\link{ggpca_cor_circle}}).
 }
 
 Hovering a point shows the data behind it: a level's crosstabs, coloured by their deviations
