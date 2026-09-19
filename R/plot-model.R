@@ -2,11 +2,13 @@
 #   clust, lang) -- and the helpers the MCA, CA and PCA builders assemble it from.
 # KEY CONSTRAINTS:
 #   - `role` says what a level row IS (active, sup, clust, central); `color_group` says how it is
-#     coloured, and NA means neutral ink -- the MCA's active levels and the central point. So no
-#     code compares a label to a sentinel string, and a CA can colour its active levels.
-#   - Hover ids are banded: supplementary levels from 1, active levels from 1000, clusters and the
-#     points of a cloud from 10000. A cluster's id is matched by its NAME, for its label and its
-#     points alike: cleannames re-sorts a factor, so its codes cannot link them.
+#     coloured, and NA means neutral ink -- the MCA's active levels, the CA's supplementary ones,
+#     the central point. So no code compares a label to a sentinel string, and a CA can colour its
+#     active levels.
+#   - Hover ids are one per VARIABLE, so hovering a level lights every level of its variable, and
+#     banded: supplementary variables from 1, active ones from 1000, clusters and the points of a
+#     cloud from 10000. A cluster's id is matched by its NAME, for its label and its points alike:
+#     cleannames re-sorts a factor, so its codes cannot link them.
 #   - Every table is flat, with no list-column: a user edits them between the two halves.
 #   - The points a graph draws are ranked heaviest first, ties broken by a Weyl sequence on their
 #     first row, so a cap on equal weights keeps an evenly spread sample, not the file's first rows.
@@ -193,7 +195,7 @@ sup_rows <- function(units, unit_coord, sup_vars, scale, clust, color_groups, cl
                                           clust_color_groups)
   rows <- rows[rows$role == "clust" | filter_levels(rows$lvs, keep_levels, discard_levels), ]
   rows$lvs <- clean_levels(rows$lvs, cleannames)
-  rows$id  <- seq_len(nrow(rows))
+  rows$id  <- match(rows$vars, unique(rows$vars))
   if (length(clust) != 0) {
     is_clust <- rows$role == "clust"
     rows$id[is_clust] <- clust_ids(rows$lvs[is_clust], clean_levels(levels(units[[clust]]),

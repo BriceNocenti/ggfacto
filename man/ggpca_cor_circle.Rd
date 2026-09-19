@@ -9,8 +9,13 @@ ggpca_cor_circle(
   axes = c(1, 2),
   proj = FALSE,
   interactive = FALSE,
-  text_size = 3,
-  lang = NULL
+  text_size = 3.5,
+  lang = NULL,
+  axes_names = NULL,
+  axes_reverse = NULL,
+  title,
+  xlim,
+  ylim
 )
 }
 \arguments{
@@ -22,19 +27,30 @@ ggpca_cor_circle(
 \item{proj}{Set to `TRUE` to print projections of vectors over the two axes.}
 
 \item{interactive}{Set to `TRUE` to get the interactive graph at once, as \code{\link{ggi}}
-would make it: hovering a variable shows its coordinates on the axes, and its projections.
-By default, a \code{\link[ggplot2]{ggplot}}, to which elements can be added with `+` before
-passing it to \code{\link{ggi}}.}
+would make it. By default, a \code{\link[ggplot2]{ggplot}}, to which elements can be added with
+`+` before passing it to \code{\link{ggi}}.}
 
-\item{text_size}{Size of the texte.}
+\item{text_size}{Size of the text.}
 
 \item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}.}
+
+\item{axes_names}{Names of all the axes, as a character vector.}
+
+\item{axes_reverse}{`1` to invert left and right, `2` to invert up and down, `1:2` for both.}
+
+\item{title}{The title of the graph.}
+
+\item{xlim, ylim}{Horizontal and vertical limits, as numeric vectors of length 2.}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}}, or an html widget with `interactive = TRUE`.
 }
 \description{
-Correlation Circle Plot for Principal Component Analysis
+The active variables of a principal component analysis as arrows in the circle of
+correlations: the coordinate of a variable on an axis is its correlation with it. Hovering a
+variable shows its coordinates, and its projections on the two axes. \code{\link{ggfacto}} draws
+it for a principal component analysis, and draws the same arrows over the cloud of individuals
+when individuals, supplementary variables or clusters are asked for.
 }
 \examples{
 data(mtcars, package = "datasets")

@@ -86,10 +86,24 @@ test_that("every type builds, ellipses too, and equal weights draw small points"
   }
   expect_no_error(ggplot2::ggplot_build(
     suppressMessages(ggpca(fx_pca2(), fx_cars(), sup_vars = cyl, ellipses = 0.5))))
-  res  <- PCA2(fx_cars(), tidyselect::all_of(fx_pca_vars()))
-  size <- ggplot2::ggplot_build(ggpca(res))$data
-  size <- unlist(lapply(size, function(d) d$size))
-  expect_true(all(abs(size[!is.na(size)] - 1.5) < 1e-9 | size[!is.na(size)] == 5))
+  res    <- PCA2(fx_cars(), tidyselect::all_of(fx_pca_vars()))
+  layers <- ggplot2::ggplot_build(ggpca(res))$data
+  points <- layers[[which(vapply(layers, nrow, 1L) == nrow(fx_cars()))[1]]]
+  expect_true(all(abs(points$size - 1.5) < 1e-9))
+})
+
+test_that("the biplot rescales the circle onto the cloud, and keeps the correlations' directions", {
+  local_null_device()
+  pd <- ggpca(fx_pca2(), get_data = TRUE)
+  cloud  <- pca_model(fx_pca2())$coord[, c("Dim 1", "Dim 2")]
+  radius <- stats::quantile(sqrt(rowSums(cloud^2)), 0.9, names = FALSE)
+  cor    <- fx_pca2()$var$coord[, 1:2]
+  expect_equal(unname(as.matrix(pd$vectors_coord[c("Dim 1", "Dim 2")])), unname(cor * radius))
+  expect_match(pd$vectors_coord$interactive_text[1], "^<b>mpg</b>\nmean \\(cv\\): [0-9.]+ \\([0-9]+%\\)\nCoord")
+  expect_match(pd$mean_point_data$interactive_text, "n: 32", fixed = TRUE)
+  expect_match(pd$mean_point_data$interactive_text, "mpg: [0-9.]+ \\([0-9]+%\\)")
+  expect_false(grepl("Frequency", pd$mean_point_data$interactive_text))
+  expect_null(ggpca(fx_pca2(), variables = FALSE, get_data = TRUE)$vectors_coord)
 })
 
 test_that("ggpca() refuses anything but a PCA, and asks for the data frame in words", {
@@ -113,6 +127,40 @@ test_that("the circle's tooltips name every axis, from the tenth on too", {
   txt <- ggplot2::ggplot_build(ggpca_cor_circle(res))$data
   txt <- unlist(lapply(txt, function(x) x$tooltip))
   expect_true(any(grepl("Coord axe 10:", gsub(unbrk, " ", txt), fixed = TRUE)))
+})
+
+test_that("the biplot's circle is graduated, its axes read in the individuals' colour", {
+  local_null_device()
+  bi <- ggpca(fx_pca2(), fx_cars())
+  b  <- ggplot2::ggplot_build(bi)
+  expect_true(any(vapply(b$data, function(d) identical(sort(as.character(d$label)),
+                                                      c("-1", "-1", "1", "1")), logical(1))))
+  expect_identical(bi$theme$axis.text$colour, "#aaaaaa")
+  expect_false(identical(ggpca_cor_circle(fx_pca2())$theme$axis.text$colour, "#aaaaaa"))
+})
+
+test_that("an arrow is hoverable, and its projections, shown at hover, never catch the pointer", {
+  local_null_device()
+  svg <- ggi(ggpca(fx_pca2(), fx_cars()))$x$html
+  # the projections carry no hover id: a stylesheet shows them while their arrow is hovered
+  expect_false(grepl("data-id='reveal-", svg, fixed = TRUE))
+  expect_match(svg, "stroke-opacity='0'[^>]*stroke-dasharray[^>]*data-reveal='1001'")
+  # hidden until then, the gold box included
+  expect_match(svg, "[data-reveal] { pointer-events:none; fill-opacity:0; stroke-opacity:0; }",
+               fixed = TRUE)
+  expect_match(svg, "polygon[data-reveal] { fill:#ffe348 !important; }", fixed = TRUE)
+  expect_match(svg, ":has([data-id='1001'].hover_data_svg_", fixed = TRUE)
+  expect_match(svg, "stroke='#34515E'[^>]*data-id='1001'")
+  # drawn for good, the projections are plain elements, nothing to reveal
+  expect_false(grepl("data-reveal", ggi(ggpca_cor_circle(fx_pca2(), proj = TRUE))$x$html))
+})
+
+test_that("an individual's tooltip gives its coordinates on the two axes drawn", {
+  pd  <- ggpca(fx_pca2(), axes = c(1, 3), get_data = TRUE)
+  txt <- pd$profiles_coord$interactive_text[1]
+  expect_match(txt, "Coord axe 1: -?[0-9.]+\nCoord axe 3: -?[0-9.]+\n\n")
+  mca <- suppressMessages(ggmca(fx_mca(), profiles = TRUE, get_data = TRUE))
+  expect_match(mca$profiles_coord$interactive_text[1], "Coord axe 2:", fixed = TRUE)
 })
 
 test_that("a supplementary level's tooltip is stable", {

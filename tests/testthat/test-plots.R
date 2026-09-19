@@ -279,6 +279,17 @@ test_that("the ggfacto_widget tag sits where neither dispatch nor htmlwidgets is
   expect_s3_class(w, "ggfacto_widget")
 })
 
+test_that("a tooltip keeps its lines in ggiraph, and its width near the right edge", {
+  # ggiraph leaves "\n" alone in a text that both starts and ends with a tag, taking it for html
+  expect_identical(ggiraph_text(c("<b>a</b>\nb", "<b>a</b>\n<b>b</b>")),
+                   c("<b>a</b>\nb", paste0("<b>a</b>\n<b>b</b>", unbrk)))
+  local_null_device()
+  pts <- suppressMessages(ggpca(fx_pca2(), get_data = TRUE))$profiles_coord$interactive_text
+  expect_false(any(grepl(">$", pts)))
+  css <- quietly(ggi(quietly(ggmca(fx_mca()))))$x$settings$tooltip$css
+  expect_match(css, "white-space:nowrap", fixed = TRUE)
+})
+
 test_that("ggi passes a graph that is already interactive through unchanged", {
   local_null_device()
   w <- quietly(ggi(quietly(ggmca(fx_mca(), fx_tea()))))
@@ -331,4 +342,21 @@ test_that("ggmca_3d draws in two dimensions too, with no 3D attribute left over"
   p <- quietly(ggmca_3d(fx_mca(), fx_tea(), axes = 1:2))
   expect_s3_class(p, "plotly")
   expect_no_warning(plotly::plotly_build(p))
+})
+
+test_that("a supplementary level is in italics in every graph, a cluster stays upright", {
+  local_null_device()
+  faces <- function(p) {
+    d <- ggplot2::ggplot_build(p)$data
+    unlist(lapply(d, function(l) if ("fontface" %in% names(l)) as.character(l$fontface)))
+  }
+  tea <- fx_tea()
+  tea$cl <- factor(rep(c("a", "b"), length.out = nrow(tea)))
+  mca <- faces(ggmca(fx_mca(), tea, sup_vars = SPC, clust = cl, profiles = FALSE))
+  expect_true(any(grepl("italic", mca)))
+  expect_true(any(!grepl("italic", mca)))
+  expect_true(any(grepl("italic", faces(ggmca(fx_mca(), tea, sup_vars = SPC, type = "labels")))))
+  expect_false(any(grepl("italic", faces(ggmca(fx_mca(), tea, sup_vars = SPC,
+                                               sup_in_italic = FALSE)))))
+  expect_true(any(grepl("italic", faces(ggpca(fx_pca2(), fx_cars(), sup_vars = cyl)))))
 })

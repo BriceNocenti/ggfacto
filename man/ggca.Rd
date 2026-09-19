@@ -108,7 +108,7 @@ out.}
 
 \item{actives_in_bold}{Set the active levels in bold font.}
 
-\item{sup_in_italic}{Set the supplementary levels in italics.}
+\item{sup_in_italic}{Set the supplementary levels in italics. They are drawn as black text.}
 
 \item{shift_colors}{Change the colors of the variables.}
 
@@ -130,8 +130,8 @@ A readable, complete and beautiful graph of a correspondence analysis. Hovering 
 level shows its profile --- its distribution over the levels of the other variable, each
 percentage coloured by its difference from the average profile, as in
 \code{tabxplor::tab(color = "diff")} --- so the graph is read with the table it draws. The
-supplementary variables of the table (see \code{\link{correspondence_analysis}}) are drawn in
-their own colours, and the clusters of one margin, made with \code{\link{hierarchical_clust}},
+supplementary variables of the table (see \code{\link{correspondence_analysis}}) are drawn as
+black italic text, and the clusters of one margin, made with \code{\link{hierarchical_clust}},
 can colour its levels. It is a \pkg{ggplot2} graph, to which elements can be added with `+`;
 pass it to \code{\link{ggi}} for the interactive version. \code{\link{ggfacto}} is the same
 graph, for any analysis.

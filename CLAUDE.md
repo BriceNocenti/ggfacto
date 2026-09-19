@@ -73,7 +73,7 @@ Nineteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / 
 
 **One verb, one model, one renderer.** `ggfacto()` is an S3 generic, as `interpret()` is, dispatching to `ggmca()`, `ggca()` or `ggpca()`: its signature holds the arguments the analyses share, so an editor completes them, and the rest goes through `...` to the analysis's own function; an argument an analysis does not take is refused in words. Each of the three builds the same plot model from its own reader, and `ggmca_plot()` draws it. `ggmca()` has a body of pure orchestration: its signature is exactly `ggmca_data()`'s plus `ggmca_plot()`'s, with no overlap. **The MCA's seam is public on purpose** — a user calls `ggmca_data()`, edits `plot_data$vars_data` (dropping a level, renaming one), and passes it to `ggmca_plot()`; the CA's and PCA's builders stay internal. Interactivity is a separate last step, so everything before `ggi()` is an ordinary ggplot you can `+` into; `ggfacto(interactive = TRUE)` takes that step at once.
 
-**What stays each analysis's own.** An MCA's tooltips cross the Burt table over its answer profiles, its points group the profiles by their *kept* answers, and a supplementary level is divided by √λ. A CA has no individuals: its supplementary levels are FactoMineR's `row.sup`/`col.sup`, its tooltips run twice (the rows' profiles, then the columns'), its frequencies come from the margins, and its clusters are a named factor over one margin. A PCA draws no active level (the circle does), its supplementary level is the plain barycentre, and its tooltips print means, not crosstabs.
+**What stays each analysis's own.** An MCA's tooltips cross the Burt table over its answer profiles, its points group the profiles by their *kept* answers, and a supplementary level is divided by √λ. A CA has no individuals: its supplementary levels are FactoMineR's `row.sup`/`col.sup`, its tooltips run twice (the rows' profiles, then the columns'), its frequencies come from the margins, and its clusters are a named factor over one margin. A PCA's active variables are **vectors** (`plot_data$vectors`): `ggfacto(acp)` alone draws the circle of correlations; asking for individuals, supplementary levels or clusters draws the **biplot**, the same arrows rescaled onto the cloud of individuals — the circle holding its 90 % closest points. The two clouds live in different units, so each keeps its own scale on the graph: the axes' values are the individuals', in their grey, and the circle carries the correlations' −1 / 1 graduations, bold, inside it with inward ticks, in the arrows' ink. A variable's tooltip opens on its mean (cv), and the central point gives n and every variable's mean (cv). Its supplementary level is the plain barycentre, and its tooltips print means, not crosstabs. A CA's supplementary levels are black text, never coloured points like the table's own. **Italics mark a supplementary level in every graph**, colour meaning something different in each analysis; clusters stay upright.
 
 ### The plot model
 
@@ -83,9 +83,9 @@ Every builder returns a plain `list`, not a class, of **flat** tables — no lis
 - **`ind_data`** — one row per drawn **point of the cloud**: an MCA's answer profile (profiles whose answers differ only in an excluded level share one), a PCA's distinct individual. `count` / `wcount`, its cluster and that cluster's colour key, its `id`, its tooltip string; `NULL` when `profiles = FALSE`, and always in a CA. A point's cluster is the **weighted plurality** of its individuals, missing ones left out: clusters made on the analysis are pure within a point, so the rule only decides for clusters made elsewhere. Points are drawn heaviest first, ties broken by a Weyl sequence, so a cap on equal weights keeps an evenly spread sample.
 - **`individuals`** — one row per fitted individual: the rank `nb` of its point (`NA` beyond `max_profiles`), its weight, its coordinates, its supplementary answers; `NULL` without `sup_vars`. Ellipses and facets group it, so an ellipse covers every individual of its level. ⚠ It stays per individual while everything else is aggregated: ggplot2's ellipse sizes its radius on `nrow(data) - 1` degrees of freedom and `MASS::cov.trob()` tests convergence on absolute weights, so an ellipse drawn from aggregated units would not be the individuals'.
 - **`res`** — a stripped `list(eig, axes_names)`, deliberately not the fitted object: the rendering half must not be able to recompute anything.
-- **`clust`** — the cluster variable's name, or `character()`. **`lang`** — the language the model was built in, which the renderer writes in too.
+- **`clust`** — the cluster variable's name, or `character()`. **`lang`** — the language the model was built in, which the renderer writes in too. A PCA's model adds **`vectors`**: its variables' correlations, and the cloud they are rescaled onto in a biplot.
 
-Hover ids are banded: supplementary levels from 1, active levels from 1000 (one per variable in an MCA, one per level in a CA), clusters and the points of the cloud from 10000, a cluster's id matched **by its name** for its label, its points and a CA's member levels. `ggmca_plot()` inserts the contribution lines of the two axes it draws between a level's header and body — the one part of a tooltip the data half cannot know. The largest point is sized from the drawn points' weights (`auto_size_max()`: the median profile stays visible, 14 on pc_AGD where the course chose 12 by hand), an explicit `size_scale_max` winning.
+Hover ids are **one per variable** — hovering a level lights every level of its variable — and banded: supplementary variables from 1, active ones (and a PCA's vectors) from 1000, clusters and the points of the cloud from 10000, a cluster's id matched **by its name** for its label, its points and a CA's member levels. `ggmca_plot()` inserts the contribution lines of the two axes it draws between a level's header and body — the one part of a tooltip the data half cannot know. The largest point is sized from the drawn points' weights (`auto_size_max()`: the median profile stays visible, 14 on pc_AGD where the course chose 12 by hand), an explicit `size_scale_max` winning.
 
 ### The tooltip is the package
 
@@ -94,6 +94,8 @@ Hover ids are banded: supplementary levels from 1, active levels from 1000 (one 
 - a **CA**'s units are its table's cells, each variable NA outside its own block; a level's tooltip is its profile over each variable of the other margin, built in two passes (rows, then columns) and pinned against `tab(pct = "row")` in both. ⚠ Its header reads the **margins**: stacking the blocks would count a level once per block.
 - a **PCA**'s units are its distinct individuals; a supplementary level's body is the mean of each active variable, coloured by its standardized difference from its block's mean (Glass's Δ, as `clust_tab()` colours a PCA's clusters), one `fmt` record per level against its own total — with several total rows in one vector, tabxplor's reference would be ambiguous. An individual's tooltip lists its values, coloured the same way.
 
+- **WARNING** — an element shown only while another is hovered (a PCA vector's dashed projections) carries **no hover id**: ggiraph lets any element with one catch the pointer. It is drawn transparent with the id `reveal-<id>`, which `ggi()` turns into a plain attribute, adding a stylesheet that shows it while its vector is hovered (css `:has()`). A text's hover colour is its `fill` (dark gold on a label's light box), an arrow's its `stroke`. A point's tooltip gives its coordinates on the two axes drawn, which only the renderer knows.
+- **WARNING** — ggiraph turns `\n` into `<br/>` only when a tooltip does not both start and end with an html tag; such a text it takes for raw html, and its lines collapse into one. `ggiraph_text()` gives every tooltip ending on a tag a trailing space. The tooltip css is `white-space:nowrap`, so near the right edge a tooltip keeps its width and ggiraph flips it to the left instead of squeezing it.
 - **WARNING** — each block is compared to its **own** Total, over the individuals who answered both variables (`tab(comp = "tab", na = "drop")`). One stacked Total would measure a variable with missing values against the wrong reference.
 - **WARNING** — the "Frequency" denominator is the population, the central point's weight, never a block's Total row, which gave some levels a frequency above 100 %.
 - **WARNING** — the numbers are aligned with `str_pad()` under a monospace font, so the shim's exact stringr semantics (a *vector* `width`, a non-space fill) are load-bearing, not stylistic.
@@ -204,7 +206,7 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 
 **Fixtures are `tea[1:6]`.** Six binary questions reach every code path and keep the goldens short; the tooltips no longer cost what made the rule (0.04 s on six questions, 0.08 s on eighteen). GDAtools fits are tested under `skip_if_not_installed("GDAtools")`. The models the suite reuses are memoised in `helper-fixtures.R`, among them `fx_tea_na()` (missing answers for the `excl` rule), `fx_mca_young()` (an analysis of a piped subset, which records its rows), `fx_ca_multi()` (a CA of `tab(gss, c(relig, marital), c(partyid, race))`, weighted) and `fx_pca2()` (a weighted PCA of `mtcars`, with factors to project). The one exception is `fx_mca_multi()`, local to `test-interpret.R`: `tea[1:6]` is all binary, so `mca_interpret()`'s row packing collapses every question to one line there and its display blanking has nothing to hide — that needs multi-level variables and a third axis.
 
-The suite is **small and serial**: 2 328 assertions (most of them the tooltip cells, one by one), about 60 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
+The suite is **small and serial**: 2 354 assertions (most of them the tooltip cells, one by one), about 60 s, no `Config/testthat/parallel`, no `setup.R`. ⚠ **A green local suite does not mean a green CI**: this box is `fr_FR.UTF-8`, while `R CMD check` forces `LANGUAGE=en` with a C message locale, where gettext cannot translate at all. Every French assertion is therefore guarded by `skip_if_no_gettext()`, and each translated feature is pinned **twice** — an unguarded English block plus a guarded French twin. ⚠ Do not turn parallelism on for it, and do not import tabxplor's worker, orphan and gettext conventions — see `~/github/tabxplor/CLAUDE.md` "## Testing" only if the suite ever grows enough to need them.
 
 **Golden tests use `expect_snapshot()`** (`_snaps/*.md`), and only where the output is genuinely stable and worth the churn: the rendered tooltip text of each graph (an MCA level, a CA level and the central point, a PCA supplementary level) and the four interpretation tables (MCA concise and complete, CA, PCA). ⚠ The *rendered html* is never snapshotted — it is 7 kB of inlined stylesheet; an interpretation table's snapshot is the console print, taken with `n = Inf` under `options(tabxplor.print = "console")`, since pillar formats only the rows it shows and a slice without a summary row makes `color = "contrib"` warn.
 
@@ -537,7 +539,7 @@ Un seul lecteur positionnel sert désormais les quatre, et `mca_interpret()` aff
 
 ```r
 ggfacto(acm, pc_AGD, sup_vars = c(SEXE, AGE), clust = cah, interactive = TRUE)
-ggfacto(tab(gss, c(relig, marital), c(partyid, race)) |> correspondence_analysis())
+ggfacto(correspondence_analysis(tab(gss, c(relig, marital), c(partyid, race))) )
 ggfacto(acp, ee, sup_vars = c(SEXE, CSTOTR), clust = cah)
 ```
 
@@ -594,7 +596,7 @@ Les bulles sont des blocs (`tip_block()`) sur un même constructeur (`R/tooltips
 - `ggi(widget)` échouait.
 - `ca_interpret()` comptait les suppléments dans son `n`.
 
-**Tests** : 2 328 assertions (1 787), 0 échec, 0 avertissement, environ 60 s. Nouveaux fichiers : `test-ggca.R`, `test-ggpca.R` et `test-ggfacto.R`, plus les tests du knit, de la taille et de la langue. L'instantané des bulles d'ACM ne change que par « Contrib axe 1: » (le deux-points perd son espace) ; ceux de l'AC et de l'ACP sont nouveaux. NEWS.md n'a pas été touché.
+**Tests** : 2 354 assertions (1 787), 0 échec, 0 avertissement, environ 60 s. Nouveaux fichiers : `test-ggca.R`, `test-ggpca.R` et `test-ggfacto.R`, plus les tests du knit, de la taille et de la langue. L'instantané des bulles d'ACM ne change que par « Contrib axe 1: » (le deux-points perd son espace) ; ceux de l'AC et de l'ACP sont nouveaux. NEWS.md n'a pas été touché.
 
 **Ce que la phase n'a pas fait.**
 - Une échelle de taille unique : `type = "points"` avec des profils les laisse petits.
@@ -603,7 +605,42 @@ Les bulles sont des blocs (`tip_block()`) sur un même constructeur (`R/tooltips
 - **Phase 1r** : `?ggfacto` est la page du générique ; une page `_PACKAGE` ne prendra que `@aliases ggfacto-package`.
 - **Phase 1s** : le cours passe à `ggfacto()`, `eigenvalues()`, la hauteur automatique des figures et `clust_tab(res, data, clust)`. Les `ca_interpret()` de `04-AC.qmd` deviennent `interpret()`.
 
-#### Phase 1r — vignette and pkgdown site
+**Après relecture du mainteneur.**
+- **L'ACP se lit sur son cercle.** `ggfacto(acp)` seul dessine le cercle des corrélations. Demander des individus, des modalités supplémentaires ou des classes dessine le **biplot** : les mêmes flèches, remises à l'échelle du nuage (le cercle en tient les 90 % les plus proches), avec une légende qui dit de n'en lire que les directions. Les deux cercles sortent du même `variable_vectors()` et du moteur partagé : même encre sobre (`#34515e`) pour le cercle et les flèches, projections au survol. Dans le biplot, chaque nuage garde son échelle : les valeurs des axes, en gris, sont celles des individus, et le cercle porte ses graduations −1 / 1 dans l'encre des flèches. La légende « lire les directions » a disparu, les graduations suffisent. La bulle d'une variable s'ouvre sur sa moyenne (cv), et le point moyen donne n puis la moyenne (cv) de chaque variable. Une flèche s'allume avec son nom (au survol, un texte est coloré par `fill`, en or foncé sur la boîte jaune clair, là où il s'y noyait) ; les projections, tiretées comme les axes, ne portent plus d'id de survol, si bien qu'aucune ne capte le pointeur : dessinées transparentes, elles s'affichent en or par une feuille de style que `ggi()` ajoute (`:has()`), le temps que leur flèche est survolée. Les graduations −1 / 1 sont en gras, à l'intérieur du cercle, avec des tics vers l'intérieur. La bulle d'un individu (ou d'un profil) donne ses coordonnées sur les deux axes dessinés. `ggpca(variables = FALSE)` retire les flèches. `ggpca_cor_circle()` passe par le moteur, et prend désormais `axes_reverse`, `title` et les limites.
+- **Les modalités supplémentaires d'une AC** s'écrivent en noir et en italique, sans point. **Et l'italique marque une modalité supplémentaire dans tous les graphiques** (`sup_in_italic = TRUE` par défaut, étiquettes comprises), puisque la couleur ne dit pas la même chose d'une analyse à l'autre ; les classes restent droites.
+- **Survoler une modalité allume toutes celles de sa variable**, supplémentaire comme active : un id par variable.
+- **Deux bogues de bulles venaient de ggiraph.**
+  - Une bulle commençant et finissant par une balise est prise pour du html brut, et ses lignes fusionnent ; c'était le cas des individus d'une ACP dont la dernière valeur était colorée.
+  - Près du bord droit, une bulle se tassait et se repliait.
+  - Corrigés par une espace finale (`ggiraph_text()`) et par `white-space:nowrap`.
+- ggrepel 0.9.8 nomme la bordure d'une étiquette `linewidth` ; `label.size` n'y fait plus rien.
+
+#### Phase 1r — rework filters and subsets 
+
+The current framework is : "**Sous-populations : le cadre existait, il manquait qu'on s'en serve.** La règle — filtrer dans le pipe de l'analyse, puis toujours donner la base entière — est celle de la phase 1m ; aucun document du cours ne l'employait. `res$source` garde désormais le nom de la base, et le refus le cite (« fitted on the 3 246 rows of `sub` »). Les pièges des carnets (`drop_na()` devant une ACM spécifique, `select()` qui efface l'identifiant, variables créées sur le sous-ensemble) sont au document ; l'extension des classes aux individus hors sous-population, par le centre pondéré le plus proche, y est proposée, pas implémentée."
+
+Je n’aime pas trop stocker le nom de la source de données, ce n’est pas fiable, c’est une sorte de hack. Maintenant que nous avons un framework qui est answer-profiles-centric, les lignes d’individus de la base de données sont de toute façon sans arrêt à matcher avec les lignes de profiles de réponse de l’ACM : je voudrais que tu intègres le `filter()` / rows subset dans cette logique de manière fiable, robuste et lisible. L’idée est que la base de données de départ reste la réference, et si possible que le même integer vector permette de matcher les lignes de l’ACM et les lignes de la base de données, de manière fiable, en permanence (avec des tests performants et peu couteux pour si l’ordre des lignes change ou s’il en manque etc.). 
+
+Pour cela :
+- Garder la possibilité de détecter les `filter()` et les `data[...,]` and the like  passés à l’input (argument data, native pipe |>, support for %>% if it’s simple and reliable only which I doubt), créer le vecteur qui permet de matcher le base de données totale à la base de données filtrée ?
+- Ajouter un argument `filter =` comme dans `tabxplor::tab`. J’aime moins la syntaxe,j’apprendrais la première solution, mais il faut que ce soit possible car c’est plus fiable dans certainses situations.
+
+Ensuite, pour ggfacto() etc., on passe la base de données initiale pour les varsup, et c’est un vecteur est utilisé pour matcher les deux ?
+
+Make many small tests with edge cases to see where it work and where it breaks.
+
+
+
+#### Phase 1s — teach the new usage in `formations_stat`
+
+The new aliases and API for the three analyses, the new `interpret()` and `ggfacto()` workflows.
+`clust_tab()` : look at `dev/hierarchical_clustering.md`
+Sous-populations des ACP AC ACM avec `filter()`, mais on travaillant passant toujours le data.frame de départ (pour les variables sup sur les graphiques, pour ajouter des variables coordonnées et clusters dans la base de données, etc.).
+
+
+
+
+#### Phase 1t — vignette and pkgdown site
 
 Look at `/home/dev1/github/tabxplor/` vignettes and pkgdown site : I want the same kind of pkgdown site for ggfacto, except it will be **much more concise**.
 
@@ -619,17 +656,10 @@ README and pkgdown site index should be very quick :
 
 In the pkgdown site, organise the functions in the "Reference" page in a user-friendly way, adapted to usage, with main functions at the top ordered by kind of analysis (everything about PCA in the same group, analysis, *_interpret, plots ; them everything about CA ; them everything about MCA, including HCPC and HCPC table), then main stuff (ggi, etc.), then secondary stuff (like pedagogical plots), helpers and details.
 
-#### Phase 1s — teach the new usage in `formations_stat`
-
-
-`clust_tab()`, and the new aliases and API : look at `dev/hierarchical_clustering.md`
-
-**Sous-populations : le cadre existait, il manquait qu'on s'en serve.** La règle — filtrer dans le pipe de l'analyse, puis toujours donner la base entière — est celle de la phase 1m ; aucun document du cours ne l'employait. `res$source` garde désormais le nom de la base, et le refus le cite (« fitted on the 3 246 rows of `sub` »). Les pièges des carnets (`drop_na()` devant une ACM spécifique, `select()` qui efface l'identifiant, variables créées sur le sous-ensemble) sont au document ; l'extension des classes aux individus hors sous-population, par le centre pondéré le plus proche, y est proposée, pas implémentée.
 
 
 
-
-#### Phase 1t — 0.4.0 release
+#### Phase 1u — 0.4.0 release
 
 Help me do the new CRAN release, so I don’t have to check everything myself : I want you to plan for everything, and only let me accept the pull request on github.com and do the `devtools::submit_cran()` myself. You can commit (but you do not sign the commits), you can push : I’ll have a harness permission asked, that’s all.
 

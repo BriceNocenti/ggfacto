@@ -25,7 +25,7 @@ ggpca(
   base_profiles_color = "#aaaaaa",
   text_repel = TRUE,
   title,
-  sup_in_italic = FALSE,
+  sup_in_italic = TRUE,
   ellipses = NULL,
   xlim,
   ylim,
@@ -40,7 +40,8 @@ ggpca(
   right_margin = 0,
   use_theme = TRUE,
   get_data = FALSE,
-  lang = NULL
+  lang = NULL,
+  variables = TRUE
 )
 }
 \arguments{
@@ -89,7 +90,7 @@ discard.}
 prefix numbers like \code{"1-"}, and text in parentheses.}
 
 \item{profiles}{By default the individuals are drawn: `FALSE` draws the supplementary levels
-alone.}
+and the variables alone.}
 
 \item{clust}{The variable of `data` holding the clusters, typically made with
 \code{\link{hierarchical_clust}}: the individuals of one cluster are coloured alike and linked
@@ -115,7 +116,8 @@ exactly at its point, which is faster to draw.}
 
 \item{title}{The title of the graph.}
 
-\item{sup_in_italic}{Set to `TRUE` to set sup variables in italics.}
+\item{sup_in_italic}{Set the supplementary levels in italics, as in every graph of the package.
+`FALSE` sets them upright.}
 
 \item{ellipses}{Set to a number between 0 and 1 to draw a concentration ellipse for
 each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
@@ -157,19 +159,26 @@ Set to \code{FALSE} to customize your own \code{\link[ggplot2:theme]{theme}}.}
 
 \item{lang}{\code{NULL} (the session's language), \code{"en"} or \code{"fr"}: the language of
 the tooltips and of the axis titles.}
+
+\item{variables}{By default the active variables are drawn as arrows. Set to `FALSE` to draw
+the individuals alone.}
 }
 \value{
 A \code{\link[ggplot2:ggplot]{ggplot}} object, to which elements can be added with
 \code{+}. Sending it through \code{\link{ggi}} draws the interactive graph.
 }
 \description{
-The cloud of the individuals of a principal component analysis, in the plane of
-two axes, with the levels of supplementary variables at the barycentre of their individuals and
-the clusters of \code{\link{hierarchical_clust}} coloured. Hovering an individual shows its value
-on each active variable; hovering a supplementary level shows the mean of each active variable
-among its individuals, coloured by its standardized difference from the population's (blue
-above, red below), as \code{\link{clust_tab}} does. The active variables are drawn by
-\code{\link{ggpca_cor_circle}}. \code{\link{ggfacto}} is the same graph, for any analysis.
+The biplot of a principal component analysis: the cloud of its individuals in the
+plane of two axes, the levels of supplementary variables at the barycentre of their individuals,
+the clusters of \code{\link{hierarchical_clust}} coloured, and the active variables as arrows,
+the circle of correlations rescaled onto the cloud. Only the DIRECTION of an arrow reads there:
+an individual lies towards the variables it scores high on; the length of an arrow and the
+distance between an arrow and an individual mean nothing, and \code{\link{ggpca_cor_circle}}
+draws the correlations at their own scale. Hovering an individual shows its value on each active
+variable; hovering a supplementary level shows the mean of each active variable among its
+individuals, coloured by its standardized difference from the population's (blue above, red
+below), as \code{\link{clust_tab}} does. \code{\link{ggfacto}} draws it for a principal
+component analysis given individuals, supplementary variables or clusters.
 }
 \examples{
 \donttest{

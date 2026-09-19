@@ -220,7 +220,8 @@ MCA2 <- multiple_correspondence_analysis
 #'  over points placed at the right of the graph without formatting problems.
 #' @param actives_in_bold Set to `TRUE` to set active variables in bold font
 #' (and sup variables in plain).
-#' @param sup_in_italic Set to `TRUE` to set sup variables in italics.
+#' @param sup_in_italic Set the supplementary levels in italics, as in every graph of the package.
+#' `FALSE` sets them upright.
 #' @param ellipses Set to a number between 0 and 1 to draw a concentration ellipse for
 #' each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the
 #' individuals of each category. \code{0.5} draw median-ellipses, containing half
@@ -287,7 +288,7 @@ ggmca <-
            clust, max_profiles = 5000,
            alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#aaaaaa",
 
-           text_repel = TRUE, title, actives_in_bold = NULL, sup_in_italic = FALSE,
+           text_repel = TRUE, title, actives_in_bold = NULL, sup_in_italic = TRUE,
            ellipses = NULL,
            xlim, ylim, out_lims_move = FALSE,
 

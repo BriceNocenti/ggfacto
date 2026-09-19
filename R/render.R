@@ -2,7 +2,8 @@
 #   palettes, ggi(), ggsave2(), as_ggfacto_plot(), and the internal plot_path().
 # ROLE: What every 2D graph ends in. as_ggfacto_plot() makes it a ggfacto graph (its class, its
 #   render hints), theme_facto() supplies the axis titles carrying eigenvalue percentages, ggi()
-#   turns it into a girafe widget (a widget passes through), ggsave2() writes an image.
+#   turns it into a girafe widget (a widget passes through), with the stylesheet that shows an
+#   element while another is hovered (reveal_on_hover()), ggsave2() writes an image.
 # KEY CONSTRAINTS:
 #   - theme_facto() returns a LIST of ggplot objects, not a theme: it is `+`-ed as a whole.
 #   - "Jaune 800" is commented out of both palettes on purpose. It is reserved for the ggiraph
@@ -208,15 +209,21 @@ ggi <- function(plot = ggplot2::last_plot(),
 girafe_widget <- function(plot, width, height, keep_ratio, ...) {
   css_hover <- attr(plot, "css_hover", exact = TRUE)
   if (is.null(css_hover)) {
+    # DESIGN: an svg text takes its colour from `fill`: dark gold on a label's light yellow box,
+    #   where the generic yellow fill made the text vanish into it.
     css_hover <- ggiraph::girafe_css("fill:#d2b200;stroke:orange;",
-                                     text  = "color:gold4;stroke:none;",
+                                     text  = "fill:#8b7500;stroke:none;",
                                      point = "fill:gold;stroke:orange;",
+                                     line  = "stroke:#d2b200;",
                                      area  = "fill:#ffe348")
   }
   css_tooltip <- attr(plot, "css_tooltip", exact = TRUE)
   if (is.null(css_tooltip)) {
+    # DESIGN: `white-space:nowrap` -- a tooltip keeps its full width near the right edge, where it
+    #   was squeezed into the space left and its lines wrapped; at full width, ggiraph measures it
+    #   and places it to the left of the pointer instead.
     css_tooltip <- str_c("color:#000000;text-align:right;padding:4px;border-radius:5px;",
-                         "background-color:#eeeeee;")
+                         "background-color:#eeeeee;white-space:nowrap;")
   }
 
   width <- if (is.null(width)) grDevices::dev.size("in")[1] else width / 2.54
@@ -232,6 +239,7 @@ girafe_widget <- function(plot, width, height, keep_ratio, ...) {
   widget <- ggiraph::girafe(ggobj = plot, width_svg = width, height_svg = height, ...) |>
     ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip),
                             ggiraph::opts_hover(css = css_hover))
+  widget$x$html <- reveal_on_hover(widget$x$html)
   as_ggfacto_widget(widget, ratio = height / width)
 }
 
@@ -321,6 +329,27 @@ plot_path <- function(dir = NULL, name = "Plot", extension = "png", replace = FA
   }
   writeLines(path)
   return(path)
+}
+
+# WARNING: an element shown only while another is hovered (a PCA vector's projections) must carry no
+#   hover id, or ggiraph lets it catch the pointer and passing near it lights its vector. It is drawn
+#   transparent with the id `reveal-<id>`, turned here into a plain attribute, and a stylesheet shows
+#   it while an element of hover id <id> is hovered (css :has(), which every current browser reads).
+#' @keywords internal
+#' @noRd
+reveal_on_hover <- function(svg) {
+  ids <- unique(regmatches(svg, gregexpr("(?<=data-id='reveal-)[^']+(?=')", svg, perl = TRUE))[[1]])
+  if (length(ids) == 0) return(svg)
+  svgid <- regmatches(svg, regexpr("(?<=<svg )[^>]*?id='\\K[^']+", svg, perl = TRUE))
+  svg   <- gsub("data-id='reveal-([^']+)'", "data-reveal='\\1'", svg)
+  rules <- paste0("#", svgid, ":has([data-id='", ids, "'].hover_data_", svgid, ") [data-reveal='",
+                  ids, "'] { stroke-opacity:1; fill-opacity:1; }", collapse = "\n")
+  # the revealed elements wear the hover's colours, as a hovered arrow and its label do
+  style <- paste0("<style>[data-reveal] { pointer-events:none; fill-opacity:0; stroke-opacity:0; }\n",
+                  "line[data-reveal] { stroke:#d2b200 !important; }\n",
+                  "polygon[data-reveal] { fill:#ffe348 !important; }\n",
+                  "text[data-reveal] { fill:#8b7500 !important; }\n", rules, "</style>")
+  sub("(<svg [^>]*>)", paste0("\\1", style), svg)
 }
 
 # Why this exists: every 2D graph ends here, so that it is a ggplot that knows what it is -- its

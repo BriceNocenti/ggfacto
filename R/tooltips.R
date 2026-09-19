@@ -193,7 +193,7 @@ mean_lines <- function(units, s, col, pop = NULL) {
     list(n = M[, 1], wn = M[, 2], mean = mean, var = M[, 4] / M[, 2] - mean^2)
   }
   a <- moments(lv); b <- moments(blk); p <- moments(pop_m)
-  digits <- max(0L, min(3L, 2L - floor(log10(abs(p$mean) + 1e-12))))
+  digits <- mean_digits(p$mean)
   cell <- function(k, ref) tabxplor::fmt(
     n = as.integer(round(c(k$n, ref$n))), wn = c(k$wn, ref$wn), mean = c(k$mean, ref$mean),
     var = c(k$var, ref$var), diff = c(k$mean - ref$mean, 0), scale = "level_mean",
@@ -208,6 +208,21 @@ mean_lines <- function(units, s, col, pop = NULL) {
   list(diff   = c(purrr::map_dbl(one, "diff"), 0),
        text   = c(purrr::map_chr(one, "text"), format(tot)[1]),
        colour = c(purrr::map_chr(one, "colour"), NA_character_))
+}
+
+# Three significant digits for a mean, at most three decimals.
+#' @keywords internal
+#' @noRd
+mean_digits <- function(mean) as.integer(max(0, min(3, 2 - floor(log10(abs(mean) + 1e-12)))))
+
+# A variable's weighted mean and coefficient of variation, as "20.1 (30%)".
+#' @keywords internal
+#' @noRd
+mean_cv <- function(x, w) {
+  mean <- sum(w * x) / sum(w)
+  sd   <- sqrt(sum(w * (x - mean)^2) / sum(w))
+  paste0(formatC(mean, format = "f", digits = mean_digits(mean)), " (",
+         round(sd / abs(mean) * 100), "%)")
 }
 
 # Columns `j` of the cells as one tabxplor record, every row level then the central row, per column.

@@ -15,6 +15,7 @@
 #     its own Total, computed on the table's cells as the MCA's crosstabs are (R/tooltips.R). Its
 #     frequency comes from the margins, never from the stacked blocks, which would count a level
 #     once per block.
+#   - A supplementary level is black italic text, never a coloured point like the table's own.
 #   - Clusters are the named factor hierarchical_clust() returns for the levels of one margin. A
 #     cluster's label is the mass-weighted barycentre of its levels: the supplementary projection
 #     of the merged category.
@@ -252,7 +253,12 @@ ca_plot_data <- function(res.ca, tooltips, cleannames, color_groups, clust, clus
       lv$vars, lv$raw, c(rows$vars, cols$vars, clust_name), color_groups,
       if (!is.null(cl)) clust_name else character(), clust_color_groups)
     sup <- lv$role == "sup"
-    vars_data$id <- as.integer(ifelse(sup, cumsum(sup), 1000L + cumsum(!sup)))
+    # DESIGN: a supplementary level is black italic text, no point: it must not be read as one of
+    #   the table's own levels, which carry the colours and the points.
+    vars_data$color_group[sup] <- NA
+    # one hover id per variable: hovering a level lights every level of its variable
+    vars_data$id <- as.integer(ifelse(sup, match(lv$vars, unique(lv$vars[sup])),
+                                      1000L + match(lv$vars, unique(lv$vars[!sup]))))
     if (!is.null(cl)) {
       is_cl <- lv$role == "clust"
       vars_data$id[is_cl] <- clust_ids(lv$lvs[is_cl], levels(k))
@@ -329,8 +335,8 @@ ca_clusters <- function(clust, lv) {
 #' level shows its profile --- its distribution over the levels of the other variable, each
 #' percentage coloured by its difference from the average profile, as in
 #' \code{tabxplor::tab(color = "diff")} --- so the graph is read with the table it draws. The
-#' supplementary variables of the table (see \code{\link{correspondence_analysis}}) are drawn in
-#' their own colours, and the clusters of one margin, made with \code{\link{hierarchical_clust}},
+#' supplementary variables of the table (see \code{\link{correspondence_analysis}}) are drawn as
+#' black italic text, and the clusters of one margin, made with \code{\link{hierarchical_clust}},
 #' can colour its levels. It is a \pkg{ggplot2} graph, to which elements can be added with `+`;
 #' pass it to \code{\link{ggi}} for the interactive version. \code{\link{ggfacto}} is the same
 #' graph, for any analysis.
@@ -371,7 +377,7 @@ ca_clusters <- function(clust, lv) {
 #' @param axes_names Names of all the axes (not just the two selected ones), as a character vector.
 #' @param axes_reverse `1` to invert left and right, `2` to invert up and down, `1:2` for both.
 #' @param actives_in_bold Set the active levels in bold font.
-#' @param sup_in_italic Set the supplementary levels in italics.
+#' @param sup_in_italic Set the supplementary levels in italics. They are drawn as black text.
 #' @param shift_colors Change the colors of the variables.
 #' @param colornames_recode A named character vector, in \code{forcats::fct_recode()} style, to
 #' rename the colour groups (printed with `options(ggfacto.verbose = TRUE)`).

@@ -7,14 +7,14 @@
 #   model (R/plot-model.R) and the one renderer. PCA_ind.sup_coord() projects arbitrary raw rows
 #   into principal space and is shared with R/pca-3d.R.
 # KEY CONSTRAINTS:
-#   - Both graphs return a ggplot; ggpca_cor_circle(interactive = TRUE) returns ggi()'s widget.
+#   - Both graphs are drawn by the one renderer from variable_vectors(): the circle of
+#     correlations, or the biplot, where the same arrows are rescaled onto the cloud of individuals
+#     and only their directions read. Both return a ggplot; `interactive = TRUE` returns the widget.
 #   - The individuals are the points of ggpca()'s cloud, distinct ones merged (pca_model(),
 #     R/model.R); a supplementary level is the plain weighted barycentre of its individuals,
 #     FactoMineR's quali.sup point, never divided by sqrt(eigenvalue) as in an MCA.
 #   - A tooltip mean is coloured by its standardized difference from its block's mean, the colour
 #     clust_tab() gives a PCA's clusters: the reader meets one ladder for one quantity.
-#   - The circle is one geom_path() over 361 points, deliberately not ggforce::geom_circle(),
-#     which re-evaluated its aes once per row of the plot data.
 # See: CLAUDE.md section ggfacto architecture > The plot model.
 
 #' Principal Component Analysis
@@ -102,16 +102,25 @@ PCA2 <- principal_component_analysis
 
 #' Correlation Circle Plot for Principal Component Analysis
 #'
+#' @description The active variables of a principal component analysis as arrows in the circle of
+#' correlations: the coordinate of a variable on an axis is its correlation with it. Hovering a
+#' variable shows its coordinates, and its projections on the two axes. \code{\link{ggfacto}} draws
+#' it for a principal component analysis, and draws the same arrows over the cloud of individuals
+#' when individuals, supplementary variables or clusters are asked for.
+#'
 #' @param res.pca An analysis made with \code{\link{principal_component_analysis}} or
 #' \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.
 #' @param axes The axes to print, as a numeric vector of length 2.
 #' @param proj Set to `TRUE` to print projections of vectors over the two axes.
 #' @param interactive Set to `TRUE` to get the interactive graph at once, as \code{\link{ggi}}
-#' would make it: hovering a variable shows its coordinates on the axes, and its projections.
-#' By default, a \code{\link[ggplot2]{ggplot}}, to which elements can be added with `+` before
-#' passing it to \code{\link{ggi}}.
-#' @param text_size Size of the texte.
+#' would make it. By default, a \code{\link[ggplot2]{ggplot}}, to which elements can be added with
+#' `+` before passing it to \code{\link{ggi}}.
+#' @param text_size Size of the text.
 #' @param lang \code{NULL} (the session's language), \code{"en"} or \code{"fr"}.
+#' @param axes_names Names of all the axes, as a character vector.
+#' @param axes_reverse `1` to invert left and right, `2` to invert up and down, `1:2` for both.
+#' @param title The title of the graph.
+#' @param xlim,ylim Horizontal and vertical limits, as numeric vectors of length 2.
 #'
 #' @return A \code{\link[ggplot2]{ggplot}}, or an html widget with `interactive = TRUE`.
 #' @export
@@ -122,121 +131,63 @@ PCA2 <- principal_component_analysis
 #' res.pca <- principal_component_analysis(mtcars, 1:7)
 #' ggpca_cor_circle(res.pca)
 #' ggpca_cor_circle(res.pca) |> ggi()  # interactive
-ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
-                             proj = FALSE, interactive = FALSE, text_size = 3, lang = NULL) {
-  p <- with_gda_lang(lang, function(lg) {
-  dim1 <- rlang::sym(paste0("Dim.", axes[1]))
-  dim2 <- rlang::sym(paste0("Dim.", axes[2]))
-
-  data_circle <- res.pca$var$coord |> as.data.frame() |> tibble::rownames_to_column("name") |>
-    tibble::as_tibble() |> dplyr::mutate(id = as.integer(as.factor(.data$name)))
-
-  coord_line <- function(v, axis) {
-    gettextf("Coord axe %s: %s (cor. %s%%)", axis,
-             str_pad(format(round(v, 2), nsmall = 2), width = 5, side = "left"),
-             str_pad(round(v * 100, 0), width = 3, side = "left")) |>
-      str_replace_all(" ", unbrk)
-  }
-  lines <- purrr::imap(dplyr::select(data_circle, tidyselect::starts_with("Dim.")),
-                       \(v, col) coord_line(v, sub("^Dim\\.", "", col)))
-  data_circle$interactive_text <- paste0("<b>", data_circle$name, "</b>\n",
-                                         do.call(paste, c(lines, sep = "\n")))
-
-  data_proj   <- dplyr::bind_rows(
-    data_circle |>
-      dplyr::mutate(name  = paste0("x=", round(!!dim1, 2)),
-                    Proj1 = !!dim1,
-                    Proj2 = 0),
-    data_circle |>
-      dplyr::mutate(name  = paste0("y=", round(!!dim2, 2)),
-                    Proj1 = 0 ,
-                    Proj2 = !!dim2),
-  )
-
-  # DESIGN: the projections are drawn when asked for; otherwise they are drawn invisible, and
-  #   appear at mouse hover once the graph passes through ggi().
-  plot_proj <- if (proj) {
-    list(
-      ggplot2::geom_segment(
-        ggplot2::aes(xend = .data$Proj1, yend = .data$Proj2),
-        data = data_proj, linewidth = 0.5, linetype = "dashed"
-      ),
-      ggrepel::geom_label_repel(
-        ggplot2::aes(x = .data$Proj1, y = .data$Proj2, label = .data$name),
-        data = data_proj,
-        fill = grDevices::rgb(1, 1, 1, alpha = 0.5), label.size = 0.05, fontface = "bold",
-        size = text_size, nudge_y = -0.075, na.rm = TRUE)
-    )
-  } else {
-    list(
-      ggiraph::geom_segment_interactive(
-        ggplot2::aes(xend = .data$Proj1, yend = .data$Proj2, data_id = .data$id),
-        data = data_proj, linewidth = 0.5, linetype = "dashed", color = NA
-      ),
-      ggiraph::geom_label_repel_interactive(
-        ggplot2::aes(x = .data$Proj1, y = .data$Proj2, label = .data$name,
-                     data_id = .data$id),
-        data = data_proj, label.size = 0.05, fontface = "bold", size = text_size,
-        nudge_y = -0.075, na.rm = TRUE, color = NA, fill = NA)
-    )
-  }
-
-  data_circle |>
-    ggplot2::ggplot(ggplot2::aes(x = !!dim1, y = !!dim2)) +
-    ggplot2::geom_path(
-      data = data.frame(angle = seq(0, 2 * pi, length.out = 361)) |>
-        dplyr::mutate(x = cos(.data$angle), y = sin(.data$angle)),
-      mapping = ggplot2::aes(x = .data$x, y = .data$y), inherit.aes = FALSE,
-      color = "#d32f2f", linewidth = 1) +
-    ggplot2::geom_hline(yintercept = 0, color="#d32f2f", linetype = "solid") +
-    ggplot2::geom_vline(xintercept = 0, color="#d32f2f", linetype = "solid") +
-    ggplot2::labs(x = axis_title(res.pca, axes[1]), y = axis_title(res.pca, axes[2])) +
-    ggplot2::coord_fixed() +
-    ggplot2::scale_x_continuous(minor_breaks = seq(-1, 1, by = 0.1)) +
-    ggplot2::scale_y_continuous(minor_breaks = seq(-1, 1, by = 0.1)) +
-    ggplot2::theme_minimal()  +
-    ggplot2::theme(legend.position = "none",
-                   panel.grid.minor = ggplot2::element_line(linewidth = 0.3, color="gray80"),
-                   panel.grid.major = ggplot2::element_line(linewidth = 0.3, color="gray60"),
-                   strip.text = ggplot2::element_text(face = "bold"),
-                   plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
-                   axis.title.x = ggplot2::element_text(size = 12, hjust = 1),
-                   axis.title.y = ggplot2::element_text(size = 12, hjust = 1),
-                   text = ggplot2::element_text(family = "sans")
-    ) +
-    plot_proj +
-    ggplot2::geom_segment(
-      ggplot2::aes(xend = !!dim1, yend = !!dim2),
-      x = 0, y = 0, color = "#0077c2",
-      arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "cm")), linewidth = 1
-    ) +
-    ggiraph::geom_label_repel_interactive(
-      ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$name,
-                   tooltip = .data$interactive_text, data_id = .data$id),
-      data = data_circle |>
-        dplyr::mutate(!!dim1 := dplyr::if_else(!!dim1 > 0, !!dim1 + 0.03, !!dim1 - 0.03)),
-      fill = grDevices::rgb(1, 1, 1, alpha = 0.5), label.size = 0, size = text_size,
-      color = "#0077c2", fontface = "bold", hjust = "outward",
-      direction = "y", force = 0.5, force_pull = 1, point.padding = 0, box.padding = 0,
-      point.size = NA, arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines")),
-      min.segment.length = 0.1, na.rm = TRUE
-    )
+ggpca_cor_circle <- function(res.pca, axes = c(1, 2), proj = FALSE, interactive = FALSE,
+                             text_size = 3.5, lang = NULL, axes_names = NULL, axes_reverse = NULL,
+                             title, xlim, ylim) {
+  if (!inherits(res.pca, "PCA")) stop(
+    "ggpca_cor_circle() draws a principal component analysis, made with ",
+    "principal_component_analysis() or FactoMineR::PCA().", call. = FALSE)
+  plot_data <- with_gda_lang(lang, function(lg) {
+    pd <- plot_model(vars_rows(character(), character(), character(),
+                               coord = matrix(0, 0, ncol(res.pca$var$coord))),
+                     res = list(eig = eig_table(res.pca), axes_names = res.pca$axes_names),
+                     lang = lg)
+    pd$vectors <- list(data = variable_vectors(res.pca), radius = 1, proj = proj)
+    pd
   })
-
-  p <- as_ggfacto_plot(p, ratio = 1)
+  p <- ggmca_plot(plot_data, axes = axes, axes_names = axes_names, axes_reverse = axes_reverse,
+                  text_size = text_size, title = title, xlim = xlim, ylim = ylim)
   if (interactive) ggi(p) else p
+}
+
+# The active variables as vectors: their correlations with the axes (the circle's coordinates),
+# the renderer scaling them onto the cloud of individuals in a biplot, each with its tooltip -- its
+# mean (cv) first, then its coordinates.
+#' @keywords internal
+#' @noRd
+variable_vectors <- function(res.pca, m = pca_model(res.pca)) {
+  coord <- as.matrix(res.pca$var$coord)
+  colnames(coord) <- paste("Dim", seq_len(ncol(coord)))
+  lines <- purrr::map(seq_len(ncol(coord)), function(k) {
+    gettextf("Coord axe %s: %s (cor. %s%%)", k,
+             str_pad(format(round(coord[, k], 2), nsmall = 2), width = 5),
+             str_pad(round(coord[, k] * 100, 0), width = 3)) |>
+      str_replace_all(" ", unbrk)
+  })
+  dplyr::bind_cols(
+    tibble::tibble(name = rownames(coord), id = 1000L + seq_len(nrow(coord)),
+                   interactive_text = paste0(
+                     "<b>", rownames(coord), "</b>\n",
+                     gettextf("mean (cv): %s", purrr::map_chr(rownames(coord), \(v) mean_cv(
+                       m$X[[v]], m$wn))), "\n",
+                     do.call(paste, c(lines, sep = "\n")))),
+    tibble::as_tibble(coord))
 }
 
 
 #' Readable and Interactive Graph of the Individuals of a Principal Component Analysis
 #'
-#' @description The cloud of the individuals of a principal component analysis, in the plane of
-#' two axes, with the levels of supplementary variables at the barycentre of their individuals and
-#' the clusters of \code{\link{hierarchical_clust}} coloured. Hovering an individual shows its value
-#' on each active variable; hovering a supplementary level shows the mean of each active variable
-#' among its individuals, coloured by its standardized difference from the population's (blue
-#' above, red below), as \code{\link{clust_tab}} does. The active variables are drawn by
-#' \code{\link{ggpca_cor_circle}}. \code{\link{ggfacto}} is the same graph, for any analysis.
+#' @description The biplot of a principal component analysis: the cloud of its individuals in the
+#' plane of two axes, the levels of supplementary variables at the barycentre of their individuals,
+#' the clusters of \code{\link{hierarchical_clust}} coloured, and the active variables as arrows,
+#' the circle of correlations rescaled onto the cloud. Only the DIRECTION of an arrow reads there:
+#' an individual lies towards the variables it scores high on; the length of an arrow and the
+#' distance between an arrow and an individual mean nothing, and \code{\link{ggpca_cor_circle}}
+#' draws the correlations at their own scale. Hovering an individual shows its value on each active
+#' variable; hovering a supplementary level shows the mean of each active variable among its
+#' individuals, coloured by its standardized difference from the population's (blue above, red
+#' below), as \code{\link{clust_tab}} does. \code{\link{ggfacto}} draws it for a principal
+#' component analysis given individuals, supplementary variables or clusters.
 #'
 #' @param res.pca An analysis made with \code{\link{principal_component_analysis}} or
 #' \code{FactoMineR::PCA()}.
@@ -249,7 +200,9 @@ ggpca_cor_circle <- function(res.pca, axes = c(1, 2),
 #' \code{\link{hierarchical_clust}}: the individuals of one cluster are coloured alike and linked
 #' at mouse hover.
 #' @param profiles By default the individuals are drawn: `FALSE` draws the supplementary levels
-#' alone.
+#' and the variables alone.
+#' @param variables By default the active variables are drawn as arrows. Set to `FALSE` to draw
+#' the individuals alone.
 #' @param max_profiles The maximum number of individuals to draw: the heaviest first, and, among
 #' individuals of equal weight, an evenly spread sample.
 #' @param type Determines the way \code{sup_vars} are printed: \code{"text"}, \code{"labels"},
@@ -279,18 +232,19 @@ ggpca <- function(res.pca, data, sup_vars, axes = c(1, 2), axes_names = NULL,
                   keep_levels, discard_levels, cleannames = TRUE,
                   profiles = TRUE, clust, max_profiles = 5000,
                   alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#aaaaaa",
-                  text_repel = TRUE, title, sup_in_italic = FALSE, ellipses = NULL,
+                  text_repel = TRUE, title, sup_in_italic = TRUE, ellipses = NULL,
                   xlim, ylim, out_lims_move = FALSE,
                   shift_colors = 0, colornames_recode,
                   scale_color_light = material_colors_light(),
                   scale_color_dark  = material_colors_dark(),
                   text_size = 3.5, size_scale_max = NULL, dist_labels = c("auto", 0.04),
-                  right_margin = 0, use_theme = TRUE, get_data = FALSE, lang = NULL) {
+                  right_margin = 0, use_theme = TRUE, get_data = FALSE, lang = NULL,
+                  variables = TRUE) {
   plot_data <- pca_plot_data(
     res.pca, data, sup_vars = rlang::enquo(sup_vars), clust = rlang::enquo(clust),
     color_groups = color_groups, clust_color_groups = clust_color_groups,
     keep_levels = keep_levels, discard_levels = discard_levels, cleannames = cleannames,
-    profiles = profiles, max_profiles = max_profiles, lang = lang
+    profiles = profiles, max_profiles = max_profiles, lang = lang, variables = variables
   )
   ggmca_plot(plot_data, axes = axes, axes_names = axes_names, axes_reverse = axes_reverse,
              type = match.arg(type), text_repel = text_repel, title = title,
@@ -305,11 +259,12 @@ ggpca <- function(res.pca, data, sup_vars, axes = c(1, 2), axes_names = NULL,
 }
 
 # The PCA's plot model: its individuals as the points of the cloud, the supplementary levels at the
-# barycentre of theirs, the central point. There is no active level: the circle draws the variables.
+# barycentre of theirs, the central point, and the active variables as vectors (`vectors`).
 #' @keywords internal
 #' @noRd
 pca_plot_data <- function(res.pca, data, sup_vars, clust, color_groups, clust_color_groups,
-                          keep_levels, discard_levels, cleannames, profiles, max_profiles, lang) {
+                          keep_levels, discard_levels, cleannames, profiles, max_profiles, lang,
+                          variables = TRUE) {
   if (!inherits(res.pca, "PCA")) stop(
     "ggpca() draws a principal component analysis, made with principal_component_analysis() ",
     "or FactoMineR::PCA().", call. = FALSE)
@@ -354,6 +309,14 @@ pca_plot_data <- function(res.pca, data, sup_vars, clust, color_groups, clust_co
       data.frame(vars = tips$vars, lvs = tips$lvs))
     vars_data$begin_text       <- tips$begin_text[i]
     vars_data$interactive_text <- tips$interactive_text[i]
+    # the central point is the population: its size, and the mean (cv) of each active variable
+    vars_data$begin_text[central] <- paste0(
+      "<b>", gettext("Central point"), "</b>\n", gettextf("n: %s", m$n),
+      if (!isTRUE(all.equal(m$n, m$W))) paste0("\n", gettextf("weighted n: %s", round(m$W))))
+    vars_data$interactive_text[central] <- paste0(
+      "\n<b>", gettext("mean (cv):"), "</b>\n",
+      paste0(m$vars, ": ", purrr::map_chr(m$vars, \(v) mean_cv(m$X[[v]], m$wn)),
+             collapse = "\n"))
 
     pts <- cloud_points(seq_along(m$count), m$count, m$wn, max_profiles)
     individuals <- if (length(sup_vars) != 0) individuals_table(
@@ -370,9 +333,14 @@ pca_plot_data <- function(res.pca, data, sup_vars, clust, color_groups, clust_co
       out
     }
 
-    plot_model(vars_data, ind_data, individuals,
-               res = list(eig = m$eig, axes_names = res.pca$axes_names), clust = clust,
-               lang = lg)
+    pd <- plot_model(vars_data, ind_data, individuals,
+                     res = list(eig = m$eig, axes_names = res.pca$axes_names), clust = clust,
+                     lang = lg)
+    # the arrows are scaled onto the whole cloud, drawn or not, so the geometry does not depend on
+    # `profiles` or `max_profiles`
+    if (variables) pd$vectors <- list(data = variable_vectors(res.pca, m), cloud = m$coord,
+                                      proj = FALSE)
+    pd
   })
 }
 
@@ -398,7 +366,7 @@ individual_lines <- function(m, drawn) {
     mean <- sum(w * x) / sum(w)
     var  <- sum(w * (x - mean)^2) / sum(w)
     k    <- length(drawn)
-    digits <- max(0L, min(3L, 2L - floor(log10(abs(mean) + 1e-12))))
+    digits <- mean_digits(mean)
     f <- tabxplor::fmt(
       n = as.integer(c(m$count[drawn], m$n)), wn = c(w[drawn], m$W),
       mean = c(x[drawn], mean), var = c(rep(0, k), var), diff = c(x[drawn] - mean, 0),

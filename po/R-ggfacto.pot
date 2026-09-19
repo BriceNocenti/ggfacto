@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: ggfacto 0.3.2.9001\n"
-"POT-Creation-Date: 2026-09-19 10:08+0200\n"
+"POT-Creation-Date: 2026-09-19 11:48+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -10,28 +10,28 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: ca.R:157 interpret.R:842
+#: ca.R:158 interpret.R:842
 msgid "Rows"
 msgstr ""
 
-#: ca.R:157 interpret.R:842
+#: ca.R:158 interpret.R:842
 msgid "Columns"
 msgstr ""
 
-#: ca.R:167
+#: ca.R:168
 msgid "Supplementary rows"
 msgstr ""
 
-#: ca.R:167
+#: ca.R:168
 msgid "Supplementary columns"
 msgstr ""
 
-#: ca.R:275
+#: ca.R:281
 #, c-format
 msgid "%s:"
 msgstr ""
 
-#: ca.R:277
+#: ca.R:283
 #, c-format
 msgid "%s (supplementary):"
 msgstr ""
@@ -177,70 +177,84 @@ msgid ""
 "contrib: its contribution to the variance of the axis; an axis sums to 100 %"
 msgstr ""
 
-#: mca-data.R:430 pca.R:343
+#: mca-data.R:435 pca.R:304
 msgid "Active variables:"
 msgstr ""
 
-#: mca-data.R:431
+#: mca-data.R:436
 #, c-format
 msgid "Distribution by %s:"
 msgstr ""
 
-#: mca-data.R:493 mca-data.R:499
+#: mca-data.R:498 mca-data.R:504
 #, c-format
 msgid "Answer profile n°%s"
 msgstr ""
 
-#: mca-data.R:498 pca.R:381
+#: mca-data.R:503 pca.R:355
 #, c-format
 msgid "Cluster: %s"
 msgstr ""
 
-#: pca.R:129
+#: pca.R:162
 #, c-format
 msgid "Coord axe %s: %s (cor. %s%%)"
 msgstr ""
 
-#: pca.R:379
+#: pca.R:171
 #, c-format
-msgid "Individual n°%s"
+msgid "mean (cv): %s"
 msgstr ""
 
-#: plot-model.R:65 tooltips.R:27
+#: pca.R:314 plot-model.R:60 tooltips.R:25
 msgid "Central point"
 msgstr ""
 
-#: plot-render.R:91 plot-render.R:92
-#, c-format
-msgid "Contrib axe %s: %s%%"
-msgstr ""
-
-#: render.R:83
-#, c-format
-msgid "Axe %s (%s%%): %s"
-msgstr ""
-
-#: render.R:85
-#, c-format
-msgid "Axe %s (%s%%)"
-msgstr ""
-
-#: tooltips.R:29
-#, c-format
-msgid "Frequency (n=%s): %s%%"
-msgstr ""
-
-#: tooltips.R:85
-#, c-format
-msgid "%s (mean): %s"
-msgstr ""
-
-#: tooltips.R:286
+#: pca.R:314 tooltips.R:294
 #, c-format
 msgid "n: %s"
 msgstr ""
 
-#: tooltips.R:288
+#: pca.R:315 tooltips.R:296
 #, c-format
 msgid "weighted n: %s"
+msgstr ""
+
+#: pca.R:317
+msgid "mean (cv):"
+msgstr ""
+
+#: pca.R:353
+#, c-format
+msgid "Individual n°%s"
+msgstr ""
+
+#: plot-render.R:104 plot-render.R:105
+#, c-format
+msgid "Contrib axe %s: %s%%"
+msgstr ""
+
+#: plot-render.R:176 plot-render.R:178
+#, c-format
+msgid "Coord axe %s: %s"
+msgstr ""
+
+#: render.R:84
+#, c-format
+msgid "Axe %s (%s%%): %s"
+msgstr ""
+
+#: render.R:86
+#, c-format
+msgid "Axe %s (%s%%)"
+msgstr ""
+
+#: tooltips.R:27
+#, c-format
+msgid "Frequency (n=%s): %s%%"
+msgstr ""
+
+#: tooltips.R:81
+#, c-format
+msgid "%s (mean): %s"
 msgstr ""

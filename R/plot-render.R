@@ -27,7 +27,7 @@ ggmca_plot <- function(plot_data,
                        axes = c(1,2), axes_names = NULL, axes_reverse = NULL,
                        type = c("text", "points", "labels", "active_vars_only", "facets"),
                        text_repel = TRUE, title, ellipses = NULL,
-                       actives_in_bold = NULL, sup_in_italic = FALSE,
+                       actives_in_bold = NULL, sup_in_italic = TRUE,
                        xlim, ylim, out_lims_move = FALSE,
                        color_profiles = TRUE, base_profiles_color = "#aaaaaa",
                        alpha_profiles = 0.7,
@@ -83,6 +83,19 @@ ggmca_plot <- function(plot_data,
     individuals <- flip(individuals)
   }
 
+  # A PCA's active variables as vectors: on the circle of correlations, or rescaled onto the cloud
+  # of individuals in a biplot -- the circle then holding the cloud's 90 % closest points.
+  vec    <- plot_data$vectors
+  vd     <- NULL
+  radius <- NULL
+  if (!is.null(vec)) {
+    radius <- if (is.null(vec$cloud)) vec$radius else {
+      stats::quantile(sqrt(rowSums(vec$cloud[, c(d1, d2), drop = FALSE]^2)), 0.9, names = FALSE)
+    }
+    vd <- dplyr::mutate(vec$data, dplyr::across(tidyselect::starts_with("Dim "), ~ . * radius))
+    if (length(axes_reverse) != 0) vd <- flip(vd)
+  }
+
   # The tooltip of a level: its header, the contributions to the two axes drawn, then its body.
   c1 <- vars_data[[str_c("contrib", axes[1])]]
   c2 <- vars_data[[str_c("contrib", axes[2])]]
@@ -94,9 +107,7 @@ ggmca_plot <- function(plot_data,
     tidyr::unite(tibble::tibble(head = str_c(vars_data$begin_text, contrib_text),
                                 body = vars_data$interactive_text),
                  "text", tidyselect::everything(), sep = "\n", na.rm = TRUE)$text
-  # a tooltip ending on a coloured cell keeps a last line, or the browser eats the closing tag
-  vars_data$interactive_text <- str_replace(vars_data$interactive_text, "</font>$",
-                                            paste0("</font>", unbrk))
+  vars_data$interactive_text <- ggiraph_text(vars_data$interactive_text)
   vars_data <- dplyr::select(vars_data, -"begin_text", -tidyselect::starts_with("contrib"))
 
   # Colours: one key per colour group, the levels of the first sup var each their own under
@@ -126,13 +137,15 @@ ggmca_plot <- function(plot_data,
     sup1 <- ellipse_individuals(vars_data, individuals, sup_vars[1], type)
     if (type == "facets") facet_data <- facet_points(sup1, sup_vars[1])
   }
-  ratio <- plot_ratio(c(vars_data[[d1]], ind_data[[d1]], facet_data[[d1]]),
-                      c(vars_data[[d2]], ind_data[[d2]], facet_data[[d2]]), xlim, ylim)
+  circle <- if (!is.null(radius)) c(-radius, radius)
+  ratio <- plot_ratio(c(vars_data[[d1]], ind_data[[d1]], facet_data[[d1]], vd[[d1]], circle),
+                      c(vars_data[[d2]], ind_data[[d2]], facet_data[[d2]], vd[[d2]], circle),
+                      xlim, ylim)
   if (type == "facets") {
     layout <- ggplot2::wrap_dims(length(unique(facet_data$lvs)))
     ratio  <- ratio * layout[1] / layout[2]
   }
-  width_range <- diff(range(c(xlim, vars_data[[d1]], ind_data[[d1]]), na.rm = TRUE))
+  width_range <- diff(range(c(xlim, vars_data[[d1]], ind_data[[d1]], circle), na.rm = TRUE))
   if (dist_labels[1] == "auto") dist_labels <- width_range / 40
   dist_labels <- as.numeric(dist_labels[1])
 
@@ -159,6 +172,14 @@ ggmca_plot <- function(plot_data,
     coloured <- !is.na(pc$color_group) &
       (if (isTRUE(color_profiles)) TRUE else cl %in% color_profiles)
     pc$color_group <- ifelse(coloured, pc$color_group, "base_profiles_color")
+    # a point's coordinates on the two axes drawn, after its counts
+    coords <- paste0(gettextf("Coord axe %s: %s", axes[1], format(round(pc[[d1]], 2), nsmall = 2)),
+                     "\n",
+                     gettextf("Coord axe %s: %s", axes[2], format(round(pc[[d2]], 2), nsmall = 2)))
+    pc$interactive_text <- ggiraph_text(ifelse(
+      grepl("\n\n", pc$interactive_text, fixed = TRUE),
+      str_replace(pc$interactive_text, "\n\n", paste0("\n", coords, "\n\n")),
+      paste0(pc$interactive_text, "\n", coords)))
     profiles <- ggiraph::geom_point_interactive(
       data = pc,
       ggplot2::aes(x = !!dim1, y = !!dim2, size = .data$wcount, colour = .data$color_group,
@@ -191,11 +212,13 @@ ggmca_plot <- function(plot_data,
     }
   }
 
+  # DESIGN: italics mark a supplementary level in every analysis, colour meaning something else in
+  #   each; clusters are not supplementary variables, and stay upright.
   vars_data$face <- dplyr::case_when(
     vars_data$role == "active" & actives_in_bold ~ "bold",
     vars_data$role == "active"                   ~ "plain",
-    sup_in_italic & actives_in_bold              ~ "italic",
-    sup_in_italic                                ~ "bold.italic",
+    vars_data$role == "sup" & sup_in_italic & actives_in_bold ~ "italic",
+    vars_data$role == "sup" & sup_in_italic                   ~ "bold.italic",
     actives_in_bold                              ~ "plain",
     TRUE                                         ~ "bold"
   )
@@ -217,15 +240,18 @@ ggmca_plot <- function(plot_data,
     ggplot2::scale_colour_manual(values = palette, limits = names(palette),
                                  aesthetics = c("colour", "fill"), na.value = "black"),
     ggplot2::theme(plot.margin = ggplot2::margin(r = right_margin, unit = "cm")),
-    if (!is.null(title)) ggplot2::labs(title = title)
+    if (!is.null(title)) ggplot2::labs(title = title),
+    if (!is.null(vec)) vector_frame(biplot = !is.null(vec$cloud), base_profiles_color)
   )
 
   if (get_data) return(list(
     vars_data = vars_data, mean_point_data = mean_point_data,
     profiles_coord = if (!is.null(profiles)) pc,
     ellipses_coord = if (!is.null(ellipses_layer)) ellipses_coord,
-    graph_theme_acm = graph_theme_acm
+    vectors_coord = vd, graph_theme_acm = graph_theme_acm
   ))
+  vl <- if (!is.null(vec)) vector_layers(vd, radius, dim1, dim2, isTRUE(vec$proj), text_size,
+                                         biplot = !is.null(vec$cloud))
 
   labels <- function(d, label = FALSE, ...) {
     level_labels(d, dim1, dim2, label = label, repel = text_repel, text_size = text_size, ...)
@@ -239,13 +265,14 @@ ggmca_plot <- function(plot_data,
 
   css_hover <- NULL
   plot_output <- if (type == "text") {
-    ggplot2::ggplot() + graph_theme_acm + profiles + ellipses_layer +
-      labels(vars_data[vars_data$role != "clust", ]) + clust_labels + mean_point_graph
+    ggplot2::ggplot() + graph_theme_acm + vl$circle + profiles + ellipses_layer + vl$arrows +
+      labels(vars_data[vars_data$role != "clust", ]) + clust_labels + vl$labels +
+      mean_point_graph
 
   } else if (type == "points") {
     names_data <- coloured
     names_data$color_group <- paste0("names_", names_data$color_group)
-    ggplot2::ggplot() + graph_theme_acm + profiles + ellipses_layer +
+    ggplot2::ggplot() + graph_theme_acm + vl$circle + profiles + ellipses_layer + vl$arrows +
       labels(neutral, colour = "black", alpha = 0.8) +
       (if (nrow(coloured) != 0) list(
         ggiraph::geom_text_repel_interactive(
@@ -261,13 +288,13 @@ ggmca_plot <- function(plot_data,
                        tooltip = .data$interactive_text, data_id = .data$id),
           shape = 18, na.rm = TRUE, inherit.aes = FALSE)
       )) +
-      clust_labels + mean_point_graph
+      clust_labels + vl$labels + mean_point_graph
 
   } else if (type == "labels") {
-    ggplot2::ggplot() + graph_theme_acm + profiles + ellipses_layer +
+    ggplot2::ggplot() + graph_theme_acm + vl$circle + profiles + ellipses_layer + vl$arrows +
       labels(neutral, colour = "black") +
       (if (nrow(coloured) != 0) labels(coloured, label = TRUE)) +
-      clust_labels + mean_point_graph
+      clust_labels + vl$labels + mean_point_graph
 
   } else {
     # facets: the points of each level of the first sup var, and that level's mark
@@ -285,13 +312,107 @@ ggmca_plot <- function(plot_data,
         inherit.aes = FALSE, na.rm = TRUE, show.legend = FALSE
       ) +
       ggplot2::facet_wrap(ggplot2::vars(.data$lvs), scales = "fixed") +
-      graph_theme_acm + ellipses_layer
+      graph_theme_acm + ellipses_layer + vl$circle + vl$arrows + vl$labels
   }
 
   as_ggfacto_plot(plot_output, ratio, css_hover)
   })
 }
 
+
+# The vectors of a PCA's variables: the circle, the arrows and their labels, and each arrow's
+# projections on the two axes, drawn with `proj`, else transparent and shown while the arrow is
+# hovered (ggi(), reveal_on_hover()). In a biplot, the circle carries its own -1 / 1 graduations,
+# inside it, with inward ticks: the axes' values are the individuals'.
+#' @keywords internal
+#' @noRd
+vector_layers <- function(vd, radius, dim1, dim2, proj, text_size, biplot = FALSE) {
+  ink  <- "#34515e"
+  x    <- vd[[rlang::as_name(dim1)]]
+  y    <- vd[[rlang::as_name(dim2)]]
+  turn <- seq(0, 2 * pi, length.out = 361)
+  circle <- data.frame(x = radius * cos(turn), y = radius * sin(turn))
+  projections <- data.frame(
+    id = paste0("reveal-", rep(vd$id, 2)), x0 = rep(x, 2), y0 = rep(y, 2),
+    x = c(x, rep(0, length(x))), y = c(rep(0, length(y)), y),
+    label = c(paste0("x=", round(x / radius, 2)), paste0("y=", round(y / radius, 2))))
+  shown <- if (proj) 1 else 0
+  # drawn for good, projections are plain elements; otherwise ggi() reveals them at hover
+  reveal <- if (proj) NULL else quote(.data$id)
+  tips <- vd
+  tips[[rlang::as_name(dim1)]] <- x + sign(x) * 0.03 * radius
+  tick <- 0.035 * radius
+  # DESIGN: each tick stands just aside its axis line, radial and starting on the circle, with its
+  #   value on the same side: an angle of asin(side / radius) off the axis.
+  side  <- 0.012 * radius
+  angle <- c(0, pi, pi / 2, -pi / 2) + c(1, -1, -1, 1) * asin(side / radius)
+  graduations <- if (biplot) data.frame(
+    x = radius * cos(angle), y = radius * sin(angle),
+    xend = (radius - tick) * cos(angle), yend = (radius - tick) * sin(angle),
+    lx = c(radius - 0.6 * tick, -radius + 0.6 * tick, 0.85 * tick, 0.85 * tick),
+    ly = c(0.85 * tick, 0.85 * tick, radius - 0.6 * tick, -radius + 0.6 * tick),
+    label = c("1", "-1", "1", "-1"), hjust = c(1, 0, 0, 0), vjust = c(0, 0, 1, 0))
+  list(
+    circle = list(
+      ggplot2::geom_path(data = circle, ggplot2::aes(x = .data$x, y = .data$y), colour = ink,
+                         linewidth = 0.5, alpha = 0.8, inherit.aes = FALSE),
+      if (biplot) list(
+        ggplot2::geom_segment(data = graduations,
+                              ggplot2::aes(x = .data$x, y = .data$y, xend = .data$xend,
+                                           yend = .data$yend),
+                              colour = ink, linewidth = 1.2, inherit.aes = FALSE),
+        ggplot2::geom_text(data = graduations,
+                           ggplot2::aes(x = .data$lx, y = .data$ly, label = .data$label,
+                                        hjust = .data$hjust, vjust = .data$vjust),
+                           colour = ink, fontface = "bold", size = text_size * 0.96,
+                           inherit.aes = FALSE))
+    ),
+    arrows = list(
+      # dashed like the main axes, and carrying no hover id of their own: see reveal_on_hover()
+      ggiraph::geom_segment_interactive(
+        data = projections,
+        ggplot2::aes(x = .data$x0, y = .data$y0, xend = .data$x, yend = .data$y,
+                     data_id = !!reveal),
+        colour = "black", alpha = shown, linewidth = 0.5, linetype = "dashed",
+        inherit.aes = FALSE),
+      ggiraph::geom_label_repel_interactive(
+        data = projections,
+        ggplot2::aes(x = .data$x, y = .data$y, label = .data$label, data_id = !!reveal),
+        colour = grDevices::adjustcolor(ink, alpha.f = shown),
+        fill = grDevices::adjustcolor("white", alpha.f = shown), linewidth = 0,
+        fontface = "bold", size = text_size * 0.85, na.rm = TRUE, inherit.aes = FALSE),
+      # an arrow lights up with its name, and shows its tooltip too
+      ggiraph::geom_segment_interactive(
+        data = vd, ggplot2::aes(x = 0, y = 0, xend = !!dim1, yend = !!dim2,
+                                tooltip = .data$interactive_text, data_id = .data$id),
+        colour = ink, linewidth = 0.8, inherit.aes = FALSE,
+        arrow = ggplot2::arrow(length = ggplot2::unit(0.22, "cm")))
+    ),
+    labels = ggiraph::geom_label_repel_interactive(
+      data = tips,
+      ggplot2::aes(x = !!dim1, y = !!dim2, label = .data$name, tooltip = .data$interactive_text,
+                   data_id = .data$id),
+      colour = ink, fill = grDevices::rgb(1, 1, 1, alpha = 0.7), linewidth = 0,
+      fontface = "bold", size = text_size, hjust = "outward", direction = "y", force = 0.5,
+      force_pull = 1, point.padding = 0, box.padding = 0, point.size = NA,
+      min.segment.length = 0.1, na.rm = TRUE, inherit.aes = FALSE)
+  )
+}
+
+# The frame of a graph of vectors: on the circle of correlations, a light grid to read them on; in a
+# biplot, the axes' values in the colour of the individuals, whose scale they are -- the circle
+# carrying the correlations' own.
+#' @keywords internal
+#' @noRd
+vector_frame <- function(biplot, base_profiles_color = "#aaaaaa") {
+  if (biplot) return(ggplot2::theme(
+    axis.text = ggplot2::element_text(colour = if (is.null(base_profiles_color)) "grey50" else
+      base_profiles_color)))
+  list(ggplot2::scale_x_continuous(minor_breaks = seq(-1, 1, by = 0.1)),
+       ggplot2::scale_y_continuous(minor_breaks = seq(-1, 1, by = 0.1)),
+       ggplot2::theme(panel.grid.major = ggplot2::element_line(linewidth = 0.3, colour = "grey85"),
+                      panel.grid.minor = ggplot2::element_line(linewidth = 0.2, colour = "grey93")))
+}
 
 # The text or label layer of some levels, repelled or at their points, their colour from their
 # group unless a fixed one is given.
@@ -302,7 +423,7 @@ level_labels <- function(d, dim1, dim2, label, repel, text_size, colour = NULL, 
                           fontface = .data$face, tooltip = .data$interactive_text,
                           data_id = .data$id)
   if (!is.null(colour)) mapping$colour <- NULL
-  if (label) mapping$fontface <- NULL
+  if (label) d$face <- ifelse(grepl("italic", d$face), "bold.italic", "bold")
   geom <- if (label) {
     if (repel) ggiraph::geom_label_repel_interactive else ggiraph::geom_label_interactive
   } else {
@@ -311,13 +432,19 @@ level_labels <- function(d, dim1, dim2, label, repel, text_size, colour = NULL, 
   args <- c(list(data = d, mapping = mapping, size = text_size, na.rm = TRUE,
                  inherit.aes = FALSE),
             if (!is.null(colour)) list(colour = colour),
-            if (label) list(fontface = "bold"),
             if (repel) list(direction = "both", force = 0.5, force_pull = 1, point.padding = 0,
                             box.padding = 0, point.size = NA, min.segment.length = 0.01,
                             arrow = ggplot2::arrow(length = ggplot2::unit(0.25, "lines"))),
             list(...))
   do.call(geom, args)
 }
+
+# WARNING: ggiraph turns "\n" into <br/> only when a tooltip does not both start and end with an
+#   HTML tag -- such a text it takes for raw HTML, and its lines collapse into one. A tooltip ending
+#   on a tag (a coloured last cell) gets a trailing space, so its lines are always kept.
+#' @keywords internal
+#' @noRd
+ggiraph_text <- function(x) ifelse(grepl(">\\s*$", x), paste0(x, unbrk), x)
 
 # The manual palette: each key its light colour for points, its dark one for names, and the base
 # colour of the points of the cloud. A key beyond the palette takes its last colour.

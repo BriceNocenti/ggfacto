@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: ggfacto 0.3.2.9001\n"
-"POT-Creation-Date: 2026-09-19 10:08+0200\n"
+"POT-Creation-Date: 2026-09-19 11:48+0200\n"
 "PO-Revision-Date: 2026-09-04 18:32+0200\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -11,28 +11,28 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: ca.R:157 interpret.R:842
+#: ca.R:158 interpret.R:842
 msgid "Rows"
 msgstr "Lignes"
 
-#: ca.R:157 interpret.R:842
+#: ca.R:158 interpret.R:842
 msgid "Columns"
 msgstr "Colonnes"
 
-#: ca.R:167
+#: ca.R:168
 msgid "Supplementary rows"
 msgstr "Lignes supplémentaires"
 
-#: ca.R:167
+#: ca.R:168
 msgid "Supplementary columns"
 msgstr "Colonnes supplémentaires"
 
-#: ca.R:275
+#: ca.R:281
 #, c-format
 msgid "%s:"
 msgstr "%s :"
 
-#: ca.R:277
+#: ca.R:283
 #, c-format
 msgid "%s (supplementary):"
 msgstr "%s (supplémentaire) :"
@@ -185,73 +185,94 @@ msgid ""
 "contrib: its contribution to the variance of the axis; an axis sums to 100 %"
 msgstr "contrib : sa contribution à la variance de l'axe ; un axe fait 100 %"
 
-#: mca-data.R:430 pca.R:343
+#: mca-data.R:435 pca.R:304
 msgid "Active variables:"
 msgstr "Variables actives :"
 
-#: mca-data.R:431
+#: mca-data.R:436
 #, c-format
 msgid "Distribution by %s:"
 msgstr "Répartition par %s :"
 
-#: mca-data.R:493 mca-data.R:499
+#: mca-data.R:498 mca-data.R:504
 #, c-format
 msgid "Answer profile n°%s"
 msgstr "Profil de réponses n°%s"
 
-#: mca-data.R:498 pca.R:381
+#: mca-data.R:503 pca.R:355
 #, c-format
 msgid "Cluster: %s"
 msgstr "Classe : %s"
 
-#: pca.R:129
+#: pca.R:162
 #, c-format
 msgid "Coord axe %s: %s (cor. %s%%)"
 msgstr "Coord axe %s : %s (cor. %s %%)"
 
-#: pca.R:379
+#: pca.R:171
 #, c-format
-msgid "Individual n°%s"
-msgstr "Individu n°%s"
+msgid "mean (cv): %s"
+msgstr "moyenne (cv) : %s"
 
-#: plot-model.R:65 tooltips.R:27
+#: pca.R:314 plot-model.R:60 tooltips.R:25
 msgid "Central point"
 msgstr "Point moyen"
 
-#: plot-render.R:91 plot-render.R:92
-#, c-format
-msgid "Contrib axe %s: %s%%"
-msgstr "Contrib axe %s : %s %%"
-
-#: render.R:83
-#, c-format
-msgid "Axe %s (%s%%): %s"
-msgstr "Axe %s (%s %%) : %s"
-
-#: render.R:85
-#, c-format
-msgid "Axe %s (%s%%)"
-msgstr "Axe %s (%s %%)"
-
-#: tooltips.R:29
-#, c-format
-msgid "Frequency (n=%s): %s%%"
-msgstr "Fréquence (n=%s) : %s %%"
-
-#: tooltips.R:85
-#, c-format
-msgid "%s (mean): %s"
-msgstr "%s (moyenne) : %s"
-
-#: tooltips.R:286
+#: pca.R:314 tooltips.R:294
 #, c-format
 msgid "n: %s"
 msgstr "n : %s"
 
-#: tooltips.R:288
+#: pca.R:315 tooltips.R:296
 #, c-format
 msgid "weighted n: %s"
 msgstr "n pondéré : %s"
+
+#: pca.R:317
+msgid "mean (cv):"
+msgstr "moyenne (cv) :"
+
+#: pca.R:353
+#, c-format
+msgid "Individual n°%s"
+msgstr "Individu n°%s"
+
+#: plot-render.R:104 plot-render.R:105
+#, c-format
+msgid "Contrib axe %s: %s%%"
+msgstr "Contrib axe %s : %s %%"
+
+#: plot-render.R:176 plot-render.R:178
+#, c-format
+msgid "Coord axe %s: %s"
+msgstr "Coord axe %s : %s"
+
+#: render.R:84
+#, c-format
+msgid "Axe %s (%s%%): %s"
+msgstr "Axe %s (%s %%) : %s"
+
+#: render.R:86
+#, c-format
+msgid "Axe %s (%s%%)"
+msgstr "Axe %s (%s %%)"
+
+#: tooltips.R:27
+#, c-format
+msgid "Frequency (n=%s): %s%%"
+msgstr "Fréquence (n=%s) : %s %%"
+
+#: tooltips.R:81
+#, c-format
+msgid "%s (mean): %s"
+msgstr "%s (moyenne) : %s"
+
+#~ msgid ""
+#~ "Variables rescaled onto the cloud of individuals: read their directions, "
+#~ "not their lengths."
+#~ msgstr ""
+#~ "Variables remises à l'échelle du nuage des individus : lire leurs "
+#~ "directions, pas leurs longueurs."
 
 #~ msgid "quality of representation"
 #~ msgstr "qualité de représentation"

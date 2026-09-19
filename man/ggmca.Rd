@@ -32,7 +32,7 @@ ggmca(
   text_repel = TRUE,
   title,
   actives_in_bold = NULL,
-  sup_in_italic = FALSE,
+  sup_in_italic = TRUE,
   ellipses = NULL,
   xlim,
   ylim,
@@ -85,7 +85,7 @@ ggmca_plot(
   title,
   ellipses = NULL,
   actives_in_bold = NULL,
-  sup_in_italic = FALSE,
+  sup_in_italic = TRUE,
   xlim,
   ylim,
   out_lims_move = FALSE,
@@ -209,7 +209,8 @@ exactly at its point, which is faster to draw.}
 \item{actives_in_bold}{Set to `TRUE` to set active variables in bold font
 (and sup variables in plain).}
 
-\item{sup_in_italic}{Set to `TRUE` to set sup variables in italics.}
+\item{sup_in_italic}{Set the supplementary levels in italics, as in every graph of the package.
+`FALSE` sets them upright.}
 
 \item{ellipses}{Set to a number between 0 and 1 to draw a concentration ellipse for
 each level of the first \code{sup_vars}. \code{0.95} draw ellipses containing 95% of the

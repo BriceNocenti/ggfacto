@@ -171,3 +171,13 @@ test_that("the former arguments keep their places, each saying once what replace
   expect_warning(ggca(fx_ca_multi(), rowtips_subtitle = "x"), "deprecated")
   expect_no_warning(ggca(fx_ca_multi(), rowtips_subtitle = "x"))
 })
+
+test_that("a supplementary level is black italic text, never a coloured point", {
+  local_null_device()
+  vd <- ggca(fx_ca_multi(), get_data = TRUE)$vars_data
+  expect_true(all(is.na(vd$color_group[vd$role == "sup"])))
+  expect_true(all(vd$face[vd$role == "sup"] == "italic"))
+  b <- ggplot2::ggplot_build(ggca(fx_ca_multi()))
+  pts <- unlist(lapply(b$data, function(d) if (!"label" %in% names(d)) d$tooltip))
+  expect_false(any(grepl("<b>Married</b>", pts, fixed = TRUE)))
+})
