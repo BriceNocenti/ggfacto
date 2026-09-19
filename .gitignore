@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+docs/
+pkgdown/index.md
+pkgdown/assets/

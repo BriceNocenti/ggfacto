@@ -31,7 +31,8 @@ is.}
 size of the MCA's axes. Set to \code{FALSE} to avoid this behavior.}
 
 \item{savewidget}{Should the html widget be saved on disk ? The file is standalone:
-one single \code{.html} carrying its own JavaScript, ready to be sent to someone.}
+one single \code{.html} carrying its own JavaScript, ready to be sent to someone, or shown
+in an \code{<iframe>}: the graph fills the window or the frame it is opened in.}
 
 \item{dir}{If saved as file, the directory in which to save the html widget.
 Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
@@ -44,7 +45,8 @@ with \code{link[base:options](options)} to change default directory.}
 \item{open}{Should the resulting file be opened at once ?}
 
 \item{...}{Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
-\code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.}
+\code{\link[ggiraph:dsvg]{dsvg}}. The widget embeds the Liberation Sans font alone;
+\code{font_set} (see \code{\link[gdtools:font_set]{gdtools::font_set()}}) embeds others.}
 }
 \value{
 An html plot, of class \code{ggfacto_widget}. In a \pkg{knitr} document,

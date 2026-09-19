@@ -3,7 +3,8 @@
 # ROLE: What every 2D graph ends in. as_ggfacto_plot() makes it a ggfacto graph (its class, its
 #   render hints), theme_facto() supplies the axis titles carrying eigenvalue percentages, ggi()
 #   turns it into a girafe widget (a widget passes through), with the stylesheet that shows an
-#   element while another is hovered (reveal_on_hover()), ggsave2() writes an image.
+#   element while another is hovered (reveal_on_hover()), or saves it as a standalone page that
+#   fills its window or frame (fill_page(), R/knit.R); ggsave2() writes an image.
 # KEY CONSTRAINTS:
 #   - theme_facto() returns a LIST of ggplot objects, not a theme: it is `+`-ed as a whole.
 #   - "Jaune 800" is commented out of both palettes on purpose. It is reserved for the ggiraph
@@ -156,7 +157,8 @@ material_colors_dark <- function() {
 #' @param keep_ratio By default, the height is forced based of the relative
 #' size of the MCA's axes. Set to \code{FALSE} to avoid this behavior.
 #' @param savewidget Should the html widget be saved on disk ? The file is standalone:
-#' one single \code{.html} carrying its own JavaScript, ready to be sent to someone.
+#' one single \code{.html} carrying its own JavaScript, ready to be sent to someone, or shown
+#' in an \code{<iframe>}: the graph fills the window or the frame it is opened in.
 #' @param dir If saved as file, the directory in which to save the html widget.
 #' Default to temporary directory. Set global option \code{"ggfacto.export_dir"}
 #' with \code{link[base:options](options)} to change default directory.
@@ -164,7 +166,8 @@ material_colors_dark <- function() {
 #' @param name The name of the file to save.
 #' @param replace Replace file ? By default, number added to find a new name.
 #' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
-#' \code{\link[ggiraph:dsvg]{dsvg}}. \code{fonts} can be used to provide text fonts.
+#' \code{\link[ggiraph:dsvg]{dsvg}}. The widget embeds the Liberation Sans font alone;
+#' \code{font_set} (see \code{\link[gdtools:font_set]{gdtools::font_set()}}) embeds others.
 #'
 #' @return An html plot, of class \code{ggfacto_widget}. In a \pkg{knitr} document,
 #' setting option \code{"ggfacto.widget_dir"} writes it to its own file and embeds an
@@ -192,7 +195,10 @@ ggi <- function(plot = ggplot2::last_plot(),
     if (!requireNamespace("htmlwidgets", quietly = TRUE)) {
       stop("`savewidget = TRUE` requires the htmlwidgets package.", call. = FALSE)
     }
-    htmlwidgets::saveWidget(widget, path, selfcontained = TRUE, title = name)
+    # WARNING: saved from its own directory: saveWidget() writes its `<name>_files` library beside
+    #   the file but unlinks it relative to the working directory, and would leave it behind.
+    withr::with_dir(dirname(path), htmlwidgets::saveWidget(fill_page(widget), basename(path),
+                                                           selfcontained = TRUE, title = name))
 
     if (open == TRUE) file.show(path)
 
@@ -204,9 +210,14 @@ ggi <- function(plot = ggplot2::last_plot(),
 
 # The girafe of a ggplot, sized from its own ratio when it has one. Render hints are attributes set
 # by the graph builders; a plain ggplot carries none, so every read tolerates NULL.
+# DESIGN: `font_set` embeds Liberation Sans alone, the one family theme_facto() draws with, where
+#   ggiraph's default embeds sans, serif, mono and symbol: 3.6 MB for a standalone widget instead of
+#   9.2 MB. `ggi(font_set =)` passes another through `...`.
 #' @keywords internal
 #' @noRd
-girafe_widget <- function(plot, width, height, keep_ratio, ...) {
+girafe_widget <- function(plot, width, height, keep_ratio,
+                          font_set = gdtools::font_set(sans = gdtools::font_liberation("sans")),
+                          ...) {
   css_hover <- attr(plot, "css_hover", exact = TRUE)
   if (is.null(css_hover)) {
     # DESIGN: an svg text takes its colour from `fill`: dark gold on a label's light yellow box,
@@ -236,7 +247,8 @@ girafe_widget <- function(plot, width, height, keep_ratio, ...) {
     height / 2.54
   }
 
-  widget <- ggiraph::girafe(ggobj = plot, width_svg = width, height_svg = height, ...) |>
+  widget <- ggiraph::girafe(ggobj = plot, width_svg = width, height_svg = height,
+                            font_set = font_set, ...) |>
     ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip),
                             ggiraph::opts_hover(css = css_hover))
   widget$x$html <- reveal_on_hover(widget$x$html)

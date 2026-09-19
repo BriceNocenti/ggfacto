@@ -296,6 +296,23 @@ test_that("ggi passes a graph that is already interactive through unchanged", {
   expect_identical(ggi(w), w)
 })
 
+test_that("ggi embeds Liberation Sans alone, and takes another font_set", {
+  # ggiraph's default embeds four families, 9.2 MB in a standalone page; the graphs draw with one.
+  local_null_device()
+  fonts <- function(w) vapply(w$dependencies, `[[`, "", "name")
+  w <- quietly(ggi(quietly(ggmca(fx_mca()))))
+  expect_identical(fonts(w), "liberation-sans")
+  w <- quietly(ggi(quietly(ggmca(fx_mca())), font_set = gdtools::font_set_liberation()))
+  expect_gt(length(fonts(w)), 1)
+})
+
+test_that("ggi(savewidget = TRUE) writes one standalone file and nothing beside it", {
+  local_null_device()
+  dir <- withr::local_tempdir()
+  quietly(ggi(quietly(ggca(fx_ca())), savewidget = TRUE, dir = dir, name = "ca", open = FALSE))
+  expect_identical(list.files(dir), "ca.html")
+})
+
 test_that("ggsave2 writes a non-empty file", {
   # Broken before the hints became attributes: grid.draw() could not dispatch on the flattened list.
   local_null_device()

@@ -1,0 +1,72 @@
+---
+output:
+  github_document:
+    html_preview: false
+    md_extensions: -implicit_figures
+always_allow_html: true
+---
+
+<!-- pkgdown/index.md is generated from pkgdown/index.Rmd by dev/build_site.R. Edit the .Rmd. -->
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", message = FALSE, warning = FALSE)
+library(ggfacto)
+# The page must not depend on the machine that builds it: English, both ways.
+options(tabxplor.lang = "en")
+Sys.setenv(LANGUAGE = "en")
+options(tabxplor.print = "html", tabxplor.tab_kable_css = FALSE)
+```
+
+# ggfacto
+
+`ggfacto` draws readable, interactive graphs of the principal component, correspondence and multiple correspondence analyses of [FactoMineR](http://factominer.free.fr/). Its point is less visual than statistical: hover over a point, and the graph shows the crosstables behind it, each deviation from the mean coloured, so that the geometry is always read against the data it summarises. The graphs are `ggplot` objects, to be extended with `+`.
+
+`ggfacto` is, for the most part, a wrapper around `FactoMineR`, which computes the analyses — our thanks to its authors, François Husson, Julie Josse, Sébastien Lê and Jérémy Mazet. Its clustering reproduces `FactoMineR::HCPC()`, and its tables are built with [tabxplor](https://bricenocenti.github.io/tabxplor/).
+
+```{r css, echo = FALSE, results = "asis"}
+# After the title: pkgdown keeps only what follows it. "auto" follows the site's light/dark switch.
+cat(tabxplor::tab_css(theme = "auto"))
+```
+
+## Installation
+
+```{r, eval = FALSE}
+install.packages("ggfacto")
+```
+
+## A multiple correspondence analysis
+
+`tea`, a survey shipped with `FactoMineR`, asked 300 people 18 questions about how they drink tea. The analysis, then the interpretation of its first two axes, the eigenvalues underneath:
+
+```{r mca}
+data(tea, package = "FactoMineR")
+
+mca <- multiple_correspondence_analysis(tea, 1:18)
+interpret(mca, axes = 1:2)
+```
+
+The clusters, added to the data frame, then the interactive graph. Hover over a category to see its crosstables with the other questions, and over a grey point to see a response pattern:
+
+```{r clust, eval = FALSE}
+tea <- tea |> dplyr::mutate(clusters = hierarchical_clust(mca, ncp = 3))
+
+ggfacto(mca, tea, clust = clusters, interactive = TRUE)
+```
+
+```{r clust-widget, echo = FALSE, results = "asis", fig.keep = "none"}
+# DESIGN: pkgdown reads a knitted index.md and cannot ship a widget's scripts from it, so the graph
+#   is a standalone page in pkgdown/assets/ (copied to the site root) shown in a frame at its ratio.
+tea <- tea |> dplyr::mutate(clusters = hierarchical_clust(mca, ncp = 3))
+widget <- ggfacto(mca, tea, clust = clusters, interactive = TRUE)
+invisible(capture.output(  # the saved path is printed, and would land on the page
+  ggi(widget, savewidget = TRUE, dir = "pkgdown/assets", name = "tea-mca", replace = TRUE,
+      open = FALSE)
+))
+cat(sprintf(paste0('<iframe src="tea-mca.html" title="Interactive MCA of tea" loading="lazy" ',
+                   'style="width:100%%; aspect-ratio:1/%.4f; border:0;"></iframe>'),
+            attr(widget, "ggfacto_ratio")))
+```
+
+## Learn more
+
+The [guide](articles/ggfacto.html) (*[en français](articles/ggfacto-fr.html)*) walks through the three analyses, their tables and graphs, and clustering.

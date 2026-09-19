@@ -1,9 +1,10 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
-^README\.Rmd$
-^readme_plot\.png$
-docs
+^docs$
+^_pkgdown\.yml$
+^pkgdown$
+^vignettes$
 ^dev$
 ^CLAUDE\.md$
 ^\.github$

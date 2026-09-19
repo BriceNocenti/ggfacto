@@ -3,6 +3,8 @@
 # ROLE: as_ggfacto_widget() tags every widget the package returns; knit_print.ggfacto_widget()
 #   writes it to its own file and emits an <iframe> instead, when the document asks for it.
 #   knit_print.ggfacto_plot() draws a ggfacto ggplot at the chunk's width and its own height.
+#   fill_page() makes a standalone widget page fill its window or frame, for these pages and for
+#   ggi(savewidget = TRUE).
 # KEY CONSTRAINTS:
 #   - Tagging PREPENDS the class, so print.girafe / print.plotly still dispatch by inheritance and
 #     interactive display is untouched. Never put the method on `girafe` or `htmlwidget`: that
@@ -131,12 +133,14 @@ widget_guard <- function() {
 # libdir reached by "..", and it would otherwise write 23 MB beside each of a book's graphs.
 # Rewriting each dependency's src as a plain `href` renders the same <script>/<link> tags with no
 # copying at all; shipping the files is then the document's job, done by knit_print()'s metadata.
-save_widget_page <- function(x, file, libdir) {
-  # The page IS the graph. Without this it keeps htmlwidgets' standalone default of a 960x500 box
-  # in a margined body, which inside a frame of another size overflows and breaks the ratio.
-  # WARNING: htmlwidgets::resolveSizing() reads the TOP LEVEL of sizingPolicy for the standalone
-  # page's own div, and the `browser` scope only for the runtime resizing script. Both have to be
-  # set, or the div keeps the 960x500 default.
+# A standalone widget page that IS the graph: it fills its window, or the frame it sits in. Without
+# this it keeps htmlwidgets' standalone default of a 960x500 box in a margined body, which inside a
+# frame of another size overflows and crops the graph. Shared by save_widget_page() and
+# ggi(savewidget = TRUE).
+# WARNING: htmlwidgets::resolveSizing() reads the TOP LEVEL of sizingPolicy for the standalone
+# page's own div, and the `browser` scope only for the runtime resizing script. Both have to be
+# set, or the div keeps the 960x500 default.
+fill_page <- function(x) {
   x$width <- NULL
   x$height <- NULL
   for (scope in list(NULL, "browser")) {
@@ -147,7 +151,12 @@ save_widget_page <- function(x, file, libdir) {
     sp$fill <- TRUE
     if (is.null(scope)) x$sizingPolicy <- sp else x$sizingPolicy[[scope]] <- sp
   }
+  x
+}
 
+
+save_widget_page <- function(x, file, libdir) {
+  x <- fill_page(x)
   rendered <- htmltools::renderTags(htmltools::as.tags(x, standalone = TRUE))
   deps <- lapply(rendered$dependencies, prefix_dependency)
 

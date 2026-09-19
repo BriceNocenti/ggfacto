@@ -26,14 +26,14 @@ Description: Readable, complete and pretty graphs for correspondence analysis ma
     Most graphs are made with 'ggplot2', which means that you can use the + syntax to 
     manually add as many graphical pieces you want, or change theme elements. 3D 
     graphs are made with 'plotly'.
-URL: https://github.com/BriceNocenti/ggfacto
+URL: https://bricenocenti.github.io/ggfacto/,
+    https://github.com/BriceNocenti/ggfacto
 BugReports: https://github.com/BriceNocenti/ggfacto/issues
 License: GPL (>= 3)
 Encoding: UTF-8
-LazyData: true
 Imports: 
     FactoMineR (>= 2.0.0),
-    ggiraph (>= 0.8.2),
+    ggiraph (>= 0.9.6),
     htmltools (>= 0.5.0),
     ggplot2 (>= 4.0.0),
     dplyr (>= 1.0.0),
@@ -46,6 +46,7 @@ Imports:
     vctrs (>= 0.3.0),
     ggrepel (>= 0.9.0),
     fastcluster (>= 1.2.3),
+    gdtools (>= 0.5.0),
     tabxplor (>= 2.0.0.9000),
     withr (>= 2.0.0),
     magrittr (>= 1.5.0),
@@ -63,5 +64,6 @@ Suggests:
 Depends:
     R (>= 4.3.0)
 Config/testthat/edition: 3
+Config/Needs/website: pkgdown, BriceNocenti/txtheme
 Config/potools/style: explicit
 Config/roxygen2/version: 8.0.0

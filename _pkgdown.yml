@@ -1,0 +1,91 @@
+url: https://bricenocenti.github.io/ggfacto/
+
+# The theme is tabxplor's, from https://github.com/BriceNocenti/txtheme: a colour changes there, not
+# here. ⚠ `light-switch: true` is what makes it apply -- every txtheme rule is scoped to
+# html[data-bs-theme="dark"]. pkgdown/extra.js opens the site light, the page ggiraph's white
+# widgets are drawn for.
+template:
+  bootstrap: 5
+  light-switch: true
+  package: txtheme
+
+# One English site. The guide, vignettes/articles/ggfacto.Rmd, is "Get started" (pkgdown's rule for
+# the article named after the package) and the target of every deprecation notice (GGFACTO_GUIDE,
+# R/utils.R); its French twin sits in Articles. Both are web-only: a self-contained page with its
+# interactive graphs weighs ~5 MB, too much for CRAN.
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github, lightswitch]
+
+articles:
+- title: Guide
+  navbar: ~
+  contents: [articles/ggfacto]
+- title: En français
+  navbar: En français
+  contents: [articles/ggfacto-fr]
+
+# Ordered by use: the one workflow the three analyses share, then what is specific to each
+# analysis, then rendering, the teaching plots and the details. Each topic is listed once.
+reference:
+- title: One workflow, three analyses
+  desc: >
+    The analysis, its interpretation table, its graph, and its clusters: the same verbs for a
+    principal component analysis, a correspondence analysis and a multiple correspondence analysis.
+  contents:
+  - principal_component_analysis
+  - correspondence_analysis
+  - multiple_correspondence_analysis
+  - interpret
+  - eigenvalues
+  - ggfacto
+  - name_axes
+  - hierarchical_clust
+  - clust_tab
+- title: Principal component analysis
+  desc: The graphs of a PCA, which `ggfacto()` dispatches to.
+  contents:
+  - ggpca
+  - ggpca_cor_circle
+  - ggpca_3d
+- title: Correspondence analysis
+  desc: The graph of a CA, which `ggfacto()` dispatches to.
+  contents:
+  - ggca
+- title: Multiple correspondence analysis
+  desc: >
+    The graph of an MCA, its two halves (the plot data, to edit, and the renderer), its 3D view,
+    and Benzecri's modified rates.
+  contents:
+  - ggmca
+  - ggmca_data
+  - ggmca_plot
+  - ggmca_3d
+  - benzecri_mrv
+- title: Interactive graphs and export
+  contents:
+  - ggi
+  - ggsave2
+  - ggfacto_plot
+  - ggfacto_widget
+  - theme_facto
+- title: Back to the data
+  desc: The individuals' coordinates, and whether they were in the analysis, inside `mutate()`.
+  contents:
+  - axis_coord
+  - is_in_analysis
+- title: Teaching plots
+  desc: The active variables in their initial frame of reference, and that frame in the analysis.
+  contents:
+  - ggmca_initial_dims
+  - ggmca_with_base_ref
+- title: Details
+  contents:
+  - ggfacto_summary
+  - material_colors_dark
+  - material_colors_light
+- title: Deprecated
+  contents:
+  - HCPC_tab
+  - mean_sd_tab

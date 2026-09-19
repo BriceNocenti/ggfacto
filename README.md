@@ -1,180 +1,22 @@
-
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
 # ggfacto
 
 <!-- badges: start -->
-
+[![CRAN status](https://www.r-pkg.org/badges/version/ggfacto)](https://CRAN.R-project.org/package=ggfacto)
 [![R-CMD-check](https://github.com/BriceNocenti/ggfacto/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/BriceNocenti/ggfacto/actions/workflows/R-CMD-check.yaml)
-
 <!-- badges: end -->
 
-Readable, complete and pretty graphs for correspondence analysis made
-with [FactoMineR](http://factominer.free.fr/). Many can be rendered as
-interactive html plots, showing useful informations at mouse hover. The
-interest is not mainly visual but statistical : it helps the reader to
-keep in mind the data contained in the cross-table or Burt table while
-reading correspondence analysis, thus preventing overinterpretation.
-Graphs are made with [ggplot2](https://ggplot2.tidyverse.org/), which
-means that you can use the `+` syntax to manually add as many graphical
-pieces you want, or change theme elements.
+`ggfacto` draws readable, interactive graphs of the principal component, correspondence and multiple correspondence analyses of [FactoMineR](http://factominer.free.fr/). Hover over a point, and the graph shows the crosstables behind it, each deviation from the mean coloured: the geometry is always read against the data it summarises. The graphs are `ggplot` objects, to be extended with `+`.
 
-## Installation
+The three analyses share one workflow: the analysis, `interpret()` for its axes, `ggfacto()` for its graph, and `hierarchical_clust()` for its clusters.
 
-You can install ggfacto from `CRAN`:
-
-``` r
+```r
 install.packages("ggfacto")
-```
 
-Or install the development version from `github`:
-
-``` r
-# install.packages("devtools")
-devtools::install_github("BriceNocenti/ggfacto")
-```
-
-## Interactive plot from multiple correspondence analysis (MCA)
-
-Make the MCA (using a wrapper function around `FactoMineR:MCA`) :
-
-``` r
 library(ggfacto)
-
 data(tea, package = "FactoMineR")
-res.mca <- MCA2(tea, active_vars = 1:18)
+mca <- multiple_correspondence_analysis(tea, 1:18)
+interpret(mca)
+ggfacto(mca, tea, sup_vars = c(sex, SPC), interactive = TRUE)
 ```
 
-Make the plot (as a ggplot2 object) and add a supplementary variable
-(`"SPC"`) :
-
-``` r
-graph_mca <- ggmca(res.mca, tea, sup_vars = "SPC", profiles = TRUE, text_repel = TRUE)
-```
-
-Use `text_repel = TRUE` to avoid overlapping of text, and obtain a more
-readable image (be careful that, if the plot is overloaded, labels can
-be far away from their original location).
-
-Use `profiles = TRUE` to draw the graph of individuals : one point is
-added for each profile of answers.
-
-Turn the plot interactive :
-
-``` r
-ggi(graph_mca)
-```
-
-![](readme_plot.png)
-
-### See the crosstables of active variables directly on the plot
-
-It is possible to print all crosstables between active variables (burt
-table) into the interactive tooltips. Spread from mean are colored and,
-usually, points near the middle will have less colors, and points at the
-edges will have plenty. It may takes time to print, but really helps to
-interpret the MCA in close proximity with the underlying data.
-
-``` r
-ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "active", 
-      ylim = c(NA, 1.2), text_repel = TRUE) |>
-  ggi()
-```
-
-### See the distribution of active variables for each level of a supplementary variable
-
-``` r
-ggmca(res.mca, tea, sup_vars = "SPC", active_tables = "sup", 
-      ylim = c(NA, 1.2), text_repel = TRUE) |>
-  ggi()
-```
-
-### Concentration ellipses for each levels of a supplementary variable
-
-``` r
-ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2), ellipses = 0.95, text_repel = TRUE, profiles = TRUE)
-#> colors based on the following categories (rename with colornames_recode): 'SPC_employee', 'SPC_middle', 'SPC_non-worker', 'SPC_other worker', 'SPC_senior', 'SPC_student', 'SPC_workman'
-```
-
-<img src="man/figures/README-unnamed-chunk-3-1.png" width="100%" />
-
-### Graph of profiles of answer for each levels of a supplementary variable (with median ellipses containing half the population)
-
-``` r
-ggmca(res.mca, tea, sup_vars = "SPC", ylim = c(NA, 1.2), type = "facets", ellipses = 0.5, profiles = TRUE)
-#> colors based on the following categories (rename with colornames_recode): 'SPC_employee', 'SPC_middle', 'SPC_non-worker', 'SPC_other worker', 'SPC_senior', 'SPC_student', 'SPC_workman'
-```
-
-<img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
-
-<!-- ## Table to help to interpret MCA -->
-<!-- ``` {r} -->
-<!-- mca_interpret(res.mca, 1:3) -->
-<!-- ``` -->
-
-## Simple correspondence analysis (CA)
-
-Make the correspondence analysis :
-
-``` r
-tabs <- as.matrix(tabxplor::tab(forcats::gss_cat, race, marital))
-res.ca <- FactoMineR::CA(tabs, graph = FALSE)
-```
-
-Interactive plot :
-
-``` r
-graph.ca <- ggca(res.ca,
-                 title = "Race by marital status: correspondence analysis",
-                 tooltips = c("row", "col"))
-ggi(graph.ca)
-```
-
-Image plot (with `text_repel` to avoid overlapping of labels) :
-
-``` r
-ggca(res.ca,
-     title = "Race by marital status: correspondence analysis",
-     text_repel = TRUE, dist_labels = 0.02)
-```
-
-<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
-
-## Personalize plots
-
-Step-by-step functions can be used to create a database with all the
-necessary data, modify it, then use it to draw the plot:
-
-``` r
-library(dplyr)
-library(ggplot2)
-
-plot_data <- ggmca_data(res.mca, tea, sup_vars = "SPC")
-
-plot_data$vars_data <- plot_data$vars_data |>
-  filter(!lvs %in% c("other worker", "non-worker"))
-
-ggmca_plot(plot_data, ylim = c(NA, 1.2), text_repel = TRUE)
-```
-
-<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
-
-The plot can always be modified using the `ggplot2` `+` operator :
-
-``` r
-ggmca_plot(plot_data, ylim = c(NA, 1.2)) +
-  labs(title = "Multiple correspondence analysis") +
-  theme(axis.line = element_line(linetype = "solid") )
-```
-
-<img src="man/figures/README-unnamed-chunk-8-1.png" width="100%" /> You
-can then pass to plot to `ggi()` to make it interactive.
-
-Set `use_theme = FALSE` to use you own ggplot2 theme :
-
-``` r
-ggmca_plot(plot_data, ylim = c(NA, 1.2), use_theme = FALSE) +
-  theme_classic()
-```
-
-<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
+See the website, with the interactive graphs: **<https://bricenocenti.github.io/ggfacto/>**, and its guide, [in English](https://bricenocenti.github.io/ggfacto/articles/ggfacto.html) or [en français](https://bricenocenti.github.io/ggfacto/articles/ggfacto-fr.html).
