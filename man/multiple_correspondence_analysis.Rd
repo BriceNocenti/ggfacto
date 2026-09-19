@@ -52,18 +52,23 @@ index its rows or columns (`ind.sup`, `quali.sup`, `quanti.sup`, `tab.disj`).}
 \value{
 A `MCA` object from \pkg{FactoMineR}, fitted on the distinct answer profiles (the
  combinations of active answers), each weighted by its individuals: the eigenvalues and every
- result on the levels are the individuals', and `$ind` has one row per profile. Use
- \code{\link{axis_coord}} and \code{\link{hierarchical_clust}} to write coordinates and clusters
- into the data frame (`FactoMineR::HCPC()` would cluster the profiles). One more element,
- `source`, records for each row of `data` its answer profile (`NA` if it was not analysed) and
- its weight.
+ result on the levels are the individuals', and `$ind` has one row per profile (per individual
+ with `MCA2()`). Use \code{\link{axis_coord}} and \code{\link{hierarchical_clust}} to write
+ coordinates and clusters into the data frame (`FactoMineR::HCPC()` would cluster the profiles).
+ One more element, `source`, records for each row of `data` its row of `$ind` (`NA` if it was not
+ analysed) and its weight.
 }
 \description{
 A user-friendly wrapper around \code{\link[FactoMineR]{MCA}}, made to
  work with \pkg{ggfacto} functions like \code{\link{ggmca}}, \code{\link{interpret}} and
  \code{\link{hierarchical_clust}}. Variables are selected the way of the `tidyverse`, as in
  \code{tabxplor::tab()}. Supplementary variables are not given here: they are added afterwards,
- in \code{\link{ggmca}}. `MCA2()` is a shorter name for the same function.
+ in \code{\link{ggmca}}.
+
+ `MCA2()` keeps the fit of \pkg{ggfacto} 0.3.2, on the individuals: `$ind` has one row per
+ analysed row, so that `FactoMineR::HCPC()` of it classifies the individuals, in their order. It
+ gives the same graphs, tables and clusters as `multiple_correspondence_analysis()`, more slowly
+ on large data, and will be deprecated.
 }
 \examples{
 data(tea, package = "FactoMineR")

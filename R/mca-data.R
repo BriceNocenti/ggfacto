@@ -1,5 +1,6 @@
-# PURPOSE: The MCA entry point and the MCA's graph -- multiple_correspondence_analysis() (alias
-#   MCA2()), ggmca(), ggmca_data(), and mca_plot_data(), the MCA's builder of the shared plot model.
+# PURPOSE: The MCA entry point and the MCA's graph -- multiple_correspondence_analysis() (and
+#   MCA2(), its 0.3.2 fit on the individuals), ggmca(), ggmca_data(), and mca_plot_data(), the
+#   MCA's builder of the shared plot model.
 # ROLE: Fits the MCA on the answer profiles, then turns the analysis plus its microdata into the
 #   plot model (R/plot-model.R) the one renderer draws (R/plot-render.R). ggmca() is pure
 #   orchestration of the two halves.
@@ -26,7 +27,12 @@
 #'  work with \pkg{ggfacto} functions like \code{\link{ggmca}}, \code{\link{interpret}} and
 #'  \code{\link{hierarchical_clust}}. Variables are selected the way of the `tidyverse`, as in
 #'  \code{tabxplor::tab()}. Supplementary variables are not given here: they are added afterwards,
-#'  in \code{\link{ggmca}}. `MCA2()` is a shorter name for the same function.
+#'  in \code{\link{ggmca}}.
+#'
+#'  `MCA2()` keeps the fit of \pkg{ggfacto} 0.3.2, on the individuals: `$ind` has one row per
+#'  analysed row, so that `FactoMineR::HCPC()` of it classifies the individuals, in their order. It
+#'  gives the same graphs, tables and clusters as `multiple_correspondence_analysis()`, more slowly
+#'  on large data, and will be deprecated.
 #'
 #' @param data The data frame. To analyse a subset of the population, give the whole data frame and
 #'  `filter`, or filter it inside the call with the native pipe,
@@ -53,11 +59,11 @@
 #'
 #' @return A `MCA` object from \pkg{FactoMineR}, fitted on the distinct answer profiles (the
 #'  combinations of active answers), each weighted by its individuals: the eigenvalues and every
-#'  result on the levels are the individuals', and `$ind` has one row per profile. Use
-#'  \code{\link{axis_coord}} and \code{\link{hierarchical_clust}} to write coordinates and clusters
-#'  into the data frame (`FactoMineR::HCPC()` would cluster the profiles). One more element,
-#'  `source`, records for each row of `data` its answer profile (`NA` if it was not analysed) and
-#'  its weight.
+#'  result on the levels are the individuals', and `$ind` has one row per profile (per individual
+#'  with `MCA2()`). Use \code{\link{axis_coord}} and \code{\link{hierarchical_clust}} to write
+#'  coordinates and clusters into the data frame (`FactoMineR::HCPC()` would cluster the profiles).
+#'  One more element, `source`, records for each row of `data` its row of `$ind` (`NA` if it was not
+#'  analysed) and its weight.
 #' @export
 #'
 #' @examples
@@ -79,41 +85,60 @@ multiple_correspondence_analysis <- function(data, active_vars, wt, excl = NA, n
                                              graph = FALSE, filter, ...) {
   # WARNING: the caller's frame is captured HERE, before any promise is forced: rlang::caller_env()
   #   evaluated lazily inside fitted_rows() would name the wrong frame.
-  expr   <- rlang::enexpr(data)
-  env    <- rlang::caller_env()
-  filter <- if (!missing(filter)) rlang::enquo(filter)
-  wt     <- tidyselect::eval_select(rlang::enquo(wt), data)
-  stopifnot(length(wt) < 2)
-  wt_name <- if (length(wt) != 0) names(wt)
-
-  active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
-  if (length(active_vars) < 2) stop(
-    "An MCA needs at least two active variables.", call. = FALSE)
-  indexed <- intersect(...names(), c("ind.sup", "quali.sup", "quanti.sup", "tab.disj", "row.w"))
-  if (length(indexed) != 0) stop(
-    "multiple_correspondence_analysis() fits the answer profiles, so `",
-    str_c(indexed, collapse = "`, `"), "` cannot be passed to FactoMineR::MCA(). Supplementary ",
-    "variables are drawn by ggmca(sup_vars = ).", call. = FALSE)
-  fr <- fitted_rows(expr, env, data, filter, if (!is.null(wt_name)) data[[wt_name]])
-
-  X <- na_levels(as.data.frame(fr$data[active_vars]), active_vars)
-  # DESIGN: FactoMineR is fed the DISTINCT answer profiles, each weighted by the sum of its
-  #   individuals: identical rows of the indicator table leave X'X unchanged, hence every eigenvalue
-  #   and every result on the levels (exact to 5e-13, dev/analysis_engine.md section 4), for a
-  #   fraction of the time and memory. `source$key` maps the rows of the data frame to them.
-  key   <- as.integer(vctrs::vec_group_id(X))
-  first <- which(!duplicated(key))
-  pw    <- if (is.null(fr$wt)) tabulate(key) else as.vector(rowsum(fr$wt, key, reorder = TRUE))
-
-  res <- FactoMineR::MCA(X[first, , drop = FALSE], ncp = ncp, row.w = pw, graph = graph,
-                         excl = excl_index(X, active_vars, excl), ...)
-  res$source <- list(key = over_reference(key, fr), w = over_reference(fr$wt, fr), wt = wt_name)
-  res
+  expr <- rlang::enexpr(data)
+  env  <- rlang::caller_env()
+  mca_ingress(expr, env, data, rlang::enquo(active_vars), rlang::enquo(wt), excl, ncp, graph,
+              if (!missing(filter)) rlang::enquo(filter), ..., units = "profiles")
 }
 
 #' @rdname multiple_correspondence_analysis
 #' @export
-MCA2 <- multiple_correspondence_analysis
+MCA2 <- function(data, active_vars, wt, excl = NA, ncp = Inf, graph = FALSE, filter, ...) {
+  expr <- rlang::enexpr(data)
+  env  <- rlang::caller_env()
+  mca_ingress(expr, env, data, rlang::enquo(active_vars), rlang::enquo(wt), excl, ncp, graph,
+              if (!missing(filter)) rlang::enquo(filter), ..., units = "individuals")
+}
+
+# The one ingress of an MCA, behind its two names. `active_vars`, `wt` and `filter` come as
+# quosures, captured in the frame the user called.
+# DESIGN: FactoMineR is fed the DISTINCT answer profiles, each weighted by the sum of its
+#   individuals: identical rows of the indicator table leave X'X unchanged, hence every eigenvalue
+#   and every result on the levels (exact to 5e-13, dev/analysis_engine.md section 4), for a
+#   fraction of the time and memory. MCA2() keeps 0.3.2's fit on the individuals, so that
+#   FactoMineR::HCPC() of it classifies them, in their order. Either way `source$key` gives each row
+#   of the data frame its row of `call$X`, which mca_model() reduces to the same profiles.
+mca_ingress <- function(expr, env, data, active_vars, wt, excl, ncp, graph, filter, ...,
+                        units = c("profiles", "individuals")) {
+  units <- match.arg(units)
+  wt    <- tidyselect::eval_select(wt, data)
+  stopifnot(length(wt) < 2)
+  wt_name <- if (length(wt) != 0) names(wt)
+
+  active_vars <- names(tidyselect::eval_select(active_vars, data))
+  if (length(active_vars) < 2) stop(
+    "An MCA needs at least two active variables.", call. = FALSE)
+  indexed <- intersect(...names(), c("ind.sup", "quali.sup", "quanti.sup", "tab.disj", "row.w"))
+  if (length(indexed) != 0) stop(
+    "`", str_c(indexed, collapse = "`, `"), "` cannot be passed to FactoMineR::MCA() here. ",
+    "Supplementary variables are drawn by ggmca(sup_vars = ).", call. = FALSE)
+  fr <- fitted_rows(expr, env, data, filter, if (!is.null(wt_name)) data[[wt_name]])
+
+  X  <- na_levels(as.data.frame(fr$data[active_vars]), active_vars)
+  ex <- excl_index(X, active_vars, excl)
+  if (units == "profiles") {
+    key   <- as.integer(vctrs::vec_group_id(X))
+    first <- which(!duplicated(key))
+    pw    <- if (is.null(fr$wt)) tabulate(key) else as.vector(rowsum(fr$wt, key, reorder = TRUE))
+    res   <- FactoMineR::MCA(X[first, , drop = FALSE], ncp = ncp, row.w = pw, graph = graph,
+                             excl = ex, ...)
+  } else {
+    key <- seq_len(nrow(X))
+    res <- FactoMineR::MCA(X, ncp = ncp, row.w = fr$wt, graph = graph, excl = ex, ...)
+  }
+  res$source <- list(key = over_reference(key, fr), w = over_reference(fr$wt, fr), wt = wt_name)
+  res
+}
 
 
 

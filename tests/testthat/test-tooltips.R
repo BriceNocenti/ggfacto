@@ -181,19 +181,19 @@ fx_tea_rw <- function() fx("tea_rw", function() {
 })
 
 test_that("the crosstab cells are tab()'s: active x active, weighted", {
-  expect_cells_equal_tab(MCA2(fx_tea_rw(), 1:6, wt = "w"), fx_tea_rw(), fx_active(), fx_active())
+  expect_cells_equal_tab(fit_mca(fx_tea_rw(), 1:6, wt = "w"), fx_tea_rw(), fx_active(), fx_active())
 })
 
 test_that("the crosstab cells are tab()'s: a supplementary variable with missing values", {
-  expect_cells_equal_tab(MCA2(fx_tea_rw(), 1:6, wt = "w"), fx_tea_rw(), "SPC", fx_active())
+  expect_cells_equal_tab(fit_mca(fx_tea_rw(), 1:6, wt = "w"), fx_tea_rw(), "SPC", fx_active())
 })
 
 test_that("the crosstab cells are tab()'s: a tooltip variable with missing values", {
-  expect_cells_equal_tab(MCA2(fx_tea_rw(), 1:6, wt = "w"), fx_tea_rw(), fx_active(), "sex")
+  expect_cells_equal_tab(fit_mca(fx_tea_rw(), 1:6, wt = "w"), fx_tea_rw(), fx_active(), "sex")
 })
 
 test_that("the crosstab cells are tab()'s: excluded levels", {
-  expect_cells_equal_tab(MCA2(fx_tea_na(), 1:6), fx_tea_na(), fx_active(), fx_active())
+  expect_cells_equal_tab(fit_mca(fx_tea_na(), 1:6), fx_tea_na(), fx_active(), fx_active())
 })
 
 # --- what the tooltips no longer get wrong ------------------------------------------------------
@@ -223,7 +223,7 @@ test_that("the central point keeps every level of the tooltip variables", {
 })
 
 test_that("no tooltip prints an excluded or a merged level", {
-  res <- MCA2(fx_tea_na(), 1:6)
+  res <- fit_mca(fx_tea_na(), 1:6)
   txt <- md(res, fx_tea_na(), tooltip_vars_1lv = SPC)$vars_data$interactive_text
   expect_false(any(grepl("Remove_levels", txt, fixed = TRUE)))
 })
@@ -231,7 +231,7 @@ test_that("no tooltip prints an excluded or a merged level", {
 test_that("a yes/no battery shows one line per question, and a level named n does not break", {
   d <- fx_tea()[1:6]
   for (v in names(d)) d[[v]] <- factor(ifelse(as.integer(d[[v]]) == 1, "y", "n"))
-  vd <- md(MCA2(d, 1:6), d)$vars_data
+  vd <- md(fit_mca(d, 1:6), d)$vars_data
   body  <- sub(".*Active variables:</b>\n", "", vd$interactive_text[1])
   lines <- strsplit(body, "\n")[[1]]
   expect_length(lines, 6L)

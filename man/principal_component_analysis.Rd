@@ -82,8 +82,8 @@ A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which rec
 A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to
  work with \pkg{ggfacto} functions like \code{\link{interpret}}, \code{\link{ggfacto}} and
  \code{\link{hierarchical_clust}}. Variables are selected the
- way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
- function.
+ way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is its name in
+ \pkg{ggfacto} 0.3.2, kept for former code.
 }
 \examples{
 cars <- dplyr::mutate(mtcars, cyl = factor(cyl))

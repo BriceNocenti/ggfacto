@@ -14,7 +14,9 @@ ggi(
   name = "Plot",
   replace = FALSE,
   open = rlang::is_interactive(),
-  ...
+  ...,
+  iframe,
+  pixel_width
 )
 }
 \arguments{
@@ -47,6 +49,8 @@ with \code{link[base:options](options)} to change default directory.}
 \item{...}{Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
 \code{\link[ggiraph:dsvg]{dsvg}}. The widget embeds the Liberation Sans font alone;
 \code{font_set} (see \code{\link[gdtools:font_set]{gdtools::font_set()}}) embeds others.}
+
+\item{iframe, pixel_width}{Deprecated and ignored: the widget sizes itself.}
 }
 \value{
 An html plot, of class \code{ggfacto_widget}. In a \pkg{knitr} document,

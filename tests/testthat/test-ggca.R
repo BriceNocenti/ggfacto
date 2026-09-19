@@ -20,7 +20,6 @@ test_that("supplementary variables ride the table, and do not move the analysis"
   expect_identical(names(dimnames(ac$call$X)), c("relig", "partyid"))
   expect_identical(unique(ac$source$rows$var), c("relig", "marital"))
   expect_identical(unique(ac$source$cols$var), c("partyid", "race"))
-  expect_identical(CA2, correspondence_analysis)
 })
 
 test_that("a supplementary level sits where FactoMineR puts its profile", {

@@ -58,8 +58,8 @@ test_that("consol = \"weighted\" counts an individual weighted 2 as two copies o
   d <- fx_tea()
   d$w <- rep(1:2, length.out = nrow(d))
   copies <- rep(seq_len(nrow(d)), d$w)
-  by_weight <- hc(MCA2(d, 1:6, wt = "w"), ncp = 3, nb_clust = 5, consol = "weighted")
-  by_copies <- hc(MCA2(d[copies, ], 1:6), ncp = 3, nb_clust = 5, consol = "weighted")
+  by_weight <- hc(fit_mca(d, 1:6, wt = "w"), ncp = 3, nb_clust = 5, consol = "weighted")
+  by_copies <- hc(fit_mca(d[copies, ], 1:6), ncp = 3, nb_clust = 5, consol = "weighted")
   expect_identical(by_weight, by_copies[match(seq_len(nrow(d)), copies)])
 })
 
@@ -133,7 +133,7 @@ test_that("in mutate() on the subset itself, every row gets its cluster", {
 
 test_that("a reordered analysis writes each cluster back on its own row", {
   d   <- fx_tea()
-  res <- d |> dplyr::arrange(age) |> MCA2(1:6)
+  res <- d |> dplyr::arrange(age) |> fit_mca(1:6)
   out <- d |> dplyr::mutate(cl = hc(res, ncp = 3, nb_clust = 4))
   # each individual gets the cluster of its own row
   expect_false(anyNA(out$cl))
@@ -155,7 +155,7 @@ test_that("hierarchical_clust refuses rows it cannot line up, and says why", {
   d <- fx_tea()
   # the subset is its own reference (%>% pipe): the whole data frame is longer than the analysis
   `%>%` <- magrittr::`%>%`
-  res <- d %>% dplyr::filter(age < 30) %>% MCA2(1:6)
+  res <- d %>% dplyr::filter(age < 30) %>% fit_mca(1:6)
   expect_error(dplyr::mutate(d, cl = hc(res, ncp = 3, nb_clust = 4)), "filter = ")
   # the data frame was reordered after the analysis
   expect_error(dplyr::mutate(dplyr::arrange(d, age), cl = hc(fx_mca(), ncp = 3, nb_clust = 4)),
@@ -304,7 +304,7 @@ test_that("a number is a mean row, unless `shape` cuts it into levels", {
 })
 
 test_that("clust_tab hides excluded levels, the missing answers first", {
-  res <- MCA2(fx_tea_na(), 1:6)
+  res <- fit_mca(fx_tea_na(), 1:6)
   d   <- fx_tea_na()
   d$clust <- hc(res, ncp = 3, nb_clust = 4)
   lvs <- function(tab) as.character(tab$lvs)

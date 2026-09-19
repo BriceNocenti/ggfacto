@@ -47,7 +47,7 @@ Imports:
     ggrepel (>= 0.9.0),
     fastcluster (>= 1.2.3),
     gdtools (>= 0.5.0),
-    tabxplor (>= 2.0.0.9000),
+    tabxplor (>= 2.0.1),
     withr (>= 2.0.0),
     magrittr (>= 1.5.0),
     grDevices (>= 4.0.0),

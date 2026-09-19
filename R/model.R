@@ -9,8 +9,9 @@
 #   individuals share one point; a PCA's graph reads its distinct individuals the same way.
 # KEY CONSTRAINTS:
 #   - mca_model() is the only code that knows how each engine stores an MCA: a ggfacto fit
-#     (FactoMineR fed the profiles, `source$key` mapping the individuals to them), a
-#     FactoMineR::MCA() fit on individuals, GDAtools' speMCA() and csMCA() (its subcloud only).
+#     (FactoMineR fed the profiles, or the individuals under MCA2(), `source$key` giving each
+#     individual's row of `call$X`), a FactoMineR::MCA() fit on individuals, GDAtools' speMCA() and
+#     csMCA() (its subcloud only). Each is reduced to its profiles, so all give the same model.
 #   - Levels are read by POSITION in the indicator table, never matched by name: FactoMineR renames
 #     a level two variables share (`var_lv`) and a y/n level (`var.y`), GDAtools names every level
 #     `var.lv`.
@@ -63,26 +64,27 @@ mca_model <- function(res) {
     x
   })
 
-  # DESIGN: a ggfacto fit was made on the profiles, and remembers each individual's; any other fit
-  #   was made on individuals, grouped here -- identical rows of the indicator table share a point.
-  src <- res$source
+  # DESIGN: every fit is reduced here to its answer profiles -- identical rows of the indicator
+  #   table share a point. It is the identity on multiple_correspondence_analysis(), fitted on the
+  #   profiles; MCA2() and any other engine fit the individuals. A ggfacto fit's `source$key` gives
+  #   each individual's row of `call$X`, and so its profile.
+  g     <- as.integer(vctrs::vec_group_id(X))
+  first <- which(!duplicated(g))
+  X     <- X[first, , drop = FALSE]
+  coord <- as.matrix(res$ind$coord)[first, , drop = FALSE]
+  src   <- res$source
   if (!is.null(src$key)) {
-    pos   <- source_positions(res)
-    key   <- src$key[pos$rows]
-    w     <- if (!is.null(src$w)) src$w[pos$rows]
-    coord <- res$ind$coord
+    pos <- source_positions(res)
+    key <- g[src$key[pos$rows]]
+    w   <- if (!is.null(src$w)) src$w[pos$rows]
   } else {
-    key   <- as.integer(vctrs::vec_group_id(X))
-    first <- which(!duplicated(key))
-    X     <- X[first, , drop = FALSE]
-    coord <- res$ind$coord[first, , drop = FALSE]
-    w     <- res$call$row.w
+    key <- g
+    w   <- res$call$row.w
     if (!is.null(rows)) w <- w[rows]
     if (all(w == 1)) w <- NULL
-    pos   <- list(n = nrow(res$call$X),
-                  rows = if (is.null(rows)) seq_len(nrow(res$call$X)) else rows)
+    pos <- list(n = nrow(res$call$X),
+                rows = if (is.null(rows)) seq_len(nrow(res$call$X)) else rows)
   }
-  coord <- as.matrix(coord)
   colnames(coord) <- paste("Dim", seq_len(ncol(coord)))
   rownames(X) <- NULL
 

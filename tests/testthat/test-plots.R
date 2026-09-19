@@ -36,7 +36,7 @@ test_that("the teaching graphs build when FactoMineR renames levels (y/n, shared
   d$always    <- factor(ifelse(d$always == "always", "y", "n"))
   d$breakfast <- factor(ifelse(d$breakfast == "breakfast", "yes", "no"))
   d$lunch     <- factor(ifelse(d$lunch == "lunch", "yes", "no"))
-  res <- MCA2(d, 1:6)
+  res <- fit_mca(d, 1:6)
   expect_no_error(ggplot2::ggplot_build(quietly(ggmca_initial_dims(res, d))))
   expect_no_error(ggplot2::ggplot_build(quietly(ggmca_with_base_ref(res, d))))
 })

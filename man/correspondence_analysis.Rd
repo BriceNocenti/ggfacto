@@ -2,12 +2,9 @@
 % Please edit documentation in R/ca.R
 \name{correspondence_analysis}
 \alias{correspondence_analysis}
-\alias{CA2}
 \title{Correspondence Analysis of a Crosstab}
 \usage{
 correspondence_analysis(table, ncp = Inf, ...)
-
-CA2(table, ncp = Inf, ...)
 }
 \arguments{
 \item{table}{A crosstab made with \code{tabxplor::tab()}, with one or several row variables and
@@ -28,8 +25,7 @@ Makes the correspondence analysis of a crosstab with
 \code{FactoMineR::\link[FactoMineR]{CA}}: first make the table with \code{tabxplor::tab()},
 then analyse it. The analysis reads the (weighted) counts of the table, whatever it displays,
 without its Total rows and columns. To leave out some rows or columns, filter the table before,
-with \code{dplyr::filter()} and \code{dplyr::select()}. `CA2()` is a shorter name for the same
-function.
+with \code{dplyr::filter()} and \code{dplyr::select()}.
 
 \strong{Supplementary variables} are given in the table itself: in a `tab()` of several row
 variables, or several column variables, the first row variable and the first column variable

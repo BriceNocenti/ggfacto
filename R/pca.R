@@ -1,4 +1,4 @@
-# PURPOSE: The PCA entry point and its 2D graphs -- principal_component_analysis() (alias PCA2()),
+# PURPOSE: The PCA entry point and its 2D graphs -- principal_component_analysis() (and PCA2(), its 0.3.2 name),
 #   ggpca_cor_circle(), ggpca() and its builder pca_plot_data(), the shared projector
 #   PCA_ind.sup_coord(), and the deprecated mean_sd_tab().
 # ROLE: principal_component_analysis() is the tidyselect ingress normaliser (row and column weights,
@@ -22,8 +22,8 @@
 #' @description A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to
 #'  work with \pkg{ggfacto} functions like \code{\link{interpret}}, \code{\link{ggfacto}} and
 #'  \code{\link{hierarchical_clust}}. Variables are selected the
-#'  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
-#'  function.
+#'  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is its name in
+#'  \pkg{ggfacto} 0.3.2, kept for former code.
 #' @param data The data frame. To analyse a subset of the population, give the whole data frame and
 #'  `filter`, or filter it inside the call with the native pipe,
 #'  `data |> dplyr::filter(...) |> principal_component_analysis(...)`: the analysis then remembers

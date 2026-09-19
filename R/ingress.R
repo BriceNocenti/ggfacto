@@ -11,8 +11,8 @@
 #   - `excl` names levels EXACTLY, never as a regex: level names hold "+", "?" and "(". `NA` (or
 #     "NA") stands for every missing level -- `<VAR>.NA`, or a level literally named "NA".
 #   - The fit stores `res$source = list(key, w, wt)`: ONE entry of `key` (and `w`) per row of the
-#     REFERENCE frame, the data frame the user named -- the row's answer profile (an MCA) or its row
-#     of `call$X` (a PCA), `NA` if it was left out -- and the name of the weight column.
+#     REFERENCE frame, the data frame the user named -- its row of `call$X` (for an MCA fitted on
+#     the profiles, its answer profile), `NA` if it was left out -- and the name of the weight column.
 #   - A row is left out by a proved pipe (reference_rows()), by `filter =`, or by a weight of 0.
 #     The fit keeps the order of the data it was given (an `arrange()` in the pipe holds); only
 #     the match to the reference frame is recorded.

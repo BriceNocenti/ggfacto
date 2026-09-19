@@ -168,6 +168,7 @@ material_colors_dark <- function() {
 #' @param ... Additional arguments to pass to \code{\link[ggiraph:girafe]{girafe}} and
 #' \code{\link[ggiraph:dsvg]{dsvg}}. The widget embeds the Liberation Sans font alone;
 #' \code{font_set} (see \code{\link[gdtools:font_set]{gdtools::font_set()}}) embeds others.
+#' @param iframe,pixel_width Deprecated and ignored: the widget sizes itself.
 #'
 #' @return An html plot, of class \code{ggfacto_widget}. In a \pkg{knitr} document,
 #' setting option \code{"ggfacto.widget_dir"} writes it to its own file and embeds an
@@ -178,8 +179,10 @@ material_colors_dark <- function() {
 ggi <- function(plot = ggplot2::last_plot(),
                 width = NULL, height = NULL, keep_ratio = TRUE,
                 savewidget = FALSE, dir = NULL, name = "Plot", replace = FALSE,
-                open = rlang::is_interactive(), ...
+                open = rlang::is_interactive(), ..., iframe, pixel_width
 ) {
+  if (!missing(iframe) || !missing(pixel_width)) deprecated_notice(
+    "ggi::iframe", "ggi(iframe =, pixel_width =) are deprecated and ignored.")
 
   # DESIGN: a widget passes through, so `ggpca_cor_circle(interactive = TRUE) |> ggi()` and a
   #   second ggi() cost nothing; it can still be saved.

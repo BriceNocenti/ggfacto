@@ -68,7 +68,7 @@ test_that("the levels FactoMineR renames keep their data's names", {
   d$always   <- factor(ifelse(d$always == "always", "y", "n"))
   d$breakfast <- factor(ifelse(d$breakfast == "breakfast", "yes", "no"))
   d$lunch     <- factor(ifelse(d$lunch == "lunch", "yes", "no"))
-  res <- MCA2(d, 1:6)
+  res <- fit_mca(d, 1:6)
   expect_true(all(c("always.n", "breakfast_no") %in% rownames(res$var$coord)))
   vd <- md(res, d)$vars_data
   expect_setequal(as.character(vd$lvs[vd$vars == "always"]), c("n", "y"))
@@ -91,7 +91,7 @@ test_that("the plot model is the same whether FactoMineR saw the profiles or the
 test_that("a GDAtools speMCA() is drawn like the equivalent specific MCA", {
   skip_if_not_installed("GDAtools")
   spe <- md(GDAtools::speMCA(fx_tea()[1:6], excl = 3), fx_tea(), sup_vars = SPC)$vars_data
-  gg  <- md(MCA2(fx_tea(), 1:6, excl = "Not.tea time"), fx_tea(), sup_vars = SPC)$vars_data
+  gg  <- md(fit_mca(fx_tea(), 1:6, excl = "Not.tea time"), fx_tea(), sup_vars = SPC)$vars_data
   expect_identical(spe[c("vars", "lvs", "wcount", "begin_text")],
                    gg[c("vars", "lvs", "wcount", "begin_text")])
   expect_equal(abs(spe$`Dim 1`), abs(gg$`Dim 1`), tolerance = 1e-10)
@@ -350,7 +350,7 @@ test_that("individuals holds one row per fitted individual, with the rank of its
 
 test_that("an excluded answer is not listed in a profile's tooltip", {
   # excl = NA (the default) excludes the `<VAR>.NA` levels: a missing answer has no line of its own.
-  res <- MCA2(fx_tea_na(), 1:6)
+  res <- fit_mca(fx_tea_na(), 1:6)
   txt <- md(res, fx_tea_na(), profiles = TRUE)$ind_data$interactive_text
   expect_false(any(grepl("Remove_levels", txt, fixed = TRUE)))
   expect_false(any(grepl("\\.NA", txt)))

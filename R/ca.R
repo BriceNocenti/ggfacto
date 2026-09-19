@@ -1,4 +1,4 @@
-# PURPOSE: The CA entry point and its graph -- correspondence_analysis() (alias CA2()), ggca(), and
+# PURPOSE: The CA entry point and its graph -- correspondence_analysis(), ggca(), and
 #   ca_plot_data(), the CA's builder of the shared plot model (R/plot-model.R).
 # ROLE: correspondence_analysis() is the ingress normaliser of a crosstab: it takes the table the
 #   student made with tabxplor::tab() and gives FactoMineR the counts it needs. ggca() draws the
@@ -27,8 +27,7 @@
 #' \code{FactoMineR::\link[FactoMineR]{CA}}: first make the table with \code{tabxplor::tab()},
 #' then analyse it. The analysis reads the (weighted) counts of the table, whatever it displays,
 #' without its Total rows and columns. To leave out some rows or columns, filter the table before,
-#' with \code{dplyr::filter()} and \code{dplyr::select()}. `CA2()` is a shorter name for the same
-#' function.
+#' with \code{dplyr::filter()} and \code{dplyr::select()}.
 #'
 #' \strong{Supplementary variables} are given in the table itself: in a `tab()` of several row
 #' variables, or several column variables, the first row variable and the first column variable
@@ -89,10 +88,6 @@ correspondence_analysis <- function(table, ncp = Inf, ...) {
   if (!is.null(tb)) res$source <- list(rows = tb$rows, cols = tb$cols, counts = tb$n)
   res
 }
-
-#' @rdname correspondence_analysis
-#' @export
-CA2 <- correspondence_analysis
 
 # The one call of FactoMineR::CA(): the matrix travels as a symbol, not inlined into the call.
 #' @keywords internal

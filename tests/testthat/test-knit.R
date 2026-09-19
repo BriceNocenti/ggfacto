@@ -106,6 +106,18 @@ test_that("an unlabelled chunk is refused rather than given a name that drifts",
   expect_error(knit_print.ggfacto_widget(w), "needs a label")
 })
 
+test_that("ggi() takes its 0.3.2 arguments, warning once, and ignores them", {
+  local_null_device()
+  e <- ggfacto:::deprecated_args_warned
+  rm(list = ls(e), envir = e)
+  p <- quietly(ggca(fx_ca()))
+  expect_warning(old <- ggi(p, iframe = TRUE, pixel_width = 600), "iframe")
+  expect_no_warning(ggi(p, pixel_width = 600))
+  new <- ggi(p)
+  expect_identical(class(old), class(new))
+  expect_identical(attr(old, "ggfacto_ratio"), attr(new, "ggfacto_ratio"))
+})
+
 
 # --- a graph knitted at its own aspect ratio ------------------------------------------------------
 

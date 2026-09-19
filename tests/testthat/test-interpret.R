@@ -17,7 +17,7 @@ withr::local_options(lifecycle_verbosity = "quiet", .local_envir = testthat::tea
 # tea[1:6] is all binary, so mca_interpret()'s row packing collapses every question to one line and
 # its display blanking has nothing to hide -- that needs multi-level variables and a third axis.
 fx_mca_multi <- function() fx("mca_multi", function() {
-  MCA2(fx_tea(), tidyselect::all_of(c("Tea", "How", "how", "where", "price")))
+  fit_mca(fx_tea(), tidyselect::all_of(c("Tea", "How", "how", "where", "price")))
 })
 
 # --- benzecri_mrv --------------------------------------------------------------------------------
@@ -34,14 +34,14 @@ test_that("interpret() reads each analysis with its own table", {
 test_that("a GDAtools speMCA() is interpreted like the equivalent specific MCA", {
   skip_if_not_installed("GDAtools")
   spe <- mca_interpret_data(GDAtools::speMCA(fx_tea()[1:6], excl = 3), 1:2)
-  gg  <- mca_interpret_data(MCA2(fx_tea(), 1:6, excl = "Not.tea time"), 1:2)
+  gg  <- mca_interpret_data(fit_mca(fx_tea(), 1:6, excl = "Not.tea time"), 1:2)
   expect_identical(spe[c("axis", "group", "level")], gg[c("axis", "group", "level")])
   # GDAtools rounds its contributions and coordinates to six decimals
   expect_equal(spe$ctr, gg$ctr, tolerance = 1e-6)
   expect_equal(abs(spe$coord), abs(gg$coord), tolerance = 1e-6)
   expect_s3_class(interpret(GDAtools::speMCA(fx_tea()[1:6], excl = 3)), "ggfacto_summary")
   expect_equal(benzecri_mrv(GDAtools::speMCA(fx_tea()[1:6], excl = 3)),
-               benzecri_mrv(MCA2(fx_tea(), 1:6, excl = "Not.tea time")), tolerance = 1e-10)
+               benzecri_mrv(fit_mca(fx_tea(), 1:6, excl = "Not.tea time")), tolerance = 1e-10)
 })
 
 test_that("benzecri_mrv returns one modified rate per retained axis", {
@@ -425,7 +425,7 @@ test_that("the eigenvalue table ends on an ellipsis STATING how many axes the cl
 test_that("the ellipsis counts the CLOUD's axes, not the ones the fit kept", {
   # `ncp` truncates `res$eig`, so the count cannot be read off it: an MCA has (levels - questions)
   # axes, whatever the fit kept. Without this, a table showing 5 of 27 axes claimed to show them all.
-  cut <- MCA2(fx_tea(), 1:6, ncp = 2)
+  cut <- fit_mca(fx_tea(), 1:6, ncp = 2)
   eig <- tabxplor::get_footer_tabs(mca_interpret(cut, axes = 1))[[1]]
   expect_identical(as.character(eig$Axe), c("Axe 1", "Axe 2", "... of 6", "Total"))
 
@@ -442,10 +442,10 @@ test_that("the eigenvalue table totals the whole cloud, truncation included", {
   eig <- tabxplor::get_footer_tabs(mca_interpret(fx_mca(), axes = 1))[[1]]
   tot <- which(tabxplor::get_row_kind(eig[["% variance"]]) == "total")
   expect_length(tot, 1L)
-  expect_equal(unname(eig[["% variance"]]$pct[tot]), 1)          # MCA2() keeps every axis
+  expect_equal(unname(eig[["% variance"]]$pct[tot]), 1)          # fit_mca() keeps every axis
   expect_equal(unname(eig$eigenvalue$var[tot]), sum(fx_mca()$eig[, 1]))
 
-  cut  <- MCA2(fx_tea(), 1:6, ncp = 3)
+  cut  <- fit_mca(fx_tea(), 1:6, ncp = 3)
   eig2 <- tabxplor::get_footer_tabs(mca_interpret(cut, axes = 1))[[1]]
   tot2 <- which(tabxplor::get_row_kind(eig2[["% variance"]]) == "total")
   expect_equal(unname(eig2[["% variance"]]$pct[tot2]), 1)
@@ -494,14 +494,14 @@ test_that("the data bar reaches the RENDERED html, on the data rows alone", {
   expect_false(any(grepl("tx-bar", rows[grepl(">Total<", rows)])))
 })
 
-test_that("MCA2() keeps every axis, so the modified rate is the cloud's", {
+test_that("an MCA keeps every axis, so the modified rate is the cloud's", {
   # `ncp` truncates `res$eig`, and benzecri_mrv() renormalises over the axes it finds: a truncated
   # fit gives the SAME axis a different modified rate. The default must therefore keep them all.
   expect_identical(formals(MCA2)$ncp, Inf)
   expect_identical(formals(PCA2)$ncp, Inf)
 
-  full <- MCA2(fx_tea(), 1:6)
-  cut  <- MCA2(fx_tea(), 1:6, ncp = 2)
+  full <- fit_mca(fx_tea(), 1:6)
+  cut  <- fit_mca(fx_tea(), 1:6, ncp = 2)
   expect_gt(nrow(full$eig), nrow(cut$eig))
   expect_equal(sum(full$eig[, 2]), 100, tolerance = 1e-6)
   # tea[1:6] has THREE axes above 1/Q, so cutting at two renormalises the rate over two of them:

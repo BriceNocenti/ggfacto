@@ -18,7 +18,7 @@ fx_tea_na_wt <- function() fx("tea_na_wt", function() {
 
 test_that("the fit on the answer profiles is the individuals' analysis", {
   d   <- fx_tea_na_wt()
-  res <- MCA2(d, 1:6, wt = "w")
+  res <- fit_mca(d, 1:6, wt = "w")
   ind <- mca_ind(d, 1:6, wt = "w")
   expect_lt(nrow(res$call$X), nrow(d))
   expect_equal(res$eig, ind$eig, tolerance = 1e-10)
@@ -31,7 +31,7 @@ test_that("the fit on the answer profiles is the individuals' analysis", {
 
 test_that("the fit remembers each individual's profile and weight", {
   d   <- fx_tea_na_wt()
-  res <- MCA2(d, 1:6, wt = "w")
+  res <- fit_mca(d, 1:6, wt = "w")
   expect_length(res$source$key, nrow(d))
   expect_identical(res$source$w, d$w)
   expect_equal(res$call$row.w, as.vector(rowsum(d$w, res$source$key, reorder = TRUE)))
@@ -41,7 +41,7 @@ test_that("the fit remembers each individual's profile and weight", {
 
 test_that("the model is the same for a profile fit and for FactoMineR on individuals", {
   d  <- fx_tea_na_wt()
-  m  <- mca_model(MCA2(d, 1:6, wt = "w"))
+  m  <- mca_model(fit_mca(d, 1:6, wt = "w"))
   mi <- mca_model(mca_ind(d, 1:6, wt = "w"))
   expect_identical(m$X, mi$X)
   expect_identical(m$key, mi$key)
@@ -53,7 +53,7 @@ test_that("the model is the same for a profile fit and for FactoMineR on individ
 test_that("a GDAtools speMCA() gives the model of the equivalent specific MCA", {
   skip_if_not_installed("GDAtools")
   spe <- mca_model(GDAtools::speMCA(fx_tea()[1:6], excl = 3))
-  gg  <- mca_model(MCA2(fx_tea(), 1:6, excl = "Not.tea time"))
+  gg  <- mca_model(fit_mca(fx_tea(), 1:6, excl = "Not.tea time"))
   expect_identical(spe$X, gg$X)
   expect_identical(spe$key, gg$key)
   expect_equal(spe$levels, gg$levels)
@@ -74,9 +74,9 @@ test_that("a GDAtools csMCA() is read over its subcloud", {
 })
 
 test_that("the ingress refuses what the profiles cannot carry, and says why", {
-  expect_error(MCA2(fx_tea(), 1), "two active variables")
-  expect_error(MCA2(fx_tea(), 1:6, ind.sup = 1:10), "ind.sup")
-  expect_error(MCA2(fx_tea(), 1:6, quali.sup = 7), "quali.sup")
+  expect_error(fit_mca(fx_tea(), 1), "two active variables")
+  expect_error(fit_mca(fx_tea(), 1:6, ind.sup = 1:10), "ind.sup")
+  expect_error(fit_mca(fx_tea(), 1:6, quali.sup = 7), "quali.sup")
   expect_error(mca_model(FactoMineR::MCA(fx_tea()[1:6], ind.sup = 1:10, graph = FALSE)),
                "supplementary individuals")
 })

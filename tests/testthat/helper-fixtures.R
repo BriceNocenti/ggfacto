@@ -54,8 +54,12 @@ fx_tea_na <- function() fx("tea_na", function() {
 
 # --- the analyses ------------------------------------------------------------------------------
 
-fx_mca    <- function() fx("mca",    function() MCA2(fx_tea(), 1:6))
-fx_mca_wt <- function() fx("mca_wt", function() MCA2(fx_tea_wt(), 1:6, wt = "w"))
+# The profile fit under a short name. A true alias, never a wrapper: the ingress replays the pipe
+# from its caller's frame. MCA2(), the fit on the individuals, is tested apart (test-ingress.R).
+fit_mca <- multiple_correspondence_analysis
+
+fx_mca    <- function() fx("mca",    function() fit_mca(fx_tea(), 1:6))
+fx_mca_wt <- function() fx("mca_wt", function() fit_mca(fx_tea_wt(), 1:6, wt = "w"))
 
 # An MCA of a SUBSET, piped from a named data frame: it records which of its rows it analysed.
 fx_mca_young <- function() fx("mca_young", function() {
