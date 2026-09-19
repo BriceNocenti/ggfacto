@@ -175,7 +175,7 @@ Preparing the factors (`na_levels()`, 0.4--0.6 s) costs more than the map.
 It composes with what exists:
 
 - `res$source` and `fit_rows()` keep picking the rows.
-- `same_answers()` becomes that one match against the stored profiles, instead of a comparison with `call$X`, which is no longer stored.
+- `same_individuals()` becomes that one match against the stored profiles, instead of a comparison with `call$X`, which is no longer stored.
 - A row that matches no profile is refused, as today.
 
 ### 4.5 What reads the profile model

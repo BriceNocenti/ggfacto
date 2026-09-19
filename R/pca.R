@@ -23,9 +23,11 @@
 #'  \code{\link{interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
 #'  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
 #'  function.
-#' @param data The data frame. To analyse a subset of the population, filter it inside the call with
-#'  the native pipe, `data |> dplyr::filter(...) |> principal_component_analysis(...)`: the analysis
-#'  then remembers which rows it used, for \code{\link{hierarchical_clust}}.
+#' @param data The data frame. To analyse a subset of the population, give the whole data frame and
+#'  `filter`, or filter it inside the call with the native pipe,
+#'  `data |> dplyr::filter(...) |> principal_component_analysis(...)`: the analysis then remembers
+#'  which rows it used, so that \code{\link{ggpca}}, \code{\link{hierarchical_clust}} or
+#'  \code{\link{is_in_analysis}} can be given the whole data frame afterwards.
 #' @param active_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The names
 #'  of the active variables.
 #' @param wt <\link[tidyr:tidyr_tidy_select]{tidy-select}> The weight variable, if any.
@@ -35,15 +37,17 @@
 #'  names of the individuals.
 #' @param scale.unit A boolean, if `TRUE` (value set by default) then data are
 #' scaled to unit variance.
-#' @param ind.sup A vector indicating the indexes of the supplementary individuals.
+#' @param ind.sup A vector indicating the indexes of the supplementary individuals, rows of `data`.
 #' @param ncp Number of dimensions kept in the results. All of them by default: the eigenvalue
 #'   table is how one chooses how many axes to interpret, and a truncated one cannot show the drop.
 #'   To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp`.
 #' @param graph A boolean, set to `TRUE` to display the base graph.
+#' @param filter A condition on the rows of `data`, as in \code{dplyr::filter()}: only the rows
+#'  where it is `TRUE` are analysed (`filter = AGE >= 18`). Supplementary individuals are kept.
 #' @param ... Additional arguments to pass to \code{\link[FactoMineR]{PCA}}.
 #'
-#' @return A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which records the
-#'  rows of `data` that were analysed.
+#' @return A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which records for
+#'  each row of `data` its row in the analysis (`NA` if it was not analysed).
 #' @export
 #'
 #' @examples
@@ -52,22 +56,23 @@
 #' interpret(res.pca)
 principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, ind_name,
                                          scale.unit = TRUE, ind.sup = NULL, ncp = Inf,
-                                         graph = FALSE, ...) {
+                                         graph = FALSE, filter, ...) {
   # WARNING: the caller's frame is captured HERE, before any promise is forced: rlang::caller_env()
-  #   evaluated lazily inside source_rows() would name the wrong frame.
+  #   evaluated lazily inside fitted_rows() would name the wrong frame.
   expr   <- rlang::enexpr(data)
   env    <- rlang::caller_env()
+  filter <- if (!missing(filter)) rlang::enquo(filter)
   wt     <- select_vars(rlang::enquo(wt), data)
   stopifnot(length(wt) <= 1)
-  source <- source_rows(expr, env, data, wt = if (length(wt) != 0) wt)
+  wt_name <- if (length(wt) != 0) wt
   active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
 
   stopifnot(is.integer(ind.sup) | is.null(ind.sup))
 
-  wt   <- if (length(wt) != 0) { data[[wt]] } else {NULL}
-  w    <- usable_weights(data, wt, source, keep = ind.sup)
-  data <- w$data; wt <- w$wt; source <- w$source
-  if (length(ind.sup) > 0) ind.sup <- match(ind.sup, w$kept)
+  fr   <- fitted_rows(expr, env, data, filter, if (!is.null(wt_name)) data[[wt_name]],
+                      keep = ind.sup)
+  data <- fr$data; wt <- fr$wt
+  if (length(ind.sup) > 0) ind.sup <- match(ind.sup, fr$kept)
 
   ind_name <- select_vars(rlang::enquo(ind_name), data)
   data <- as.data.frame(data)
@@ -92,7 +97,7 @@ principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, in
                          ind.sup = ind.sup,
                          col.w = col.w,
                          ...)
-  res$source <- source
+  res$source <- list(key = over_reference(seq_len(nrow(data)), fr), wt = wt_name)
   res
 }
 

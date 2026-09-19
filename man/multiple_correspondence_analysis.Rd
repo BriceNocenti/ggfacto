@@ -12,16 +12,18 @@ multiple_correspondence_analysis(
   excl = NA,
   ncp = Inf,
   graph = FALSE,
+  filter,
   ...
 )
 
-MCA2(data, active_vars, wt, excl = NA, ncp = Inf, graph = FALSE, ...)
+MCA2(data, active_vars, wt, excl = NA, ncp = Inf, graph = FALSE, filter, ...)
 }
 \arguments{
-\item{data}{The data frame. To analyse a subset of the population, filter it inside the call with
-the native pipe, `data |> dplyr::filter(...) |> multiple_correspondence_analysis(...)`: the
-analysis then remembers which rows it used, so that \code{\link{hierarchical_clust}} and
-\code{\link{ggmca}} can be given the whole data frame afterwards.}
+\item{data}{The data frame. To analyse a subset of the population, give the whole data frame and
+`filter`, or filter it inside the call with the native pipe,
+`data |> dplyr::filter(...) |> multiple_correspondence_analysis(...)`: the analysis then
+remembers which rows it used, so that \code{\link{ggmca}}, \code{\link{hierarchical_clust}} or
+\code{\link{is_in_analysis}} can be given the whole data frame afterwards.}
 
 \item{active_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The active variables.}
 
@@ -41,6 +43,9 @@ rate. To cluster on the first axes, give \code{\link{hierarchical_clust}} its ow
 \item{graph}{By default no graph is made, since the result can be plotted with
 \code{\link{ggmca}}.}
 
+\item{filter}{A condition on the rows of `data`, as in \code{dplyr::filter()}: only the rows
+where it is `TRUE` are analysed (`filter = AGE >= 18`).}
+
 \item{...}{Additional arguments to pass to \code{\link[FactoMineR]{MCA}}, except those that
 index its rows or columns (`ind.sup`, `quali.sup`, `quanti.sup`, `tab.disj`).}
 }
@@ -50,7 +55,8 @@ A `MCA` object from \pkg{FactoMineR}, fitted on the distinct answer profiles (th
  result on the levels are the individuals', and `$ind` has one row per profile. Use
  \code{\link{axis_coord}} and \code{\link{hierarchical_clust}} to write coordinates and clusters
  into the data frame (`FactoMineR::HCPC()` would cluster the profiles). One more element,
- `source`, records the rows of `data` that were analysed, their weights and their profiles.
+ `source`, records for each row of `data` its answer profile (`NA` if it was not analysed) and
+ its weight.
 }
 \description{
 A user-friendly wrapper around \code{\link[FactoMineR]{MCA}}, made to
@@ -71,4 +77,6 @@ ggmca(res.mca, tea, sup_vars = SPC, ylim = c(NA, 1.2)) |>
 res.mca_young <- tea |>
   dplyr::filter(age < 30) |>
   multiple_correspondence_analysis(1:18)
+# the same analysis
+res.mca_young <- multiple_correspondence_analysis(tea, 1:18, filter = age < 30)
 }

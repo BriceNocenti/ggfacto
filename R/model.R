@@ -1,7 +1,7 @@
 # PURPOSE: The readers of a fitted analysis -- mca_model(), the one reader of an MCA, and
 #   pca_model(), a PCA's individuals as a cloud of points -- the units their consumers aggregate
-#   over, and what an analysis gives back to the data frame: axis_coord(), and the write-back it
-#   shares with hierarchical_clust(). A CA's reader, ca_model(), lives with it in R/ca.R.
+#   over, and what an analysis gives back to the data frame: axis_coord(), is_in_analysis(), and the
+#   write-back they share with hierarchical_clust(). A CA's reader, ca_model(), lives in R/ca.R.
 # ROLE: Every consumer of an MCA (the plot model, the tooltips, the clusters, the interpretation
 #   table, the teaching plots, the alignment in R/ingress.R) reads the model, never the fitted
 #   object's slots. Its unit is the ANSWER PROFILE, a distinct combination of active answers, whose
@@ -13,8 +13,9 @@
 #   - Levels are read by POSITION in the indicator table, never matched by name: FactoMineR renames
 #     a level two variables share (`var_lv`) and a y/n level (`var.y`), GDAtools names every level
 #     `var.lv`.
-#   - Profiles are numbered by first appearance, so `key` maps each fitted individual to a row of
-#     the profile tables, in the order the fit saw them.
+#   - Profiles are numbered by first appearance. The model's `key` maps each fitted individual to a
+#     row of the profile tables, and `source$rows` places it in the reference frame: both are read
+#     off the fit's one vector, `source$key` (R/ingress.R).
 #   - A unit is a (profile x non-active answers) cell, with its `..n` and `..wn`: every crosstab,
 #     supplementary coordinate and cluster plurality is a rowsum() over the units, never over
 #     individuals. cloud_units() serves the PCA's model too, whose points are its distinct
@@ -63,8 +64,9 @@ mca_model <- function(res) {
   #   was made on individuals, grouped here -- identical rows of the indicator table share a point.
   src <- res$source
   if (!is.null(src$key)) {
-    key   <- src$key
-    w     <- src$w
+    pos   <- source_positions(res)
+    key   <- src$key[pos$rows]
+    w     <- if (!is.null(src$w)) src$w[pos$rows]
     coord <- res$ind$coord
   } else {
     key   <- as.integer(vctrs::vec_group_id(X))
@@ -74,7 +76,8 @@ mca_model <- function(res) {
     w     <- res$call$row.w
     if (!is.null(rows)) w <- w[rows]
     if (all(w == 1)) w <- NULL
-    src   <- list(n = nrow(res$call$X), rows = rows, wt = NULL, name = NULL)
+    pos   <- list(n = nrow(res$call$X),
+                  rows = if (is.null(rows)) seq_len(nrow(res$call$X)) else rows)
   }
   coord <- as.matrix(coord)
   colnames(coord) <- paste("Dim", seq_len(ncol(coord)))
@@ -111,7 +114,7 @@ mca_model <- function(res) {
     var = list(coord = axes(res$var$coord), contrib = axes(res$var$contrib),
                cos2 = axes(res$var$cos2)),
     eig = eig_table(res), vs = res$svd$vs,
-    source = src[c("n", "rows", "wt", "name")]
+    source = list(n = pos$n, rows = pos$rows, wt = src$wt)
   ), class = c("ggfacto_mca_model", "ggfacto_fit_view"))
 }
 
@@ -130,7 +133,7 @@ pca_model <- function(res) {
     X    <- X[-sup, , drop = FALSE]
     rows <- rows[-sup]
   }
-  if (!is.null(res$source$rows)) rows <- res$source$rows[rows]
+  rows <- source_positions(res)$rows[rows]
   names <- rownames(X)
   if (is.null(names) || all(grepl("^[0-9]+$", names))) names <- NULL
 
@@ -185,8 +188,9 @@ active_factors <- function(m, profile) {
 
 # Why this exists: the values an analysis computes for its fitted rows -- clusters, coordinates --
 # written on the rows of a data frame: inside mutate() the frame being written, its rows aligned and
-# verified (R/ingress.R); outside, the frame the analysis started from, `NA` on rows it did not use.
-to_data_rows <- function(res, values, vars, fn) {
+# verified (R/ingress.R); outside, the reference frame the analysis started from. The rows it did
+# not use take `fill`, `NA` by default.
+to_data_rows <- function(res, values, vars, fn, fill = NULL) {
   target <- tryCatch(dplyr::pick(tidyselect::any_of(vars)), error = function(e) NULL)
   if (!is.null(target) && ncol(dplyr::cur_group()) != 0) stop(
     fn, "() must be used in an ungrouped mutate(): call dplyr::ungroup() first.", call. = FALSE)
@@ -195,11 +199,11 @@ to_data_rows <- function(res, values, vars, fn) {
     idx <- fit_rows(res, target)
   } else {
     src <- fit_view(res)$source
-    if (is.null(src$rows)) return(values)
     n   <- src$n
     idx <- src$rows
   }
-  vctrs::vec_assign(vctrs::vec_init(values, n), idx, values)
+  out <- if (is.null(fill)) vctrs::vec_init(values, n) else vctrs::vec_rep(fill, n)
+  vctrs::vec_assign(out, idx, values)
 }
 
 # Why this exists: a CA describes LEVELS; in mutate(), each individual takes the value of its level,
@@ -310,4 +314,43 @@ axis_coord <- function(res, axes = 1, margin = "rows") {
     return(if (is.data.frame(out)) tibble::as_tibble(out) else out)
   }
   to_data_rows(res, if (is.null(dim(values))) unname(values) else values, vars, "axis_coord")
+}
+
+#' Which Rows an Analysis Was Made On
+#'
+#' @description
+#' `TRUE` for each row of the data frame the analysis was made on, `FALSE` for the others: the rows
+#' filtered out (with the pipe or with `filter`), those with a weight of 0, and the supplementary
+#' individuals of a principal component analysis. Use it to describe the analysed population:
+#'
+#' `data |> dplyr::filter(is_in_analysis(res)) |> tabxplor::tab(SEXE, AGE)`
+#'
+#' @param res An analysis made with \code{\link{multiple_correspondence_analysis}} or
+#' \code{\link{principal_component_analysis}} (or with \code{FactoMineR::MCA()} or \code{PCA()}, or
+#' \code{GDAtools::speMCA()} or \code{csMCA()}).
+#'
+#' @return A logical vector, one value per row: inside \code{dplyr::filter()} or
+#' \code{dplyr::mutate()}, of the data frame being read; outside, of the data frame the analysis
+#' started from.
+#' @export
+#'
+#' @examples
+#' data(tea, package = "FactoMineR")
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18, filter = age < 30)
+#'
+#' tea |>
+#'   dplyr::filter(is_in_analysis(res.mca)) |>
+#'   tabxplor::tab(sex, SPC)
+is_in_analysis <- function(res) {
+  if (inherits(res, "CA")) stop(
+    "A correspondence analysis is made from its table, whose population is the table's: filter ",
+    "the data frame the way the table was made.", call. = FALSE)
+  if (!(is_mca(res) || inherits(res, "PCA"))) stop(
+    "is_in_analysis() reads a principal component or multiple correspondence analysis.",
+    call. = FALSE)
+  view   <- fit_view(res)
+  active <- rep(TRUE, length(view$source$rows))
+  sup    <- if (!is_mca(res)) res$call$ind.sup
+  if (length(sup) != 0) active[sup] <- FALSE
+  to_data_rows(view, active, view$vars, "is_in_analysis", fill = FALSE)
 }

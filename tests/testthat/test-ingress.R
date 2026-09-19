@@ -7,8 +7,10 @@
 #   - What is asserted is the FITTED OBJECT's slots -- $call$excl, $call$quali, $source -- because
 #     the MCA's model (R/model.R) reads them, and a user's own code may too. The profile fit itself
 #     is pinned in test-model.R.
-#   - The source-row contract is pinned in both directions: every pipe shape that CAN be proved is
-#     recorded, and every one that cannot falls back to "the fitted rows only" -- never a guess.
+#   - The subset matrix is pinned in both directions: every pipe shape that CAN be proved, and
+#     `filter =`, record the rows of the reference frame; every shape that cannot makes the subset
+#     its own reference -- never a guess. And every way a data frame handed back can differ from
+#     the analysed one is refused.
 # See: CLAUDE.md section ggfacto architecture > The FactoMineR contract.
 
 # --- the names ----------------------------------------------------------------------------------
@@ -82,8 +84,8 @@ test_that("a zero weight leaves its row out, and the whole data frame still alig
   # FactoMineR's MCA() crashes on a zero weight; in a survey it marks an out-of-scope row.
   d <- fx_tea(); d$w <- c(0, 0, rep(1, nrow(d) - 2))
   expect_message(res <- MCA2(d, 1:6, wt = "w"), "2 row")
-  expect_length(res$source$key, nrow(d) - 2)
-  expect_identical(res$source$rows, 3:nrow(d))
+  expect_length(res$source$key, nrow(d))
+  expect_identical(which(!is.na(res$source$key)), 3:nrow(d))
   clust <- dplyr::mutate(d, cl = hierarchical_clust(res, ncp = 2, nb_clust = 3, tree = FALSE))$cl
   expect_true(all(is.na(clust[1:2])) && !anyNA(clust[-(1:2)]))
   expect_no_error(quietly(ggmca(res, d, sup_vars = "SPC")))
@@ -156,79 +158,181 @@ test_that("with no missing answer, the default excl leaves $call$excl empty", {
   expect_length(fx_mca()$call$excl, 0L)
 })
 
-# --- source rows: which rows of the named data frame were analysed ----------------------------
+# --- the rows of the reference frame: recorded or not ------------------------------------------
 
-src <- function(expr, data) {
-  e   <- rlang::enexpr(expr)
-  env <- rlang::caller_env()
-  ggfacto:::source_rows(e, env, data)
-}
+fitted <- function(res) which(!is.na(res$source$key))
 
-test_that("a bare data frame records every row", {
-  expect_identical(fx_mca()$source[c("n", "rows", "wt", "name")], list(n = nrow(fx_tea()), rows = NULL, wt = NULL, name = NULL))
-  tea <- fx_tea()
-  expect_identical(MCA2(tea, 1:6)$source$name, "tea")
+test_that("the source is one key per row of the reference frame", {
+  res <- fx_mca_young()
+  d   <- fx_tea()
+  expect_named(res$source, c("key", "w", "wt"))
+  expect_length(res$source$key, nrow(d))
+  expect_identical(fitted(res), which(d$age < 30))
+  # the key IS the profile of each row, the same integer vector on both sides
+  m <- mca_model(res)
+  expect_identical(res$source$key[fitted(res)], m$key)
+  expect_identical(fitted(fx_mca()), seq_len(nrow(d)))
 })
 
 test_that("every provable pipe shape records the rows it kept", {
   d <- fx_tea()
   young <- which(d$age < 30)
-  expect_identical(fx_mca_young()$source[c("n", "rows", "wt", "name")], list(n = nrow(d), rows = young, wt = NULL, name = "d"))
-
-  expect_identical(MCA2(d[which(d$age < 30), ], 1:6)$source$rows, young)
-  expect_identical(MCA2(d[d$age < 30 & !is.na(d$age), ], 1:6)$source$rows, young)
-  expect_identical(MCA2(subset(d, age < 30), 1:6)$source$rows, young)
+  expect_identical(fitted(d |> dplyr::filter(age < 30) |> MCA2(1:6)), young)
+  expect_identical(fitted(dplyr::filter(d, age < 30) |> MCA2(1:6)), young)
+  expect_identical(fitted(MCA2(dplyr::filter(d, age < 30), 1:6)), young)
+  expect_identical(fitted(MCA2(d[which(d$age < 30), ], 1:6)), young)
+  expect_identical(fitted(MCA2(d[d$age < 30 & !is.na(d$age), ], 1:6)), young)
+  expect_identical(fitted(MCA2(subset(d, age < 30), 1:6)), young)
+  expect_identical(fitted(d |> head(100) |> MCA2(1:6)), 1:100)
+  expect_identical(fitted(d |> dplyr::slice(10:50) |> MCA2(1:6)), 10:50)
   expect_identical(
-    (d |> dplyr::mutate(age2 = age * 2) |> dplyr::filter(age2 < 60) |> MCA2(1:6))$source$rows,
+    fitted(d |> dplyr::mutate(age2 = age * 2) |> dplyr::filter(age2 < 60) |> MCA2(1:6)), young)
+  expect_identical(
+    fitted(d |> dplyr::group_by(sex) |> dplyr::filter(age < 30) |> dplyr::ungroup() |> MCA2(1:6)),
     young)
-  # a reordering is a subset too: the rows, in their new order
-  expect_identical((d |> dplyr::arrange(age) |> MCA2(1:6))$source$rows,
-                   order(d$age, method = "radix"))
-
+  expect_identical(fitted(tibble::as_tibble(d) |> dplyr::filter(age < 30) |> MCA2(1:6)), young)
+  limit <- 30
+  expect_identical(fitted(d |> dplyr::filter(age < limit) |> MCA2(1:6)), young)
   f <- function() {
     local_data <- fx_tea()
     local_data |> dplyr::filter(age < 30) |> MCA2(1:6)
   }
-  expect_identical(f()$source$rows, young)
+  expect_identical(fitted(f()), young)
+})
+
+test_that("a reordering pipe keeps its order, and the reference frame still aligns", {
+  d <- fx_tea()
+  ord <- order(d$age, method = "radix")
+  arranged <- d |> dplyr::arrange(age) |> dplyr::mutate(x = 1) |> MCA2(1:6)
+  expect_identical(fitted(arranged), seq_len(nrow(d)))
+  expect_equal(arranged$eig, fx_mca()$eig)
+  # the profiles are numbered in the order the analysis saw them
+  expect_identical(arranged$source$key[ord][!duplicated(arranged$source$key[ord])],
+                   seq_len(nrow(arranged$ind$coord)))
+  # to rounding: FactoMineR was fed the same profiles in another order
+  expect_equal(md(arranged, d, sup_vars = "SPC")$vars_data,
+               md(fx_mca(), d, sup_vars = "SPC")$vars_data)
+
+  # a PCA keeps the pipe's order in $ind, and its key places each individual in the frame
+  cars <- fx_cars()
+  pca  <- cars |> dplyr::arrange(mpg) |> PCA2(tidyselect::all_of(fx_pca_vars()), wt = w)
+  expect_identical(rownames(pca$ind$coord), rownames(cars)[order(cars$mpg)])
+  expect_identical(pca$source$key[order(cars$mpg)], seq_len(nrow(cars)))
+  plain <- PCA2(cars, tidyselect::all_of(fx_pca_vars()), wt = w)
+  expect_equal(abs(dplyr::mutate(cars, a = axis_coord(pca, 1))$a),
+               abs(dplyr::mutate(cars, a = axis_coord(plain, 1))$a))
+  local_null_device()
+  expect_no_error(quietly(ggfacto(pca, cars, sup_vars = gear)))
 })
 
 test_that("tidyr::drop_na() records the complete rows", {
   d <- fx_tea_na()
-  expect_identical((d |> tidyr::drop_na(breakfast) |> MCA2(1:6))$source$rows,
-                   which(!is.na(d$breakfast)))
+  expect_identical(fitted(d |> tidyr::drop_na(breakfast) |> MCA2(1:6)), which(!is.na(d$breakfast)))
 })
 
-test_that("a pipe that cannot be proved records nothing beyond the fitted rows", {
+test_that("a pipe that cannot be proved makes the subset its own reference", {
   d <- fx_tea()
   n_young <- sum(d$age < 30)
-  fitted_only <- function(res, n) {
-    expect_identical(res$source[c("n", "rows", "name")], list(n = n, rows = NULL, name = NULL))
+  own <- function(res, n) {
+    expect_length(res$source$key, n)
+    expect_identical(fitted(res), seq_len(n))
   }
-
   # the id column is lost
-  fitted_only(d |> dplyr::select(1:6, age) |> dplyr::filter(age < 30) |> MCA2(1:6), n_young)
+  own(d |> dplyr::select(1:6, age) |> dplyr::filter(age < 30) |> MCA2(1:6), n_young)
   # random: the re-run is another sample
   set.seed(1)
-  fitted_only(d |> dplyr::slice_sample(n = 200) |> MCA2(1:6), 200L)
+  own(d |> dplyr::slice_sample(n = 200) |> MCA2(1:6), 200L)
   # %>% hides the expression behind `.`
   `%>%` <- magrittr::`%>%`
-  fitted_only(d %>% dplyr::filter(age < 30) %>% MCA2(1:6), n_young)
+  own(d %>% dplyr::filter(age < 30) %>% MCA2(1:6), n_young)
   # the root is not a named data frame
-  fitted_only(MCA2(dplyr::filter(fx_tea(), age < 30), 1:6), n_young)
+  own(MCA2(dplyr::filter(fx_tea(), age < 30), 1:6), n_young)
+  # a join that duplicates rows: the ids are not unique
+  dup <- dplyr::left_join(d, tibble::tibble(sex = c("F", "F"), k = 1:2), by = "sex",
+                          relationship = "many-to-many")
+  own(d |> dplyr::left_join(tibble::tibble(sex = c("F", "F"), k = 1:2), by = "sex",
+                            relationship = "many-to-many") |> MCA2(1:6), nrow(dup))
 
   # a base subset on a condition with NA yields rows of NA: no id can be proved for them
   x <- data.frame(a = c(1, NA, 3, 4), b = letters[1:4])
-  expect_null(src(x[x$a > 2, ], x[x$a > 2, ])$rows)
+  e <- rlang::current_env()
+  expect_identical(reference_rows(quote(x[x$a > 2, ]), e, x[x$a > 2, ])$n, 3L)
+
+  # the subset aligns, the whole frame is refused with the counts and the way out
+  res <- d |> dplyr::select(1:6, age, SPC) |> dplyr::filter(age < 30) |> MCA2(1:6)
+  expect_no_error(md(res, dplyr::filter(d, age < 30), sup_vars = "SPC"))
+  expect_error(md(res, d, sup_vars = "SPC"), paste0("fitted on the ", n_young, " rows it was given"))
+  expect_error(md(res, d, sup_vars = "SPC"), "filter = ")
+})
+
+# --- filter = : the subset declared in the call ------------------------------------------------
+
+test_that("filter = records the same rows, and gives the same analysis, as the pipe", {
+  d <- fx_tea()
+  res <- MCA2(d, 1:6, filter = age < 30)
+  expect_identical(res$source, fx_mca_young()$source)
+  expect_equal(res$eig, fx_mca_young()$eig)
+  expect_equal(res$var$coord, fx_mca_young()$var$coord)
+  expect_identical(md(res, d, sup_vars = "SPC")$vars_data, md(fx_mca_young(), d, sup_vars = "SPC")$vars_data)
+  limit <- 30
+  expect_identical(MCA2(d, 1:6, filter = age < limit)$source, res$source)
 })
 
 test_that("the fit records the name of its weight column", {
   d <- fx_tea_wt()
   expect_identical(MCA2(d, 1:6, wt = w)$source$wt, "w")
   expect_identical(MCA2(d, 1:6, wt = "w")$source$wt, "w")
-  cars <- mtcars
-  cars$w <- rep(1:2, 16)
-  expect_identical(PCA2(cars, 1:7, wt = w)$source$wt, "w")
+  expect_identical(PCA2(fx_cars(), tidyselect::all_of(fx_pca_vars()), wt = w)$source$wt, "w")
   expect_null(fx_mca()$source$wt)
+})
+
+test_that("filter = drops the rows where the condition is NA, as dplyr::filter()", {
+  d <- fx_tea(); d$age[1:5] <- NA
+  expect_identical(fitted(MCA2(d, 1:6, filter = age < 30)), which(d$age < 30))
+})
+
+test_that("filter = combines with the pipe, the weights and excl", {
+  d <- fx_tea()
+  both <- d |> dplyr::filter(sex == "F") |> MCA2(1:6, filter = age < 30)
+  expect_identical(fitted(both), which(d$sex == "F" & d$age < 30))
+  expect_length(both$source$key, nrow(d))
+
+  d$w <- c(0, 0, rep(1, nrow(d) - 2))
+  d$w[3] <- NA                                     # a missing weight outside the filter is fine
+  d$age[3] <- 90
+  res <- suppressMessages(MCA2(d, 1:6, wt = w, filter = age < 30))
+  expect_identical(fitted(res), setdiff(which(d$age < 30), 1:2))
+  expect_true(all(is.na(res$source$w[-fitted(res)])))
+
+  na <- fx_tea_na()
+  spe <- MCA2(na, 1:6, filter = age < 30, excl = NA)
+  expect_identical(fitted(spe), which(na$age < 30))
+  expect_true(length(spe$call$excl) > 0)
+})
+
+test_that("filter = is refused in words when it selects nothing or is not a condition", {
+  d <- fx_tea()
+  expect_error(MCA2(d, 1:6, filter = age > 1000), "No row")
+  expect_error(MCA2(d, 1:6, filter = age), "condition")
+  expect_error(MCA2(d, 1:6, filter = c(TRUE, FALSE)), "condition")
+})
+
+test_that("a PCA takes filter = too, and keeps its supplementary individuals", {
+  cars <- fx_cars()
+  vars <- fx_pca_vars()
+  f <- PCA2(cars, tidyselect::all_of(vars), wt = w, filter = mpg < 25)
+  p <- cars |> dplyr::filter(mpg < 25) |> PCA2(tidyselect::all_of(vars), wt = w)
+  expect_identical(f$source, p$source)
+  expect_equal(f$eig, p$eig)
+  expect_equal(f$ind$coord, p$ind$coord)
+  expect_identical(fitted(f), which(cars$mpg < 25))
+
+  s <- PCA2(cars, tidyselect::all_of(vars), wt = w, filter = mpg < 25, ind.sup = 1:3)
+  expect_identical(fitted(s), sort(union(1:3, which(cars$mpg < 25))))
+  expect_identical(rownames(s$ind.sup$coord), rownames(cars)[1:3])
+  out <- dplyr::mutate(cars, i = is_in_analysis(s), a = axis_coord(s, 1))
+  expect_identical(out$i, cars$mpg < 25 & !seq_len(nrow(cars)) %in% 1:3)
+  expect_identical(!is.na(out$a), seq_len(nrow(cars)) %in% fitted(s))
 })
 
 # --- taking the data back: the one gate -------------------------------------------------------
@@ -238,16 +342,81 @@ test_that("ggmca takes the whole data frame back after an analysis of a subset",
   whole <- md(fx_mca_young(), d, sup_vars = "SPC")
   sub   <- md(fx_mca_young(), d[d$age < 30, ], sup_vars = "SPC")
   expect_identical(whole$vars_data$`Dim 1`, sub$vars_data$`Dim 1`)
+  # new columns do not matter
+  expect_no_error(md(fx_mca_young(), dplyr::mutate(d, z = 1), sup_vars = "SPC"))
 })
 
 test_that("ggmca refuses data that is not the analysed data, and says why", {
   d <- fx_tea()
-  expect_error(md(fx_mca(), d[1:100, ], sup_vars = "SPC"), "fitted on 300 rows")
-  # an analysis of a subset kept apart names the data frame it was made on
-  young <- dplyr::filter(d, age < 30)
-  expect_error(md(MCA2(young, 1:6), d, sup_vars = "SPC"), "rows of `young`")
-  expect_error(md(fx_mca(), dplyr::arrange(d, age), sup_vars = "SPC"), "reordered or modified")
+  expect_error(md(fx_mca(), d[1:100, ], sup_vars = "SPC"), "fitted on the 300 rows")
+  expect_error(md(fx_mca_young(), d[1:100, ], sup_vars = "SPC"),
+               paste0("fitted on ", sum(d$age < 30), " of the 300 rows"))
+  expect_error(md(fx_mca(), dplyr::arrange(d, age), sup_vars = "SPC"), "reordered")
+  expect_error(md(fx_mca_young(), dplyr::arrange(d, age), sup_vars = "SPC"), "reordered")
+  expect_error(md(fx_mca(), rbind(d, d[1, ]), sup_vars = "SPC"), "fitted on the 300")
+  recoded <- d; recoded$breakfast[which(d$age < 30)[1]] <- setdiff(levels(d$breakfast), d$breakfast[which(d$age < 30)[1]])
+  expect_error(md(fx_mca_young(), recoded, sup_vars = "SPC"), "reordered")
+  # an edit outside the analysed rows is no concern of the analysis
+  outside <- d; outside$breakfast[which(d$age >= 30)[1]] <- NA
+  expect_no_error(md(fx_mca_young(), outside, sup_vars = "SPC"))
+  expect_error(md(fx_mca(), d[-1], sup_vars = "SPC"), "lacks the active variable")
   expect_error(md(fx_mca(), sup_vars = "SPC"), "pass it second")
+})
+
+test_that("the weights are checked too: a swap of two rows with the same answers is refused", {
+  d   <- fx_tea_wt()
+  res <- fx_mca_wt()
+  key <- res$source$key
+  pair <- which(key == key[which(duplicated(key) & d$w != d$w[match(key, key)])[1]])[1:2]
+  pair <- c(match(key[pair[2]], key), pair[2])
+  swapped <- d[replace(seq_len(nrow(d)), pair, rev(pair)), ]
+  expect_false(d$w[pair[1]] == d$w[pair[2]])
+  expect_error(md(res, swapped, sup_vars = "SPC"), "reordered")
+  # without the weight column, the fit's own weights are used
+  expect_no_error(md(res, d[setdiff(names(d), "w")], sup_vars = "SPC"))
+})
+
+test_that("an analysis made by another engine on a subset aligns on that subset", {
+  d <- fx_tea()
+  raw <- FactoMineR::MCA(d[d$age < 30, 1:6], graph = FALSE)
+  expect_no_error(md(raw, d[d$age < 30, ], sup_vars = "SPC"))
+  expect_error(md(raw, d, sup_vars = "SPC"), "fitted on the")
+  skip_if_not_installed("GDAtools")
+  women <- d$sex == "F"
+  cs <- GDAtools::csMCA(d[1:6], subcloud = women)
+  out <- dplyr::mutate(d, i = is_in_analysis(cs), a = axis_coord(cs, 1))
+  expect_identical(out$i, women)
+  expect_identical(!is.na(out$a), women)
+})
+
+test_that("what an analysis writes back is NA, or FALSE, outside its rows", {
+  d   <- fx_tea()
+  res <- fx_mca_young()
+  young <- d$age < 30
+  out <- dplyr::mutate(d, a = axis_coord(res, 1), i = is_in_analysis(res),
+                       k = hierarchical_clust(res, ncp = 2, nb_clust = 3, tree = FALSE))
+  expect_identical(out$i, young)
+  expect_identical(!is.na(out$a), young)
+  expect_identical(!is.na(out$k), young)
+  expect_identical(is_in_analysis(res), young)
+  expect_identical(length(axis_coord(res, 1)), nrow(d))
+  expect_identical(nrow(dplyr::filter(d, is_in_analysis(res))), sum(young))
+  # on the analysed rows alone
+  expect_true(all(dplyr::mutate(d[young, ], i = is_in_analysis(res))$i))
+  expect_error(dplyr::mutate(dplyr::group_by(d, sex), i = is_in_analysis(res)), "ungrouped")
+  expect_error(is_in_analysis(fx_ca()), "table")
+})
+
+test_that("clust_tab and a PCA's biplot describe an analysed subset given the whole data frame", {
+  cars <- fx_cars()
+  vars <- fx_pca_vars()
+  res  <- PCA2(cars, tidyselect::all_of(vars), wt = w, filter = mpg < 25)
+  cars <- dplyr::mutate(cars, k = hierarchical_clust(res, ncp = 2, nb_clust = 2, tree = FALSE))
+  expect_identical(!is.na(cars$k), cars$mpg < 25)
+  local_null_device()
+  expect_no_error(quietly(ggfacto(res, cars, sup_vars = gear, clust = k)))
+  expect_s3_class(clust_tab(res, cars, k), "tabxplor_tab")
+  expect_error(quietly(ggfacto(res, dplyr::arrange(cars, mpg), sup_vars = gear)), "reordered")
 })
 
 test_that("ggmca without data draws the active variables alone", {

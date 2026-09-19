@@ -135,9 +135,14 @@ test_that("a reordered analysis writes each cluster back on its own row", {
   d   <- fx_tea()
   res <- d |> dplyr::arrange(age) |> MCA2(1:6)
   out <- d |> dplyr::mutate(cl = hc(res, ncp = 3, nb_clust = 4))
-  # the same clusters as on the sorted data, sorted back
-  sorted <- d |> dplyr::arrange(age) |> dplyr::mutate(cl = hc(res, ncp = 3, nb_clust = 4))
-  expect_identical(as.character(out$cl[order(d$age, method = "radix")]), as.character(sorted$cl))
+  # each individual gets the cluster of its own row
+  expect_false(anyNA(out$cl))
+  m <- mca_model(res)
+  expect_identical(lengths(split(res$source$key, out$cl)) > 0, rep(TRUE, 4) |> stats::setNames(levels(out$cl)))
+  expect_true(all(tapply(as.character(out$cl), res$source$key, dplyr::n_distinct) == 1))
+  # the reference frame is the one to hand back, not the sorted one
+  expect_error(d |> dplyr::arrange(age) |> dplyr::mutate(cl = hc(res, ncp = 3, nb_clust = 4)),
+               "reordered")
 })
 
 test_that("outside mutate(), the clusters line up with the data frame the analysis started from", {
@@ -148,13 +153,13 @@ test_that("outside mutate(), the clusters line up with the data frame the analys
 
 test_that("hierarchical_clust refuses rows it cannot line up, and says why", {
   d <- fx_tea()
-  # no rows recorded (%>% pipe): the whole data frame is longer than the analysis
+  # the subset is its own reference (%>% pipe): the whole data frame is longer than the analysis
   `%>%` <- magrittr::`%>%`
   res <- d %>% dplyr::filter(age < 30) %>% MCA2(1:6)
-  expect_error(dplyr::mutate(d, cl = hc(res, ncp = 3, nb_clust = 4)), "native pipe")
+  expect_error(dplyr::mutate(d, cl = hc(res, ncp = 3, nb_clust = 4)), "filter = ")
   # the data frame was reordered after the analysis
   expect_error(dplyr::mutate(dplyr::arrange(d, age), cl = hc(fx_mca(), ncp = 3, nb_clust = 4)),
-               "reordered or modified")
+               "reordered")
   # grouped
   expect_error(dplyr::mutate(dplyr::group_by(d, SPC), cl = hc(fx_mca(), ncp = 3, nb_clust = 4)),
                "ungroup")

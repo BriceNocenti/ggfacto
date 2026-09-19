@@ -227,33 +227,38 @@ pc_AGD <- pc_AGD |> mutate(cah_culture = hierarchical_clust(acm, ncp = 3, names 
 
 ### 8.1 The rule
 
-**Filter inside the analysis's pipe, then always hand the whole data frame:**
+**Declare the subset in the analysis, then always hand the whole data frame:**
 
 ```r
 acm <- pc_AGD |>
   filter(CRITAGE %in% c("1-15 à 29 ans", "2-30 à 44 ans")) |>
   multiple_correspondence_analysis(all_of(variables_actives), wt = POND)
+# or, the same analysis
+acm <- multiple_correspondence_analysis(pc_AGD, all_of(variables_actives), wt = POND,
+                                        filter = CRITAGE %in% c("1-15 à 29 ans", "2-30 à 44 ans"))
 
 pc_AGD <- pc_AGD |> mutate(cah_jeunes = hierarchical_clust(acm, ncp = 2, nb_clust = 4))
 ggmca(acm, pc_AGD, sup_vars = variables_sup, clust = cah_jeunes)
 clust_tab(acm, pc_AGD, cah_jeunes)
+pc_AGD |> filter(is_in_analysis(acm)) |> tab(SEXE, CRITAGE)
 ```
 
-The analysis records in `res$source` which rows of `pc_AGD` it used (3,246 of 9,234 here), the name of the frame, and its weight column. Every function that takes the microdata back goes through `align_to_fit()`, which picks those rows and checks the active answers again: the clusters are written on the right rows with `NA` elsewhere, the graph and the table describe the analysed population, and a data frame reordered or edited since the fit is refused with an explanation instead of misaligned.
+The analysis records in `res$source$key` one entry per row of `pc_AGD`: its answer profile, or `NA` for the rows it left out (5,988 of 9,234 here). Every function that takes the microdata back goes through `align_to_fit()`, which picks the analysed rows and checks their answers and weights again: the clusters are written on the right rows with `NA` elsewhere, the graph and the table describe the analysed population, and a data frame reordered, shortened or extended since the fit is refused with the counts instead of misaligned.
 
 ### 8.2 What is recorded, what is refused
 
 | The analysis is given                                   | Rows recorded                              |
 |---------------------------------------------------------|--------------------------------------------|
 | `data`                                                  | all of them                                |
+| `data, filter = cond`                                   | the rows where `cond` is TRUE              |
 | `data \|> filter() \|> mutate() \|> drop_na(vars)`      | the rows kept, proved by re-running        |
-| `data[cond, ]`, `subset(data, cond)`, `arrange()`       | the rows kept, in their order              |
-| a `select()` in the pipe                                | refused: the hidden row id is lost         |
-| `slice_sample()`                                        | refused: a re-run draws another sample     |
-| `data %>% filter()`                                     | refused: the expression is only `.`        |
-| `sub <- filter(data, ...)`, then `sub`                  | the rows of `sub`, named `sub`             |
+| `data[cond, ]`, `subset(data, cond)`, `arrange()`       | the rows kept, fitted in the pipe's order  |
+| a `select()` in the pipe                                | none: the hidden row id is lost            |
+| `slice_sample()`                                        | none: a re-run draws another sample        |
+| `data %>% filter()`                                     | none: the expression is only `.`           |
+| `sub <- filter(data, ...)`, then `sub`                  | the rows of `sub`                          |
 
-Refused means "the fitted rows only": the subset data frame itself still works everywhere, and the whole one is refused with a message naming the frame the analysis was made on (`fitted on the 3 246 rows of \`sub\``) and the pipe to write instead.
+"None" makes the subset its own reference: it still works everywhere, and the whole data frame is refused with a message giving both counts and the `filter =` to write instead. A zero weight leaves its row out in every case.
 
 ### 8.3 Pitfalls the notebooks fell into
 
@@ -379,7 +384,7 @@ A jamovi analysis re-runs from its options at every change, and only an Image el
 - **The seam.** The build and the cut are two functions: the module calls `ward_tree()` when its key misses, keeps the tree (a plain list) in the `$state` of a hidden Image declared `clearWith: []`, and calls `cut_ward_tree()` on every run. The key is the same `rlang::hash()` of the coordinates, weights and answers; a key that differs, including after an rlang upgrade, means "rebuild".
 - **The options.** `ncp`, the variables, the weights and `excl` change the key; `nClust`, `consol` and `names` only the cut. A large cloud (tens of thousands of distinct points) would make the tree a staged step behind a Run button, as tabxplor's regression comparison already is.
 - **The clusters** are an `Output` column (`measureType: nominal`), written with `setRowNums()` and `setValues()`, as the `snowCluster` module does.
-- **Subpopulations** are jamovi's own filters: the analysis receives the filtered rows, and `setRowNums(rownames(self$data))` writes the clusters back on them, which is what `res$source$rows` does in R.
+- **Subpopulations** are jamovi's own filters: the analysis receives the filtered rows, and `setRowNums(rownames(self$data))` writes the clusters back on them, which is what `res$source$key` does in R.
 - **Weights** are jamovi's data-level weights, which reach the analysis as a column: the same channel as `wt =`.
 
 ---

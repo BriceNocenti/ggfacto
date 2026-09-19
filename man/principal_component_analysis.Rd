@@ -15,6 +15,7 @@ principal_component_analysis(
   ind.sup = NULL,
   ncp = Inf,
   graph = FALSE,
+  filter,
   ...
 )
 
@@ -28,13 +29,16 @@ PCA2(
   ind.sup = NULL,
   ncp = Inf,
   graph = FALSE,
+  filter,
   ...
 )
 }
 \arguments{
-\item{data}{The data frame. To analyse a subset of the population, filter it inside the call with
-the native pipe, `data |> dplyr::filter(...) |> principal_component_analysis(...)`: the analysis
-then remembers which rows it used, for \code{\link{hierarchical_clust}}.}
+\item{data}{The data frame. To analyse a subset of the population, give the whole data frame and
+`filter`, or filter it inside the call with the native pipe,
+`data |> dplyr::filter(...) |> principal_component_analysis(...)`: the analysis then remembers
+which rows it used, so that \code{\link{ggpca}}, \code{\link{hierarchical_clust}} or
+\code{\link{is_in_analysis}} can be given the whole data frame afterwards.}
 
 \item{active_vars}{<\link[tidyr:tidyr_tidy_select]{tidy-select}> The names
 of the active variables.}
@@ -50,7 +54,7 @@ names of the individuals.}
 \item{scale.unit}{A boolean, if `TRUE` (value set by default) then data are
 scaled to unit variance.}
 
-\item{ind.sup}{A vector indicating the indexes of the supplementary individuals.}
+\item{ind.sup}{A vector indicating the indexes of the supplementary individuals, rows of `data`.}
 
 \item{ncp}{Number of dimensions kept in the results. All of them by default: the eigenvalue
 table is how one chooses how many axes to interpret, and a truncated one cannot show the drop.
@@ -58,11 +62,14 @@ To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp
 
 \item{graph}{A boolean, set to `TRUE` to display the base graph.}
 
+\item{filter}{A condition on the rows of `data`, as in \code{dplyr::filter()}: only the rows
+where it is `TRUE` are analysed (`filter = AGE >= 18`). Supplementary individuals are kept.}
+
 \item{...}{Additional arguments to pass to \code{\link[FactoMineR]{PCA}}.}
 }
 \value{
-A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which records the
- rows of `data` that were analysed.
+A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which records for
+ each row of `data` its row in the analysis (`NA` if it was not analysed).
 }
 \description{
 A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to

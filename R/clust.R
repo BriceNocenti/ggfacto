@@ -560,9 +560,9 @@ clust_tab_build <- function(data, row_vars, clust, wt, excl, color, pct, row_tot
     blocks <- c(blocks, list(fct_tab))
   }
   if (length(num_vars) != 0) {
-    num_tab <- rlang::exec(tabxplor::tab, data, row_vars = "clust", col_vars = num_vars,
-                           wt = wt, na = "drop", color = color,
-                           !!!dots[setdiff(names(dots), "shape")]) |>
+    num_tab <- rlang::inject(tabxplor::tab(data, row_vars = "clust", col_vars = num_vars,
+                                           wt = !!wt, na = "drop", color = color,
+                                           !!!dots[setdiff(names(dots), "shape")])) |>
       tabxplor::tab_transpose(name = "levels") |>
       dplyr::mutate(row_var = as.character(.data$levels), .before = 1)
     blocks <- c(blocks, list(num_tab))

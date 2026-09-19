@@ -28,10 +28,11 @@
 #'  \code{tabxplor::tab()}. Supplementary variables are not given here: they are added afterwards,
 #'  in \code{\link{ggmca}}. `MCA2()` is a shorter name for the same function.
 #'
-#' @param data The data frame. To analyse a subset of the population, filter it inside the call with
-#'  the native pipe, `data |> dplyr::filter(...) |> multiple_correspondence_analysis(...)`: the
-#'  analysis then remembers which rows it used, so that \code{\link{hierarchical_clust}} and
-#'  \code{\link{ggmca}} can be given the whole data frame afterwards.
+#' @param data The data frame. To analyse a subset of the population, give the whole data frame and
+#'  `filter`, or filter it inside the call with the native pipe,
+#'  `data |> dplyr::filter(...) |> multiple_correspondence_analysis(...)`: the analysis then
+#'  remembers which rows it used, so that \code{\link{ggmca}}, \code{\link{hierarchical_clust}} or
+#'  \code{\link{is_in_analysis}} can be given the whole data frame afterwards.
 #' @param active_vars <\link[tidyr:tidyr_tidy_select]{tidy-select}> The active variables.
 #' @param wt <\link[tidyr:tidyr_tidy_select]{tidy-select}> The weight variable, if any.
 #' @param excl The levels to exclude from the calculation of the axes (specific multiple
@@ -45,6 +46,8 @@
 #'   rate. To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp`.
 #' @param graph By default no graph is made, since the result can be plotted with
 #'  \code{\link{ggmca}}.
+#' @param filter A condition on the rows of `data`, as in \code{dplyr::filter()}: only the rows
+#'  where it is `TRUE` are analysed (`filter = AGE >= 18`).
 #' @param ... Additional arguments to pass to \code{\link[FactoMineR]{MCA}}, except those that
 #'  index its rows or columns (`ind.sup`, `quali.sup`, `quanti.sup`, `tab.disj`).
 #'
@@ -53,7 +56,8 @@
 #'  result on the levels are the individuals', and `$ind` has one row per profile. Use
 #'  \code{\link{axis_coord}} and \code{\link{hierarchical_clust}} to write coordinates and clusters
 #'  into the data frame (`FactoMineR::HCPC()` would cluster the profiles). One more element,
-#'  `source`, records the rows of `data` that were analysed, their weights and their profiles.
+#'  `source`, records for each row of `data` its answer profile (`NA` if it was not analysed) and
+#'  its weight.
 #' @export
 #'
 #' @examples
@@ -68,15 +72,18 @@
 #' res.mca_young <- tea |>
 #'   dplyr::filter(age < 30) |>
 #'   multiple_correspondence_analysis(1:18)
+#' # the same analysis
+#' res.mca_young <- multiple_correspondence_analysis(tea, 1:18, filter = age < 30)
 multiple_correspondence_analysis <- function(data, active_vars, wt, excl = NA, ncp = Inf,
-                                             graph = FALSE, ...) {
+                                             graph = FALSE, filter, ...) {
   # WARNING: the caller's frame is captured HERE, before any promise is forced: rlang::caller_env()
-  #   evaluated lazily inside source_rows() would name the wrong frame.
+  #   evaluated lazily inside fitted_rows() would name the wrong frame.
   expr   <- rlang::enexpr(data)
   env    <- rlang::caller_env()
+  filter <- if (!missing(filter)) rlang::enquo(filter)
   wt     <- tidyselect::eval_select(rlang::enquo(wt), data)
   stopifnot(length(wt) < 2)
-  source <- source_rows(expr, env, data, wt = if (length(wt) != 0) names(wt))
+  wt_name <- if (length(wt) != 0) names(wt)
 
   active_vars <- names(tidyselect::eval_select(rlang::enquo(active_vars), data))
   if (length(active_vars) < 2) stop(
@@ -86,21 +93,20 @@ multiple_correspondence_analysis <- function(data, active_vars, wt, excl = NA, n
     "multiple_correspondence_analysis() fits the answer profiles, so `",
     str_c(indexed, collapse = "`, `"), "` cannot be passed to FactoMineR::MCA(). Supplementary ",
     "variables are drawn by ggmca(sup_vars = ).", call. = FALSE)
-  wt <- if (length(wt) != 0) data[[wt]] else NULL
-  w  <- usable_weights(data, wt, source)
+  fr <- fitted_rows(expr, env, data, filter, if (!is.null(wt_name)) data[[wt_name]])
 
-  X <- na_levels(as.data.frame(w$data[active_vars]), active_vars)
+  X <- na_levels(as.data.frame(fr$data[active_vars]), active_vars)
   # DESIGN: FactoMineR is fed the DISTINCT answer profiles, each weighted by the sum of its
   #   individuals: identical rows of the indicator table leave X'X unchanged, hence every eigenvalue
   #   and every result on the levels (exact to 5e-13, dev/analysis_engine.md section 4), for a
-  #   fraction of the time and memory. `source$key` maps the individuals back to them.
+  #   fraction of the time and memory. `source$key` maps the rows of the data frame to them.
   key   <- as.integer(vctrs::vec_group_id(X))
   first <- which(!duplicated(key))
-  pw    <- if (is.null(w$wt)) tabulate(key) else as.vector(rowsum(w$wt, key, reorder = TRUE))
+  pw    <- if (is.null(fr$wt)) tabulate(key) else as.vector(rowsum(fr$wt, key, reorder = TRUE))
 
   res <- FactoMineR::MCA(X[first, , drop = FALSE], ncp = ncp, row.w = pw, graph = graph,
                          excl = excl_index(X, active_vars, excl), ...)
-  res$source <- c(w$source, list(key = key, w = w$wt))
+  res$source <- list(key = over_reference(key, fr), w = over_reference(fr$wt, fr), wt = wt_name)
   res
 }
 
