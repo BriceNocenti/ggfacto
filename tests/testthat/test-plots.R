@@ -290,6 +290,15 @@ test_that("a tooltip keeps its lines in ggiraph, and its width near the right ed
   expect_match(css, "white-space:nowrap", fixed = TRUE)
 })
 
+test_that("a tooltip's bold text keeps its colour against the host page's rule on `b`", {
+  # bootstrap's `strong, b { color: #000 }` blanked every graded cell on the pkgdown site
+  local_null_device()
+  html  <- quietly(ggi(quietly(ggmca(fx_mca(), fx_tea()))))$x$html
+  svgid <- regmatches(html, regexpr("(?<=<svg )[^>]*?id='\\K[^']+", html, perl = TRUE))
+  expect_match(html, paste0(".tooltip_", svgid, " b"), fixed = TRUE)
+  expect_match(html, "color:inherit !important", fixed = TRUE)
+})
+
 test_that("ggi passes a graph that is already interactive through unchanged", {
   local_null_device()
   w <- quietly(ggi(quietly(ggmca(fx_mca(), fx_tea()))))

@@ -3,7 +3,8 @@
 # ROLE: What every 2D graph ends in. as_ggfacto_plot() makes it a ggfacto graph (its class, its
 #   render hints), theme_facto() supplies the axis titles carrying eigenvalue percentages, ggi()
 #   turns it into a girafe widget (a widget passes through), with the stylesheet that shows an
-#   element while another is hovered (reveal_on_hover()), or saves it as a standalone page that
+#   element while another is hovered (reveal_on_hover()) and the rule keeping a tooltip's colours
+#   against the host page's (tooltip_ink()), or saves it as a standalone page that
 #   fills its window or frame (fill_page(), R/knit.R); ggsave2() writes an image.
 # KEY CONSTRAINTS:
 #   - theme_facto() returns a LIST of ggplot objects, not a theme: it is `+`-ed as a whole.
@@ -254,7 +255,7 @@ girafe_widget <- function(plot, width, height, keep_ratio,
                             font_set = font_set, ...) |>
     ggiraph::girafe_options(ggiraph::opts_tooltip(css = css_tooltip),
                             ggiraph::opts_hover(css = css_hover))
-  widget$x$html <- reveal_on_hover(widget$x$html)
+  widget$x$html <- tooltip_ink(reveal_on_hover(widget$x$html))
   as_ggfacto_widget(widget, ratio = height / width)
 }
 
@@ -364,6 +365,20 @@ reveal_on_hover <- function(svg) {
                   "line[data-reveal] { stroke:#d2b200 !important; }\n",
                   "polygon[data-reveal] { fill:#ffe348 !important; }\n",
                   "text[data-reveal] { fill:#8b7500 !important; }\n", rules, "</style>")
+  sub("(<svg [^>]*>)", paste0("\\1", style), svg)
+}
+
+# WARNING: a tooltip's bold text inherits its colour -- a graded cell is `<font color><b>`, and a
+#   host page's own rule on `b` (bootstrap's `strong, b`, black, gold in dark mode) otherwise wins
+#   over inheritance and blanks every colour. `!important`: bootstrap's dark-mode rule is the more
+#   specific. ggiraph's tooltip div is classed `tooltip_<svg id>`; a <style> in an svg is global.
+#' @keywords internal
+#' @noRd
+tooltip_ink <- function(svg) {
+  svgid <- regmatches(svg, regexpr("(?<=<svg )[^>]*?id='\\K[^']+", svg, perl = TRUE))
+  if (length(svgid) == 0) return(svg)
+  style <- paste0("<style>.tooltip_", svgid, " b, .tooltip_", svgid,
+                  " strong { color:inherit !important; }</style>")
   sub("(<svg [^>]*>)", paste0("\\1", style), svg)
 }
 
