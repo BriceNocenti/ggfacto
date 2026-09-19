@@ -2,7 +2,8 @@
 #   ggpca_cor_circle(), ggpca() and its builder pca_plot_data(), the shared projector
 #   PCA_ind.sup_coord(), and the deprecated mean_sd_tab().
 # ROLE: principal_component_analysis() is the tidyselect ingress normaliser (row and column weights,
-#   supplementary and named individuals, and the source rows R/ingress.R records).
+#   supplementary and named individuals, missing values at their weighted mean, and the source rows
+#   R/ingress.R records).
 #   ggpca_cor_circle() draws the variables; ggpca() draws the individuals through the shared plot
 #   model (R/plot-model.R) and the one renderer. PCA_ind.sup_coord() projects arbitrary raw rows
 #   into principal space and is shared with R/pca-3d.R.
@@ -19,8 +20,8 @@
 
 #' Principal Component Analysis
 #' @description A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to
-#'  work with \pkg{ggfacto} functions like \code{\link{ggpca_cor_circle}},
-#'  \code{\link{interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
+#'  work with \pkg{ggfacto} functions like \code{\link{interpret}}, \code{\link{ggfacto}} and
+#'  \code{\link{hierarchical_clust}}. Variables are selected the
 #'  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
 #'  function.
 #' @param data The data frame. To analyse a subset of the population, give the whole data frame and
@@ -42,6 +43,10 @@
 #'   table is how one chooses how many axes to interpret, and a truncated one cannot show the drop.
 #'   To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp`.
 #' @param graph A boolean, set to `TRUE` to display the base graph.
+#' @param na How missing values of the active variables are treated. `"mean"`, the default, places
+#'  each one at its variable's weighted mean, where it adds nothing to the axes (as an excluded level
+#'  does in a specific multiple correspondence analysis); the tooltips and \code{\link{interpret}}
+#'  count them. `"drop"` leaves out the rows with a missing value.
 #' @param filter A condition on the rows of `data`, as in \code{dplyr::filter()}: only the rows
 #'  where it is `TRUE` are analysed (`filter = AGE >= 18`). Supplementary individuals are kept.
 #' @param ... Additional arguments to pass to \code{\link[FactoMineR]{PCA}}.
@@ -51,12 +56,18 @@
 #' @export
 #'
 #' @examples
-#' active_vars <- c("mpg", "cyl", "hp", "drat", "qsec")
-#' res.pca <- principal_component_analysis(mtcars, tidyselect::all_of(active_vars))
-#' interpret(res.pca)
+#' cars <- dplyr::mutate(mtcars, cyl = factor(cyl))
+#' res.pca <- principal_component_analysis(cars, c(mpg, disp, hp, drat, wt, qsec))
+#' interpret(res.pca)                           # the eigenvalues, then the axes
+#' \donttest{
+#' ggfacto(res.pca, cars, sup_vars = cyl)       # the individuals and the variables (biplot)
+#' ggfacto(res.pca, profiles = FALSE)           # the circle of correlations alone
+#' ggfacto(res.pca, cars, sup_vars = cyl, interactive = TRUE)  # hover: the means
+#' }
 principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, ind_name,
                                          scale.unit = TRUE, ind.sup = NULL, ncp = Inf,
-                                         graph = FALSE, filter, ...) {
+                                         graph = FALSE, na = "mean", filter, ...) {
+  na <- match.arg(na, c("mean", "drop"))
   # WARNING: the caller's frame is captured HERE, before any promise is forced: rlang::caller_env()
   #   evaluated lazily inside fitted_rows() would name the wrong frame.
   expr   <- rlang::enexpr(data)
@@ -70,7 +81,8 @@ principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, in
   stopifnot(is.integer(ind.sup) | is.null(ind.sup))
 
   fr   <- fitted_rows(expr, env, data, filter, if (!is.null(wt_name)) data[[wt_name]],
-                      keep = ind.sup)
+                      keep = ind.sup,
+                      drop = if (na == "drop") !stats::complete.cases(data[active_vars]))
   data <- fr$data; wt <- fr$wt
   if (length(ind.sup) > 0) ind.sup <- match(ind.sup, fr$kept)
 
@@ -89,6 +101,21 @@ principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, in
 
   if (length(ind.sup) > 0) wt <- wt[-ind.sup]
 
+  # DESIGN: a missing value is placed at its variable's WEIGHTED mean among the active individuals,
+  #   where it adds nothing to the axes -- what an excluded level does in a specific MCA. FactoMineR
+  #   would take the unweighted mean, off the weighted centre, and warn. The cells are recorded in
+  #   `source$na`, so that tooltips and interpret() show what was observed (pca_observed()).
+  miss <- purrr::map(data, ~ which(is.na(.x)))
+  miss <- miss[lengths(miss) != 0]
+  act  <- if (length(ind.sup) > 0) -ind.sup else seq_len(nrow(data))
+  w_act <- if (is.null(wt)) rep(1, nrow(data[act, , drop = FALSE])) else wt
+  for (v in names(miss)) {
+    x  <- data[[v]][act]
+    ok <- !is.na(x)
+    if (!any(ok)) stop("`", v, "` has no value among the analysed rows.", call. = FALSE)
+    data[[v]][miss[[v]]] <- sum(w_act[ok] * x[ok]) / sum(w_act[ok])
+  }
+
   res <- FactoMineR::PCA(data,
                          scale.unit = scale.unit,
                          ncp = ncp,
@@ -97,7 +124,8 @@ principal_component_analysis <- function(data, active_vars, wt, col.w = NULL, in
                          ind.sup = ind.sup,
                          col.w = col.w,
                          ...)
-  res$source <- list(key = over_reference(seq_len(nrow(data)), fr), wt = wt_name)
+  res$source <- list(key = over_reference(seq_len(nrow(data)), fr), wt = wt_name,
+                     na = if (length(miss) != 0) miss)
   res
 }
 
@@ -110,8 +138,8 @@ PCA2 <- principal_component_analysis
 #' @description The active variables of a principal component analysis as arrows in the circle of
 #' correlations: the coordinate of a variable on an axis is its correlation with it. Hovering a
 #' variable shows its coordinates, and its projections on the two axes. \code{\link{ggfacto}} draws
-#' it for a principal component analysis, and draws the same arrows over the cloud of individuals
-#' when individuals, supplementary variables or clusters are asked for.
+#' it for a principal component analysis with `profiles = FALSE` and nothing else asked for; by
+#' default, it draws the same arrows over the cloud of individuals.
 #'
 #' @param res.pca An analysis made with \code{\link{principal_component_analysis}} or
 #' \code{\link[FactoMineR:PCA]{FactoMineR::PCA}}.
@@ -175,6 +203,7 @@ variable_vectors <- function(res.pca, m = pca_model(res.pca)) {
                      "<b>", rownames(coord), "</b>\n",
                      gettextf("mean (cv): %s", purrr::map_chr(rownames(coord), \(v) mean_cv(
                        m$X[[v]], m$wn))), "\n",
+                     purrr::map_chr(rownames(coord), \(v) missing_line(m, v)),
                      do.call(paste, c(lines, sep = "\n")))),
     tibble::as_tibble(coord))
 }
@@ -192,7 +221,7 @@ variable_vectors <- function(res.pca, m = pca_model(res.pca)) {
 #' variable; hovering a supplementary level shows the mean of each active variable among its
 #' individuals, coloured by its standardized difference from the population's (blue above, red
 #' below), as \code{\link{clust_tab}} does. \code{\link{ggfacto}} draws it for a principal
-#' component analysis given individuals, supplementary variables or clusters.
+#' component analysis, unless `profiles = FALSE` leaves nothing but the circle.
 #'
 #' @param res.pca An analysis made with \code{\link{principal_component_analysis}} or
 #' \code{FactoMineR::PCA()}.
@@ -360,16 +389,30 @@ individual_headings <- function(m, pts, ind_data) {
   list(bold(gettextf("Cluster: %s", ind_data$clust)), bold(who))
 }
 
+# How many individuals miss a variable, as a tooltip line ending on a line break -- nothing when
+# none does. They sit at its mean (principal_component_analysis()).
+#' @keywords internal
+#' @noRd
+missing_line <- function(m, v) {
+  k <- sum(m$count[is.na(m$X[[v]])])
+  if (k == 0) return("")
+  paste0(gettextf("missing: %s (%s%%), placed at the mean", format(k, big.mark = " "),
+                  gda_num(round(100 * k / m$n, 1), gda_resolve_lang(NULL))), "\n")
+}
+
 # An individual's value on each active variable, against the population's mean, coloured by its
 # standardized difference: one tabxplor record per variable, the drawn points and the population.
+# A missing value prints as such: it was placed at the mean, which is not what was observed.
 #' @keywords internal
 #' @noRd
 individual_lines <- function(m, drawn) {
-  w <- m$wn
   purrr::map(m$vars, function(v) {
     x    <- m$X[[v]]
-    mean <- sum(w * x) / sum(w)
-    var  <- sum(w * (x - mean)^2) / sum(w)
+    ok   <- !is.na(x)
+    w    <- m$wn[ok]
+    mean <- sum(w * x[ok]) / sum(w)
+    var  <- sum(w * (x[ok] - mean)^2) / sum(w)
+    w    <- m$wn
     k    <- length(drawn)
     digits <- mean_digits(mean)
     f <- tabxplor::fmt(
@@ -377,8 +420,9 @@ individual_lines <- function(m, drawn) {
       mean = c(x[drawn], mean), var = c(rep(0, k), var), diff = c(x[drawn] - mean, 0),
       scale = "level_mean", display = "mean", digits = digits,
       row_kind = c(rep("data", k), "total"), ref = "tot", col_var = v, color = "difference")
-    format_mean(x[drawn] - mean, format(f)[seq_len(k)], v,
-                tabxplor::fmt_get_color_code(f)[seq_len(k)])
+    out <- format_mean(x[drawn] - mean, format(f)[seq_len(k)], v,
+                       tabxplor::fmt_get_color_code(f)[seq_len(k)])
+    ifelse(is.na(x[drawn]), paste0(v, ": NA"), out)
   })
 }
 

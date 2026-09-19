@@ -41,7 +41,7 @@ renormalises Benzecri's modified rate over the axes it kept, so the same axis ge
 rate. To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp`.}
 
 \item{graph}{By default no graph is made, since the result can be plotted with
-\code{\link{ggmca}}.}
+\code{\link{ggfacto}}.}
 
 \item{filter}{A condition on the rows of `data`, as in \code{dplyr::filter()}: only the rows
 where it is `TRUE` are analysed (`filter = AGE >= 18`).}
@@ -68,10 +68,11 @@ A user-friendly wrapper around \code{\link[FactoMineR]{MCA}}, made to
 \examples{
 data(tea, package = "FactoMineR")
 res.mca <- multiple_correspondence_analysis(tea, 1:18)
-interpret(res.mca)
-
-ggmca(res.mca, tea, sup_vars = SPC, ylim = c(NA, 1.2)) |>
-  ggi() # to make the graph interactive
+interpret(res.mca)                           # the eigenvalues, then the axes
+\donttest{
+ggfacto(res.mca, tea, sup_vars = c(sex, SPC))  # the graph, with supplementary variables
+ggfacto(res.mca, tea, sup_vars = c(sex, SPC), interactive = TRUE)  # hover: the crosstables
+}
 
 # A subset of the population: the analysis remembers which rows it used
 res.mca_young <- tea |>

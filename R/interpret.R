@@ -795,11 +795,23 @@ mca_interpret <- function(res.mca,
                   gettextf("Axe %s: %s%% of variance", packed$axis, gda_num(packed$pct, lg)),
                   gettextf("Axe %s: %s%% of variance (mod. %s%%)",
                            packed$axis, gda_num(packed$pct, lg), round(m)))
+  label <- paste0(label, axis_name_clause(res.mca, packed$axis))
 
   gda_poles_tab(packed, axis_label = label, group_name = "Question",
                 n_ind = model$n,
                 eig_tab = if (eig) eig_tab, contrib = TRUE, complete = complete, color = color)
   })
+}
+
+
+# The name name_axes() gave an axis, after a dash, for its heading -- nothing when it has none.
+# DESIGN: the heading is a factor level, i.e. prose, so it can carry the user's words; a PCA's axes
+#   are `col_var`s, part of the column names, and keep their bare number.
+#' @keywords internal
+#' @noRd
+axis_name_clause <- function(res, axis) {
+  nm <- as.character(res$axes_names)[as.integer(axis)]
+  ifelse(!is.na(nm) & nzchar(nm), paste0(" \u2014 ", nm), "")
 }
 
 
@@ -848,7 +860,8 @@ ca_interpret <- function(res.ca, axes = 1:2, complete = FALSE, min_contrib = NUL
   # the ACTIVE table: `Xtot` also holds the supplementary rows and columns
   n_ind   <- round(sum(res.ca$call$X))
   eig_tab <- eig_tab_of(res.ca, n_axes = n_axes, color = color)
-  label   <- gettextf("Axe %s: %s%% of variance", packed$axis, gda_num(packed$pct, lg))
+  label   <- paste0(gettextf("Axe %s: %s%% of variance", packed$axis, gda_num(packed$pct, lg)),
+                    axis_name_clause(res.ca, packed$axis))
 
   gda_poles_tab(packed, axis_label = label, group_name = "Variable", n_ind = n_ind,
                 eig_tab = if (eig) eig_tab,
@@ -884,12 +897,13 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
   #   under `scale.unit = FALSE` it is 1 for every variable -- a column of standard deviations that
   #   would every one of them read 1. The mean and the weights are FactoMineR's own, so the block
   #   still describes the very cloud the axes were built on.
-  act     <- rownames(res.pca$var$coord)
-  x_act   <- as.data.frame(res.pca$call$X)[, act, drop = FALSE]
+  # WARNING: the ACTIVE individuals, as observed. `call$X` also holds the supplementary ones, which
+  #   `row.w` does not weigh, and holds a missing value at its mean, which would shrink the spread.
+  x_act   <- pca_observed(res.pca)
+  sup     <- res.pca$call$ind.sup
+  if (length(sup) != 0) x_act <- x_act[-sup, , drop = FALSE]
   row_w   <- if (is.null(res.pca$call$row.w)) rep(1, nrow(x_act)) else res.pca$call$row.w
-  ctr_all <- res.pca$call$centre
-  ctr_pca <- if (!is.null(names(ctr_all)) && all(act %in% names(ctr_all))) ctr_all[act]
-             else purrr::map_dbl(x_act, ~ stats::weighted.mean(.x, row_w, na.rm = TRUE))
+  ctr_pca <- purrr::map_dbl(x_act, ~ stats::weighted.mean(.x, row_w, na.rm = TRUE))
   var_pca <- purrr::map_dbl(x_act, ~ weighted.var(.x, wt = row_w, na.rm = TRUE))
   univ <- function(display, digits) tabxplor::fmt(
     n = nn, scale = "level_mean", mean = pad(unname(ctr_pca)), var = pad(unname(var_pca)),
@@ -898,6 +912,12 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
   out[["mean_Variables"]]    <- univ("mean", 2L)
   out[["sd_Variables"]]      <- univ("sd"  , 2L)
   out[["sd/mean_Variables"]] <- univ("cv"  , 0L)
+  # the missing values, placed at the mean by principal_component_analysis(): counted, only when
+  # there are some -- the total row counts the individuals missing at least one
+  miss <- purrr::map_int(x_act, ~ sum(is.na(.x)))
+  if (any(miss != 0)) out[["NA_Variables"]] <- tabxplor::fmt(
+    n = c(unname(miss), sum(!stats::complete.cases(x_act))), display = "n",
+    row_kind = kind, col_var = "Variables", color = "no")
 
   # DESIGN: the column is named `<statistic>_<col_var>`, and tabxplor strips the suffix at export
   #   (tab_col_var_header) -- the same rule that turns "Other_race" into "Other". So the tibble keeps
@@ -944,7 +964,8 @@ pca_interpret <- function(res.pca, axes = 1:3, color = TRUE, eig = TRUE, n_axes 
   glossary <- c(
     gettext("contrib: its contribution to the variance of the axis; an axis sums to 100 %"),
     gettext("cos2: quality of representation"),
-    gda_cv_line())
+    gda_cv_line(),
+    if (any(miss != 0)) gettext("NA: missing values, placed at the mean of their variable"))
 
   gda_summary(tabxplor::new_tab(out, meta = list(render_extras = list(n = "no"))),
               footer = if (eig) eig_tab, words = gda_pca_words(), glossary = glossary)

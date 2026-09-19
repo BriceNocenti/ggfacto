@@ -178,7 +178,7 @@ draws the correlations at their own scale. Hovering an individual shows its valu
 variable; hovering a supplementary level shows the mean of each active variable among its
 individuals, coloured by its standardized difference from the population's (blue above, red
 below), as \code{\link{clust_tab}} does. \code{\link{ggfacto}} draws it for a principal
-component analysis given individuals, supplementary variables or clusters.
+component analysis, unless `profiles = FALSE` leaves nothing but the circle.
 }
 \examples{
 \donttest{

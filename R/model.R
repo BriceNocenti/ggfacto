@@ -1,7 +1,8 @@
 # PURPOSE: The readers of a fitted analysis -- mca_model(), the one reader of an MCA, and
 #   pca_model(), a PCA's individuals as a cloud of points -- the units their consumers aggregate
-#   over, and what an analysis gives back to the data frame: axis_coord(), is_in_analysis(), and the
-#   write-back they share with hierarchical_clust(). A CA's reader, ca_model(), lives in R/ca.R.
+#   over, the names of its axes (name_axes()), and what an analysis gives back to the data frame:
+#   axis_coord(), is_in_analysis(), and the write-back they share with hierarchical_clust(). A CA's
+#   reader, ca_model(), lives in R/ca.R.
 # ROLE: Every consumer of an MCA (the plot model, the tooltips, the clusters, the interpretation
 #   table, the teaching plots, the alignment in R/ingress.R) reads the model, never the fitted
 #   object's slots. Its unit is the ANSWER PROFILE, a distinct combination of active answers, whose
@@ -16,6 +17,8 @@
 #   - Profiles are numbered by first appearance. The model's `key` maps each fitted individual to a
 #     row of the profile tables, and `source$rows` places it in the reference frame: both are read
 #     off the fit's one vector, `source$key` (R/ingress.R).
+#   - A PCA is read as observed (pca_observed()): `call$X` holds a missing value at its weighted
+#     mean, and `source$na` says where.
 #   - A unit is a (profile x non-active answers) cell, with its `..n` and `..wn`: every crosstab,
 #     supplementary coordinate and cluster plurality is a rowsum() over the units, never over
 #     individuals. cloud_units() serves the PCA's model too, whose points are its distinct
@@ -126,7 +129,7 @@ mca_model <- function(res) {
 #' @noRd
 pca_model <- function(res) {
   vars <- rownames(res$var$coord)
-  X    <- as.data.frame(res$call$X)[vars]
+  X    <- pca_observed(res)
   rows <- seq_len(nrow(X))
   sup  <- res$call$ind.sup
   if (length(sup) != 0) {
@@ -152,6 +155,18 @@ pca_model <- function(res) {
     n = length(key), W = sum(wn), vars = vars, rows = rows[first], names = names[first],
     eig = eig_table(res)
   ), class = "ggfacto_pca_model")
+}
+
+# The active values of a PCA as they were observed: `call$X` holds them imputed, and `source$na`
+# records, per variable, the rows of `call$X` where they were missing (principal_component_analysis()).
+# A point is then an individual's OBSERVED values: one missing value is not the mean itself.
+#' @keywords internal
+#' @noRd
+pca_observed <- function(res) {
+  X  <- as.data.frame(res$call$X)[rownames(res$var$coord)]
+  na <- res$source$na
+  for (v in intersect(names(na), names(X))) X[[v]][na[[v]]] <- NA
+  X
 }
 
 # The distinct (point x non-active answers) cells of the fitted individuals -- an MCA's answer
@@ -226,6 +241,56 @@ level_values <- function(values, target, var, fn) {
   out <- vctrs::vec_slice(values, idx)
   if (is.data.frame(out)) rownames(out) <- NULL else names(out) <- NULL
   out
+}
+
+#' Name the Axes of an Analysis
+#'
+#' @description Gives the axes of an analysis the names its interpretation arrived at: every graph
+#' (\code{\link{ggfacto}}) prints them in its axis titles, and every interpretation table
+#' (\code{\link{interpret}}) in its axis headings. The names are given in the order of the axes;
+#' an empty name, `""`, leaves an axis unnamed, so that `name_axes(res, "", "")` can wait in a script
+#' to be filled.
+#'
+#' @param res An analysis made with \code{\link{multiple_correspondence_analysis}},
+#' \code{\link{correspondence_analysis}} or \code{\link{principal_component_analysis}} (or with
+#' 'FactoMineR' or 'GDAtools').
+#' @param ... The names, as character strings: the first names axis 1, the second axis 2, and so
+#' on. A name given as `"3" = "..."` names axis 3 alone, and leaves the others as they are.
+#'
+#' @return The analysis, its axes named.
+#' @export
+#'
+#' @examples
+#' data(tea, package = "FactoMineR")
+#' res.mca <- multiple_correspondence_analysis(tea, 1:18)
+#' interpret(res.mca, axes = 1:2)
+#'
+#' res.mca <- name_axes(res.mca, "tea as a habit / tea as an outing", "tea time / tea shop")
+#' \donttest{
+#' ggfacto(res.mca)
+#' }
+name_axes <- function(res, ...) {
+  nm <- c(...)
+  if (length(nm) == 0) return(res)
+  if (!is.character(nm)) stop(
+    "name_axes() takes the names of the axes as character strings: ",
+    "name_axes(res, \"name of axis 1\", \"name of axis 2\").", call. = FALSE)
+  keys <- names(nm)
+  if (is.null(keys)) keys <- rep("", length(nm))
+  pos  <- suppressWarnings(as.integer(keys))
+  pos[keys == ""] <- seq_len(sum(keys == ""))
+  n_axes <- nrow(eig_table(res))
+  if (anyNA(pos) || any(pos < 1L)) stop(
+    "An axis is named by its number: name_axes(res, `3` = \"name of axis 3\").", call. = FALSE)
+  if (anyDuplicated(pos)) stop("Each axis can be given only one name.", call. = FALSE)
+  if (any(pos > n_axes)) stop(
+    "The analysis has ", n_axes, " axes: axis ", max(pos), " cannot be named.", call. = FALSE)
+  out <- as.character(res$axes_names)
+  length(out) <- max(length(out), pos)
+  out[is.na(out)] <- ""
+  out[pos] <- unname(nm)
+  res$axes_names <- out
+  res
 }
 
 #' Coordinates of the Individuals on the Axes of an Analysis

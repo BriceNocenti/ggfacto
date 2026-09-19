@@ -194,7 +194,7 @@ purrr::map(c("cah_5", "cah_6", "cah_7"), \(cl) clust_tab(acm, data, !!rlang::sym
   tabxplor::tab_xl(sheets = "tabs")
 
 # every partition on the map
-ggmca(acm, data, sup_vars = c("cah_5", "cah_6", "cah_7"))
+ggfacto(acm, data, sup_vars = c(cah_5, cah_6, cah_7))
 ```
 
 A vectorised `nb_clust = 5:7` was set aside: it would return a data frame, which `mutate()` packs into one column under a name, or splices only when unnamed, and it breaks "one factor per call".
@@ -238,7 +238,7 @@ acm <- multiple_correspondence_analysis(pc_AGD, all_of(variables_actives), wt = 
                                         filter = CRITAGE %in% c("1-15 à 29 ans", "2-30 à 44 ans"))
 
 pc_AGD <- pc_AGD |> mutate(cah_jeunes = hierarchical_clust(acm, ncp = 2, nb_clust = 4))
-ggmca(acm, pc_AGD, sup_vars = variables_sup, clust = cah_jeunes)
+ggfacto(acm, pc_AGD, sup_vars = all_of(variables_sup), clust = cah_jeunes)
 clust_tab(acm, pc_AGD, cah_jeunes)
 pc_AGD |> filter(is_in_analysis(acm)) |> tab(SEXE, CRITAGE)
 ```
@@ -278,7 +278,7 @@ A class-specific MCA (`GDAtools::csMCA()`, the analysis of a subpopulation withi
 
 ### 9.1 `clust_tab(res, data, clust)`
 
-The table takes the analysis first, in the order of `ggmca(res, data, clust = )`:
+The table takes the analysis first, in the order of `ggfacto(res, data, clust = )`:
 
 - **The variables** default to the active ones; `row_vars =` describes the clusters by others.
 - **The weights** are the analysis's (`res$call$row.w`, or `row.w.init` for a PCA), under the name of their column (`res$source$wt`), so the caption still reads "Weighted by POND."; `wt =` is refused in this form.
@@ -341,7 +341,7 @@ tab(gss, relig, relig_clust)                                      # which levels
 
 ## 10. The course code
 
-The MCA, as a student writes it:
+The MCA, as the course teaches it (`06-CAH.qmd`):
 
 ```r
 acm <- multiple_correspondence_analysis(pc_AGD, all_of(variables_actives), wt = POND)
@@ -351,8 +351,8 @@ hierarchical_clust(acm, ncp = 3)                   # the tree, to choose the num
 
 pc_AGD <- pc_AGD |>
   mutate(cah_culture = hierarchical_clust(acm, ncp = 3, nb_clust = 6))
-ggmca(acm, pc_AGD, clust = cah_culture)
 clust_tab(acm, pc_AGD, cah_culture)
+ggfacto(acm, pc_AGD, clust = cah_culture, interactive = TRUE)
 
 pc_AGD <- pc_AGD |>                                # the names, once the clusters are read
   mutate(cah_culture = hierarchical_clust(acm, ncp = 3, names = c(
@@ -360,7 +360,7 @@ pc_AGD <- pc_AGD |>                                # the names, once the cluster
     "Culture patrimoniale" = 4, "Éclectisme classique" = 6, "Éclectisme augmenté" = 5
   )))
 clust_tab(acm, pc_AGD, cah_culture, row_vars = all_of(variables_sup), pct = "row")
-ggmca(acm, pc_AGD, clust = cah_culture)
+ggfacto(acm, pc_AGD, clust = cah_culture)
 ```
 
 On a subpopulation, only the analysis's line changes (section 8.1). A PCA:
@@ -391,7 +391,7 @@ A jamovi analysis re-runs from its options at every change, and only an Image el
 
 ## 12. Set aside, and open
 
-**Set aside, with their reasons in the sections above:** the column attribute and the vctrs subclass (4.1), the data-first verb (4.1), vectorised `nb_clust` (6), a disk cache (4.1), a `filter =` argument on the analyses (tabxplor has superseded its own: filtering belongs upstream, in the pipe).
+**Set aside, with their reasons in the sections above:** the column attribute and the vctrs subclass (4.1), the data-first verb (4.1), vectorised `nb_clust` (6), a disk cache (4.1).
 
 **Open:**
 
@@ -399,4 +399,3 @@ A jamovi analysis re-runs from its options at every change, and only an Image el
 - An exported `clust_tree(res, ncp)` returning a real `hclust`, for expert dendrogram tooling (4.1).
 - Paragons, the individuals nearest each centre, for a PCA of named individuals (`HCPC()$desc.ind`).
 - Coloured means beside coloured percentages in one table, which waits on tabxplor 2.1.0 (9.2).
-- The course's move to this workflow (06-CAH, the exams, `agd.md`, the notebooks' subset recipe), which belongs to `formations_stat`.

@@ -49,8 +49,8 @@ A \code{\link[ggplot2]{ggplot}}, or an html widget with `interactive = TRUE`.
 The active variables of a principal component analysis as arrows in the circle of
 correlations: the coordinate of a variable on an axis is its correlation with it. Hovering a
 variable shows its coordinates, and its projections on the two axes. \code{\link{ggfacto}} draws
-it for a principal component analysis, and draws the same arrows over the cloud of individuals
-when individuals, supplementary variables or clusters are asked for.
+it for a principal component analysis with `profiles = FALSE` and nothing else asked for; by
+default, it draws the same arrows over the cloud of individuals.
 }
 \examples{
 data(mtcars, package = "datasets")

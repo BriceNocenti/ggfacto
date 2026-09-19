@@ -52,14 +52,20 @@
 #' gss <- forcats::gss_cat |>
 #'   dplyr::filter(!relig %in% c("No answer", "Don't know", "Not applicable"),
 #'                 !partyid %in% c("No answer", "Don't know"))
-#' tableau <- tabxplor::tab(gss, relig, partyid)
-#' res.ca <- correspondence_analysis(tableau)
-#' interpret(res.ca)
+#' crosstab <- tabxplor::tab(gss, relig, partyid)
+#' res.ca <- correspondence_analysis(crosstab)
+#' interpret(res.ca)                            # the eigenvalues, then the axes
+#' \donttest{
+#' ggfacto(res.ca)                              # the graph
+#' ggfacto(res.ca, interactive = TRUE)          # hover: the profile of each level
+#' }
+#' # the size of the deviations, which the graph does not show
+#' tabxplor::tab(gss, relig, partyid, pct = "row", color = "contrib")
 #'
 #' # marital (rows) and race (columns) are supplementary
 #' res.ca2 <- tabxplor::tab(gss, c(relig, marital), c(partyid, race)) |>
 #'   correspondence_analysis()
-#' ggca(res.ca2) |> ggi()
+#' ggfacto(res.ca2)
 correspondence_analysis <- function(table, ncp = Inf, ...) {
   dots <- list(...)
   tb   <- NULL

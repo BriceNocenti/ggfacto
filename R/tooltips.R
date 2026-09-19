@@ -215,10 +215,13 @@ mean_lines <- function(units, s, col, pop = NULL) {
 #' @noRd
 mean_digits <- function(mean) as.integer(max(0, min(3, 2 - floor(log10(abs(mean) + 1e-12)))))
 
-# A variable's weighted mean and coefficient of variation, as "20.1 (30%)".
+# A variable's weighted mean and coefficient of variation, as "20.1 (30%)", over its observed values.
 #' @keywords internal
 #' @noRd
 mean_cv <- function(x, w) {
+  ok   <- !is.na(x)
+  x    <- x[ok]
+  w    <- w[ok]
   mean <- sum(w * x) / sum(w)
   sd   <- sqrt(sum(w * (x - mean)^2) / sum(w))
   paste0(formatC(mean, format = "f", digits = mean_digits(mean)), " (",

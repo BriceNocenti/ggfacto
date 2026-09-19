@@ -108,3 +108,27 @@ test_that("axis_coord reads a PCA's individuals and a CA's levels", {
   by_level <- axis_coord(ca, 1)
   expect_identical(gss$ax, unname(by_level[as.character(gss$relig)]))
 })
+
+test_that("name_axes() names the axes in order, or one by its number, and they are printed", {
+  res <- name_axes(fx_mca(), "first", "")
+  expect_equal(res$axes_names, c("first", ""))
+  res <- name_axes(res, "3" = "third")
+  expect_equal(res$axes_names, c("first", "", "third"))
+  expect_equal(name_axes(res, "one")$axes_names, c("one", "", "third"))
+  expect_identical(name_axes(res), res)
+  expect_error(name_axes(res, "x" = "a"), "by its number")
+  expect_error(name_axes(res, 1), "character strings")
+  expect_error(name_axes(res, "99" = "a"), "cannot be named")
+  expect_error(name_axes(res, "a", "1" = "b"), "only one name")
+
+  p <- suppressMessages(ggfacto(res, axes = c(1, 3)))
+  expect_equal(p$labels$x, "Axe 1 (23.4%): first")
+  expect_match(p$labels$y, "third$")
+  heads <- unique(as.character(interpret(res, axes = 1:3, eig = FALSE, lang = "en")$Axe))
+  expect_match(heads[1], " \u2014 first$")
+  expect_no_match(heads[2], "\u2014")
+  expect_match(heads[3], " \u2014 third$")
+
+  ca <- name_axes(fx_ca(), "rows / cols")
+  expect_match(as.character(interpret(ca, eig = FALSE, lang = "en")$Axe)[1], "\u2014 rows / cols$")
+})

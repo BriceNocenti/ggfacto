@@ -205,15 +205,18 @@ unbrk <- "\u202f" # narrow no-break space
 
 
 
+# The weighted (maximum-likelihood) variance, as Hmisc::wtd.var(method = "ML").
+# WARNING: `na.rm` drops a missing value's WEIGHT too: summing every weight under the observed
+#   deviations alone gave the variance a missing value placed at the mean would have.
 #' @keywords internal
 weighted.var <- function(x, wt, na.rm = FALSE) {
-  #Nwt_non_zero <- length((wt)[wt != 0])
-  round(
-    sum(wt * (x - stats::weighted.mean(x, wt, na.rm = na.rm))^2,  na.rm = na.rm) /
-      ( sum(wt, na.rm = na.rm) ),
-    10)
-  #((Nwt_non_zero - 1) / Nwt_non_zero) *
-} #Same results as sqrt(Hmisc::wtd.var(!!num_var, !!wt, na.rm = TRUE, method = "ML")
+  if (na.rm) {
+    ok <- !is.na(x) & !is.na(wt)
+    x  <- x[ok]
+    wt <- wt[ok]
+  }
+  round(sum(wt * (x - stats::weighted.mean(x, wt))^2) / sum(wt), 10)
+}
 
 
 # Soft-deprecated names and forms ------------------------------------

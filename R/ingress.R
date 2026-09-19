@@ -98,7 +98,8 @@ reference_rows <- function(expr, env, data) {
 # gives it an infinite coordinate in a PCA. `keep` (a PCA's `ind.sup`) is exempt from both.
 # DESIGN: the kept rows stay in the order of `data`, the one the user intended; `rows` places each
 #   in the reference frame, and one vector over that frame, `source$key`, records the match.
-fitted_rows <- function(expr, env, data, filter = NULL, wt = NULL, keep = integer()) {
+fitted_rows <- function(expr, env, data, filter = NULL, wt = NULL, keep = integer(),
+                        drop = NULL) {
   ref <- reference_rows(expr, env, data)
   sel <- rep(TRUE, nrow(data))
   if (!is.null(filter)) {
@@ -109,6 +110,12 @@ fitted_rows <- function(expr, env, data, filter = NULL, wt = NULL, keep = intege
     sel <- sel & !is.na(cond) & cond
   }
   sel[keep] <- TRUE
+  if (!is.null(drop)) {
+    out <- sel & drop
+    out[keep] <- FALSE
+    if (any(out)) message(sum(out), " row(s) with a missing value are left out of the analysis.")
+    sel <- sel & !out
+  }
   if (!is.null(wt)) {
     bad <- sel & (is.na(wt) | wt < 0)
     bad[keep] <- FALSE
@@ -158,7 +165,7 @@ fit_view <- function(res) {
   sup  <- res$call$ind.sup
   w[if (length(sup) != 0) -sup else seq_along(w)] <- fit_weights(res)
   structure(list(
-    n = nrow(res$call$X), vars = vars, X = res$call$X[vars], key = NULL, w = w,
+    n = nrow(res$call$X), vars = vars, X = pca_observed(res), key = NULL, w = w,
     source = c(source_positions(res), list(wt = res$source$wt))
   ), class = "ggfacto_fit_view")
 }

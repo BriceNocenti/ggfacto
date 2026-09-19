@@ -156,8 +156,8 @@ ggfacto.PCA <- function(res, data, sup_vars, clust, axes = c(1, 2), axes_reverse
     "`active_tables` is for a multiple correspondence analysis: a supplementary level of a ",
     "principal component analysis shows the means of the active variables.", call. = FALSE)
   # DESIGN: the individuals, supplementary levels and clusters live in another space than the
-  #   variables, drawn with the circle's arrows rescaled onto it (a biplot); with none of them,
-  #   the circle of correlations itself.
+  #   variables, drawn with the circle's arrows rescaled onto it (a biplot, the default); with
+  #   `profiles = FALSE` and none of them, the circle of correlations itself.
   if (missing(sup_vars) && missing(clust) && isFALSE(profiles) && is.null(ellipses)) {
     return(graph_out(ggpca_cor_circle(res, axes = axes, axes_reverse = axes_reverse,
                                       title = title, xlim = xlim, ylim = ylim,

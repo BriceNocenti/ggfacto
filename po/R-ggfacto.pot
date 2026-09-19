@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: ggfacto 0.3.2.9001\n"
-"POT-Creation-Date: 2026-09-19 11:48+0200\n"
+"POT-Creation-Date: 2026-09-19 15:50+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -10,47 +10,47 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: ca.R:158 interpret.R:842
+#: ca.R:164 interpret.R:854
 msgid "Rows"
 msgstr ""
 
-#: ca.R:158 interpret.R:842
+#: ca.R:164 interpret.R:854
 msgid "Columns"
 msgstr ""
 
-#: ca.R:168
+#: ca.R:174
 msgid "Supplementary rows"
 msgstr ""
 
-#: ca.R:168
+#: ca.R:174
 msgid "Supplementary columns"
 msgstr ""
 
-#: ca.R:281
+#: ca.R:287
 #, c-format
 msgid "%s:"
 msgstr ""
 
-#: ca.R:283
+#: ca.R:289
 #, c-format
 msgid "%s (supplementary):"
 msgstr ""
 
-#: clust.R:358
+#: clust.R:361
 msgid "Hierarchical clustering"
 msgstr ""
 
-#: clust.R:359
+#: clust.R:362
 msgid "inertia gain"
 msgstr ""
 
-#: clust.R:361
+#: clust.R:364
 #, c-format
 msgid ""
 "%d clusters: the between-cluster inertia is %s%% of the inertia of axis 1"
 msgstr ""
 
-#: clust.R:364
+#: clust.R:367
 #, c-format
 msgid ""
 "%d clusters: the between-cluster inertia is %s%% of the inertia of axes 1 to "
@@ -148,7 +148,7 @@ msgstr ""
 msgid "coord: coordinate on the axis"
 msgstr ""
 
-#: interpret.R:638 interpret.R:946
+#: interpret.R:638 interpret.R:966
 msgid "cos2: quality of representation"
 msgstr ""
 
@@ -158,7 +158,7 @@ msgid ""
 "accounts for"
 msgstr ""
 
-#: interpret.R:795 interpret.R:851
+#: interpret.R:795 interpret.R:863
 #, c-format
 msgid "Axe %s: %s%% of variance"
 msgstr ""
@@ -168,65 +168,74 @@ msgstr ""
 msgid "Axe %s: %s%% of variance (mod. %s%%)"
 msgstr ""
 
-#: interpret.R:877
+#: interpret.R:890
 msgid "Total"
 msgstr ""
 
-#: interpret.R:945
+#: interpret.R:965
 msgid ""
 "contrib: its contribution to the variance of the axis; an axis sums to 100 %"
 msgstr ""
 
-#: mca-data.R:435 pca.R:304
+#: interpret.R:968
+msgid "NA: missing values, placed at the mean of their variable"
+msgstr ""
+
+#: mca-data.R:442 pca.R:337
 msgid "Active variables:"
 msgstr ""
 
-#: mca-data.R:436
+#: mca-data.R:443
 #, c-format
 msgid "Distribution by %s:"
 msgstr ""
 
-#: mca-data.R:498 mca-data.R:504
+#: mca-data.R:505 mca-data.R:511
 #, c-format
 msgid "Answer profile n°%s"
 msgstr ""
 
-#: mca-data.R:503 pca.R:355
+#: mca-data.R:510 pca.R:388
 #, c-format
 msgid "Cluster: %s"
 msgstr ""
 
-#: pca.R:162
+#: pca.R:194
 #, c-format
 msgid "Coord axe %s: %s (cor. %s%%)"
 msgstr ""
 
-#: pca.R:171
+#: pca.R:203
 #, c-format
 msgid "mean (cv): %s"
 msgstr ""
 
-#: pca.R:314 plot-model.R:60 tooltips.R:25
+#: pca.R:347 plot-model.R:60 tooltips.R:25
 msgid "Central point"
 msgstr ""
 
-#: pca.R:314 tooltips.R:294
+#: pca.R:347 tooltips.R:297
 #, c-format
 msgid "n: %s"
 msgstr ""
 
-#: pca.R:315 tooltips.R:296
+#: pca.R:348 tooltips.R:299
 #, c-format
 msgid "weighted n: %s"
 msgstr ""
 
-#: pca.R:317
+#: pca.R:350
 msgid "mean (cv):"
 msgstr ""
 
-#: pca.R:353
+#: pca.R:386
 #, c-format
 msgid "Individual n°%s"
+msgstr ""
+
+#: pca.R:398
+#, c-format
+msgid "missing: %s (%s%%), placed at the mean"
 msgstr ""
 
 #: plot-render.R:104 plot-render.R:105
@@ -239,12 +248,12 @@ msgstr ""
 msgid "Coord axe %s: %s"
 msgstr ""
 
-#: render.R:84
+#: render.R:85
 #, c-format
 msgid "Axe %s (%s%%): %s"
 msgstr ""
 
-#: render.R:86
+#: render.R:87
 #, c-format
 msgid "Axe %s (%s%%)"
 msgstr ""

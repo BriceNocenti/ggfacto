@@ -15,6 +15,7 @@ principal_component_analysis(
   ind.sup = NULL,
   ncp = Inf,
   graph = FALSE,
+  na = "mean",
   filter,
   ...
 )
@@ -29,6 +30,7 @@ PCA2(
   ind.sup = NULL,
   ncp = Inf,
   graph = FALSE,
+  na = "mean",
   filter,
   ...
 )
@@ -62,6 +64,11 @@ To cluster on the first axes, give \code{\link{hierarchical_clust}} its own `ncp
 
 \item{graph}{A boolean, set to `TRUE` to display the base graph.}
 
+\item{na}{How missing values of the active variables are treated. `"mean"`, the default, places
+each one at its variable's weighted mean, where it adds nothing to the axes (as an excluded level
+does in a specific multiple correspondence analysis); the tooltips and \code{\link{interpret}}
+count them. `"drop"` leaves out the rows with a missing value.}
+
 \item{filter}{A condition on the rows of `data`, as in \code{dplyr::filter()}: only the rows
 where it is `TRUE` are analysed (`filter = AGE >= 18`). Supplementary individuals are kept.}
 
@@ -73,13 +80,18 @@ A `PCA` object from \pkg{FactoMineR}, with one more element, `source`, which rec
 }
 \description{
 A user-friendly wrapper around \code{\link[FactoMineR]{PCA}}, made to
- work with \pkg{ggfacto} functions like \code{\link{ggpca_cor_circle}},
- \code{\link{interpret}} and \code{\link{hierarchical_clust}}. Variables are selected the
+ work with \pkg{ggfacto} functions like \code{\link{interpret}}, \code{\link{ggfacto}} and
+ \code{\link{hierarchical_clust}}. Variables are selected the
  way of the `tidyverse`, as in \code{tabxplor::tab()}. `PCA2()` is a shorter name for the same
  function.
 }
 \examples{
-active_vars <- c("mpg", "cyl", "hp", "drat", "qsec")
-res.pca <- principal_component_analysis(mtcars, tidyselect::all_of(active_vars))
-interpret(res.pca)
+cars <- dplyr::mutate(mtcars, cyl = factor(cyl))
+res.pca <- principal_component_analysis(cars, c(mpg, disp, hp, drat, wt, qsec))
+interpret(res.pca)                           # the eigenvalues, then the axes
+\donttest{
+ggfacto(res.pca, cars, sup_vars = cyl)       # the individuals and the variables (biplot)
+ggfacto(res.pca, profiles = FALSE)           # the circle of correlations alone
+ggfacto(res.pca, cars, sup_vars = cyl, interactive = TRUE)  # hover: the means
+}
 }

@@ -167,3 +167,63 @@ test_that("a supplementary level's tooltip is stable", {
   vd <- pca_pd("en")$vars_data
   expect_snapshot(cat(vd$interactive_text[vd$vars == "cyl"][1]))
 })
+
+test_that("a missing value sits at its variable's weighted mean, silently, and is counted", {
+  d <- fx_cars()
+  d$mpg[c(2, 5, 9)] <- NA
+  d$hp[5] <- NA
+  v <- fx_pca_vars()
+  expect_no_warning(res <- PCA2(d, tidyselect::all_of(v), wt = w))
+  expect_equal(res$source$na, list(mpg = c(2L, 5L, 9L), hp = 5L))
+  expect_equal(res$call$X$mpg[2], stats::weighted.mean(d$mpg, d$w, na.rm = TRUE))
+
+  # the table describes the observed values, and counts the missing ones
+  tb <- interpret(res, axes = 1)
+  obs <- !is.na(d$mpg)
+  expect_equal(vctrs::field(tb$mean_Variables, "mean")[1], stats::weighted.mean(d$mpg, d$w, na.rm = TRUE))
+  expect_equal(vctrs::field(tb$sd_Variables, "var")[1],
+               weighted.var(d$mpg[obs], wt = res$call$row.w[obs]))
+  expect_equal(vctrs::field(tb$NA_Variables, "n"), c(3L, 0L, 1L, rep(0L, length(v) - 3L), 3L))
+  expect_false("NA_Variables" %in% names(interpret(fx_pca2(), axes = 1)))
+
+  # the arrow's tooltip counts them; an individual's prints what was observed
+  pd <- suppressMessages(pca_plot_data(res, d, rlang::quo(), rlang::quo(), "^.{0}", "^.+$",
+                                       character(), character(), TRUE, TRUE, 5000, "en"))
+  mpg <- pd$vectors$data$interactive_text[pd$vectors$data$name == "mpg"]
+  expect_match(mpg, "missing: 3 (9.4%), placed at the mean", fixed = TRUE)
+  expect_no_match(pd$vectors$data$interactive_text[pd$vectors$data$name == "disp"], "missing")
+  wag <- pd$ind_data$interactive_text[grepl("<b>Mazda RX4 Wag</b>", pd$ind_data$interactive_text)]
+  expect_match(wag, "mpg: NA", fixed = TRUE)
+
+  # the data frame with its missing values is still the analysed one
+  cl <- dplyr::mutate(d, cl = hierarchical_clust(res, ncp = 2, nb_clust = 3))$cl
+  expect_equal(sum(!is.na(cl)), nrow(d))
+})
+
+test_that("a missing value's line speaks French", {
+  skip_if_no_gettext()
+  d <- fx_cars()
+  d$mpg[2] <- NA
+  res <- PCA2(d, tidyselect::all_of(fx_pca_vars()), wt = w)
+  pd <- suppressMessages(pca_plot_data(res, d, rlang::quo(), rlang::quo(), "^.{0}", "^.+$",
+                                       character(), character(), TRUE, TRUE, 5000, "fr"))
+  expect_match(pd$vectors$data$interactive_text[1], "valeurs manquantes : 1 (3,1", fixed = TRUE)
+})
+
+test_that("na = \"drop\" leaves out the rows with a missing value", {
+  d <- fx_cars()
+  d$mpg[c(2, 5)] <- NA
+  expect_message(PCA2(d, tidyselect::all_of(fx_pca_vars()), wt = w, na = "drop"),
+                 "2 row\\(s\\) with a missing value")
+  res <- suppressMessages(PCA2(d, tidyselect::all_of(fx_pca_vars()), wt = w, na = "drop"))
+  expect_equal(nrow(res$ind$coord), nrow(d) - 2L)
+  expect_null(res$source$na)
+  expect_equal(is_in_analysis(res), !seq_len(nrow(d)) %in% c(2, 5))
+})
+
+test_that("interpret() of a PCA with supplementary individuals weighs the active ones", {
+  res <- PCA2(fx_cars(), tidyselect::all_of(fx_pca_vars()), wt = w, ind.sup = 1:3)
+  tb <- interpret(res, axes = 1)
+  d  <- fx_cars()[-(1:3), ]
+  expect_equal(vctrs::field(tb$mean_Variables, "mean")[1], stats::weighted.mean(d$mpg, d$w))
+})

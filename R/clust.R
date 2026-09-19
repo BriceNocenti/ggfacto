@@ -331,21 +331,24 @@ name_clusters <- function(clust, nm) {
 plot_clust_tree <- function(hc, labels, ncp) {
   op <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(op))
-  graphics::layout(matrix(c(rep(c(2, 4, 4, 4, 4), 4), 1, 3, 3, 3, 3), 5), respect = TRUE)
+  # DESIGN: the cells fill the device (no `respect`), and each text is shrunk to its cell: a
+  #   square grid centred in a knitr figure left the caption far wider than its cell.
+  graphics::layout(matrix(c(rep(c(2, 4, 4, 4, 4), 4), 1, 3, 3, 3, 3), 5))
+  fit <- function(x, cex) min(cex, 0.95 / graphics::strwidth(x, cex = 1))
   gain <- rev(hc$tree$height)
-  gain <- gain[seq_len(min(15, length(gain)))]
+  gain <- gain[seq_len(min(max(10, hc$nb_clust), length(gain)))]
   graphics::par(mar = c(1, 2, 0.75, 0))
   mids <- graphics::barplot(gain, col = ifelse(seq_along(gain) < hc$nb_clust, "black", "grey"),
                             space = 0.9)
   graphics::axis(1, at = mids, labels = seq_along(gain) + 1L, tick = FALSE, line = -0.9,
-                 cex.axis = 0.55, gap.axis = -1)
+                 cex.axis = 0.7)
   graphics::par(mar = c(0.5, 2, 0.75, 0))
   graphics::plot.new()
   words <- clust_tree_caption(hc$nb_clust, hc$between, ncp)
-  graphics::text(0.5, 0.62, words[["title"]], cex = 2)
-  graphics::text(0.5, 0.12, words[["caption"]], cex = 1.1)
+  graphics::text(0.5, 0.62, words[["title"]], cex = fit(words[["title"]], 2))
+  graphics::text(0.5, 0.12, words[["caption"]], cex = fit(words[["caption"]], 1.1))
   graphics::plot.new()
-  graphics::legend("top", words[["gain"]])
+  graphics::legend("top", words[["gain"]], cex = fit(words[["gain"]], 1) * 0.85)
   graphics::plot(hc$tree, labels = if (labels) NULL else FALSE, hang = -1,
                  main = "", xlab = "", ylab = "", sub = "")
   stats::rect.hclust(hc$tree, h = hc$cut, border = unique(hc$leaf_clust[hc$tree$order]))
