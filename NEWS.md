@@ -1,3 +1,5 @@
+# ggfacto (development version)
+
 # ggfacto 0.4.0
 
 One workflow for the three analyses: the analysis, `interpret()` for its axes, `ggfacto()` for its graph, `hierarchical_clust()` for its clusters. See the guide: <https://bricenocenti.github.io/ggfacto/articles/ggfacto.html>.

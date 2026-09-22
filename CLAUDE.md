@@ -2,7 +2,7 @@
 
 ## What ggfacto is, and why
 
-`ggfacto` is a public R package: **v0.3.2 on CRAN, 0.4.0 in development here**. It builds readable, complete and pretty graphs for correspondence analysis made with 'FactoMineR'. They can be rendered as interactive 'HTML' plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical: it helps the reader to keep in mind the data contained in the cross-table or Burt table while reading the correspondence analysis, thus preventing over-interpretation. Most graphs are made with 'ggplot2', which means that you can use the + syntax to  manually add as many graphical pieces you want, or change theme elements. 3D  graphs are made with 'plotly'.
+`ggfacto` is a public R package: **v0.4.0 on CRAN, 0.4.0.9000 in development here**. It builds readable, complete and pretty graphs for correspondence analysis made with 'FactoMineR'. They can be rendered as interactive 'HTML' plots, showing useful informations at mouse hover. The interest is not mainly visual but statistical: it helps the reader to keep in mind the data contained in the cross-table or Burt table while reading the correspondence analysis, thus preventing over-interpretation. Most graphs are made with 'ggplot2', which means that you can use the + syntax to  manually add as many graphical pieces you want, or change theme elements. 3D  graphs are made with 'plotly'.
 
 The target users are : 1. a "literary" social sciences student, not good at math, learning to read geometrical data analysis ; 2. a serious quantitative analyst — survey researcher, sociologist — often working with weighted survey data.
 
@@ -681,7 +681,7 @@ Les bulles sont des blocs (`tip_block()`) sur un même constructeur (`R/tooltips
 
 **Tests** : les tests qui utilisaient `MCA2()` comme ajustement sur profils passent à `fit_mca`, vrai alias de test du nom long (un wrapper casserait le rejeu du pipe) ; un bloc `MCA2()` dans `test-ingress.R` épingle l'ajustement sur individus, le modèle égal à celui du nom long, `HCPC(MCA2())` égal à `hierarchical_clust()` en `mutate()` (pondéré, avec manquants), l'ordre d'un `arrange()` et les sous-populations ; `ggi(iframe =)` dans `test-knit.R`. **2 496 assertions**, 0 échec, 0 avertissement ; `check` 0/0/1, la note étant le dossier `.claude/` qu'une session Claude Code crée à la racine, désormais dans `.Rbuildignore`.
 
-#### Phase 1v — publication de la 0.4.0 (DONE jusqu'à la soumission)
+#### Phase 1v — publication de la 0.4.0 (DONE)
 
 **La procédure est écrite une fois pour toutes** : `dev/release_checklist.md`, celle de tabxplor sans jamovi ni dépendance inverse — `dev` / `main` / `gh-pages`, le contrôle préalable dans l'ordre (suite, `check(manual, remote, incoming)`, le contrôle `_R_CHECK_DEPENDS_ONLY_`, `check_pkgdown()`), la branche `release/x.y.z` sans `dev/` ni `CLAUDE.md` et la preuve que son arbre est celui de `dev`, la PR fusionnée par un **commit de fusion**, puis l'URL, rhub et win-builder **après** le déploiement du site. « Aide-moi à publier la v0.x.y » doit suffire.
 
@@ -691,7 +691,7 @@ Les bulles sont des blocs (`tip_block()`) sur un même constructeur (`R/tooltips
 
 **Résultats** : suite 2 498 assertions, 0 échec ; `check(manual, remote, incoming)` 0/0/1, la note étant les 404 du site, jamais déployé (pas de branche `gh-pages`) ; contrôle `nosuggests` 0/0/0 ; `check_pkgdown()` propre, le site se construit.
 
-**Publié jusqu'à la soumission.** PR #2 fusionnée par commit de fusion, GitHub Pages sur `gh-pages`, `url_check()` propre, R-CMD-check de `main` et rhub (six plateformes) `Status: OK` sans note, win-builder soumis. La CI a demandé deux correctifs : XQuartz sur le runner macOS (le binaire de gdtools, que ggiraph importe, lie `libXrender`), et un instantané ACP rendu indépendant du gras du `Total` (tabxplor 2.0.1 du CRAN le perd, sa version de développement le garde). **Reste** : le lien win-builder et `submit_cran()` (le mainteneur), puis le tag `v0.4.0` sur le commit de fusion, la release GitHub et le passage de `dev` en 0.4.0.9000 après acceptation.
+**Publié jusqu'à la soumission.** PR #2 fusionnée par commit de fusion, GitHub Pages sur `gh-pages`, `url_check()` propre, R-CMD-check de `main` et rhub (six plateformes) `Status: OK` sans note, win-builder soumis. La CI a demandé deux correctifs : XQuartz sur le runner macOS (le binaire de gdtools, que ggiraph importe, lie `libXrender`), et un instantané ACP rendu indépendant du gras du `Total` (tabxplor 2.0.1 du CRAN le perd, sa version de développement le garde). win-builder `Status: OK`. **Acceptée par le CRAN le 22 septembre 2026**, sans relecture humaine (contrôles automatiques Debian et Windows sans note) ; tag `v0.4.0` sur le commit de fusion `e67bd06`, release GitHub, `dev` en 0.4.0.9000.
 
 
 ---
