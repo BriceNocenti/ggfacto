@@ -1,0 +1,10 @@
+pandoc: 3.8.3
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  articles/ggfacto-fr: ggfacto-fr.html
+  articles/ggfacto: ggfacto.html
+last_built: 2026-09-22T16:05Z
+urls:
+  reference: https://bricenocenti.github.io/ggfacto/reference
+  article: https://bricenocenti.github.io/ggfacto/articles

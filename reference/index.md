@@ -1,0 +1,118 @@
+# Package index
+
+## One workflow, three analyses
+
+The analysis, its interpretation table, its graph, and its clusters: the
+same verbs for a principal component analysis, a correspondence analysis
+and a multiple correspondence analysis.
+
+- [`principal_component_analysis()`](https://bricenocenti.github.io/ggfacto/reference/principal_component_analysis.md)
+  [`PCA2()`](https://bricenocenti.github.io/ggfacto/reference/principal_component_analysis.md)
+  : Principal Component Analysis
+- [`correspondence_analysis()`](https://bricenocenti.github.io/ggfacto/reference/correspondence_analysis.md)
+  : Correspondence Analysis of a Crosstab
+- [`multiple_correspondence_analysis()`](https://bricenocenti.github.io/ggfacto/reference/multiple_correspondence_analysis.md)
+  [`MCA2()`](https://bricenocenti.github.io/ggfacto/reference/multiple_correspondence_analysis.md)
+  : Multiple Correspondence Analysis
+- [`interpret()`](https://bricenocenti.github.io/ggfacto/reference/interpret.md)
+  [`mca_interpret()`](https://bricenocenti.github.io/ggfacto/reference/interpret.md)
+  [`pca_interpret()`](https://bricenocenti.github.io/ggfacto/reference/interpret.md)
+  : Interpret the Axes of an Analysis
+- [`eigenvalues()`](https://bricenocenti.github.io/ggfacto/reference/eigenvalues.md)
+  : The Eigenvalues of an Analysis
+- [`ggfacto()`](https://bricenocenti.github.io/ggfacto/reference/ggfacto.md)
+  : The Graph of an Analysis
+- [`name_axes()`](https://bricenocenti.github.io/ggfacto/reference/name_axes.md)
+  : Name the Axes of an Analysis
+- [`hierarchical_clust()`](https://bricenocenti.github.io/ggfacto/reference/hierarchical_clust.md)
+  : Hierarchical Clustering on the Axes of an Analysis
+- [`clust_tab()`](https://bricenocenti.github.io/ggfacto/reference/clust_tab.md)
+  : Describe Clusters with One Table
+
+## Principal component analysis
+
+The graphs of a PCA, which
+[`ggfacto()`](https://bricenocenti.github.io/ggfacto/reference/ggfacto.md)
+dispatches to.
+
+- [`ggpca()`](https://bricenocenti.github.io/ggfacto/reference/ggpca.md)
+  : Readable and Interactive Graph of the Individuals of a Principal
+  Component Analysis
+- [`ggpca_cor_circle()`](https://bricenocenti.github.io/ggfacto/reference/ggpca_cor_circle.md)
+  : Correlation Circle Plot for Principal Component Analysis
+- [`ggpca_3d()`](https://bricenocenti.github.io/ggfacto/reference/ggpca_3d.md)
+  : Interactive 3D Plot for Principal Component Analyses (plotly::)
+
+## Correspondence analysis
+
+The graph of a CA, which
+[`ggfacto()`](https://bricenocenti.github.io/ggfacto/reference/ggfacto.md)
+dispatches to.
+
+- [`ggca()`](https://bricenocenti.github.io/ggfacto/reference/ggca.md) :
+  Readable and Interactive Graph for Simple Correspondence Analysis
+
+## Multiple correspondence analysis
+
+The graph of an MCA, its two halves (the plot data, to edit, and the
+renderer), its 3D view, and Benzecri’s modified rates.
+
+- [`ggmca()`](https://bricenocenti.github.io/ggfacto/reference/ggmca.md)
+  [`ggmca_data()`](https://bricenocenti.github.io/ggfacto/reference/ggmca.md)
+  [`ggmca_plot()`](https://bricenocenti.github.io/ggfacto/reference/ggmca.md)
+  : Readable and Interactive graph for multiple correspondence analysis
+- [`ggmca_3d()`](https://bricenocenti.github.io/ggfacto/reference/ggmca_3d.md)
+  : Interactive 3D Plot for Multiple Correspondence Analyses (plotly::)
+- [`benzecri_mrv()`](https://bricenocenti.github.io/ggfacto/reference/benzecri_mrv.md)
+  : Benzecri's modified rate of variance
+
+## Interactive graphs and export
+
+- [`ggi()`](https://bricenocenti.github.io/ggfacto/reference/ggi.md) :
+  Make a graph interactive
+- [`ggsave2()`](https://bricenocenti.github.io/ggfacto/reference/ggsave2.md)
+  : Save a plot as image
+- [`ggfacto_plot`](https://bricenocenti.github.io/ggfacto/reference/ggfacto_plot.md)
+  : Graphs knitted at their own aspect ratio
+- [`ggfacto_widget`](https://bricenocenti.github.io/ggfacto/reference/ggfacto_widget.md)
+  : Widgets written to their own file
+- [`theme_facto()`](https://bricenocenti.github.io/ggfacto/reference/theme_facto.md)
+  : A ggplot2 Theme for Geometrical Data Analysis
+
+## Back to the data
+
+The individuals’ coordinates, and whether they were in the analysis,
+inside `mutate()`.
+
+- [`axis_coord()`](https://bricenocenti.github.io/ggfacto/reference/axis_coord.md)
+  : Coordinates of the Individuals on the Axes of an Analysis
+- [`is_in_analysis()`](https://bricenocenti.github.io/ggfacto/reference/is_in_analysis.md)
+  : Which Rows an Analysis Was Made On
+
+## Teaching plots
+
+The active variables in their initial frame of reference, and that frame
+in the analysis.
+
+- [`ggmca_initial_dims()`](https://bricenocenti.github.io/ggfacto/reference/ggmca_initial_dims.md)
+  : Plot Initial Dimensions (Active Variables) of Multiple
+  Correspondence Analysis
+- [`ggmca_with_base_ref()`](https://bricenocenti.github.io/ggfacto/reference/ggmca_with_base_ref.md)
+  : Plot Initial Dimensions (Active Variables) on a Multiple
+  Correspondence Analyses
+
+## Details
+
+- [`print(`*`<ggfacto_summary>`*`)`](https://bricenocenti.github.io/ggfacto/reference/ggfacto_summary.md)
+  : The interpretation tables, and how they print
+- [`material_colors_dark()`](https://bricenocenti.github.io/ggfacto/reference/material_colors_dark.md)
+  : Dark Material palette for MCA level names
+- [`material_colors_light()`](https://bricenocenti.github.io/ggfacto/reference/material_colors_light.md)
+  : Light Material palette for MCA points
+
+## Deprecated
+
+- [`HCPC_tab()`](https://bricenocenti.github.io/ggfacto/reference/HCPC_tab.md)
+  : Describe Clusters with One Table: the Former Form
+- [`mean_sd_tab()`](https://bricenocenti.github.io/ggfacto/reference/mean_sd_tab.md)
+  : Simple Mean and SD Summary (deprecated)
