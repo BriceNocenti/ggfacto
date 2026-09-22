@@ -29,7 +29,7 @@ ggmca_plot <- function(plot_data,
                        text_repel = TRUE, title, ellipses = NULL,
                        actives_in_bold = NULL, sup_in_italic = TRUE,
                        xlim, ylim, out_lims_move = FALSE,
-                       color_profiles = TRUE, base_profiles_color = "#aaaaaa",
+                       color_profiles = TRUE, base_profiles_color = "#bbbbbb",
                        alpha_profiles = 0.7,
                        shift_colors = 0, colornames_recode,
                        scale_color_light = material_colors_light(),
@@ -404,7 +404,7 @@ vector_layers <- function(vd, radius, dim1, dim2, proj, text_size, biplot = FALS
 # carrying the correlations' own.
 #' @keywords internal
 #' @noRd
-vector_frame <- function(biplot, base_profiles_color = "#aaaaaa") {
+vector_frame <- function(biplot, base_profiles_color = "#bbbbbb") {
   if (biplot) return(ggplot2::theme(
     axis.text = ggplot2::element_text(colour = if (is.null(base_profiles_color)) "grey50" else
       base_profiles_color)))

@@ -318,7 +318,7 @@ ggmca <-
 
            profiles = TRUE, profiles_tooltip_discard = "^Pas |^Non |^Not |^No ",
            clust, max_profiles = 2000,
-           alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#aaaaaa",
+           alpha_profiles = 0.7, color_profiles = TRUE, base_profiles_color = "#bbbbbb",
 
            text_repel = TRUE, title, actives_in_bold = NULL, sup_in_italic = TRUE,
            ellipses = NULL,

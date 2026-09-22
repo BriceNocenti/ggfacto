@@ -135,8 +135,8 @@ test_that("the biplot's circle is graduated, its axes read in the individuals' c
   b  <- ggplot2::ggplot_build(bi)
   expect_true(any(vapply(b$data, function(d) identical(sort(as.character(d$label)),
                                                       c("-1", "-1", "1", "1")), logical(1))))
-  expect_identical(bi$theme$axis.text$colour, "#aaaaaa")
-  expect_false(identical(ggpca_cor_circle(fx_pca2())$theme$axis.text$colour, "#aaaaaa"))
+  expect_identical(bi$theme$axis.text$colour, "#bbbbbb")
+  expect_false(identical(ggpca_cor_circle(fx_pca2())$theme$axis.text$colour, "#bbbbbb"))
 })
 
 test_that("an arrow is hoverable, and its projections, shown at hover, never catch the pointer", {

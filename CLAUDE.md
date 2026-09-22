@@ -695,10 +695,9 @@ Then, release branch, pull request, new github actions.
 
 For my message to CRAN, reuse `/home/dev1/github/tabxplor/cran-comments.md` and modify it, and change the rhub and github actions links once you have them.
 
-At the end, when everything is ready, I’ll I’ll add win-builder link in CRAN comments and submit to CRAN myself.
+At the end, when everything is ready, I’ll add the win-builder link in CRAN comments and submit to CRAN myself.
 
 github release when CRAN have accepted.
-
 
 
 ---

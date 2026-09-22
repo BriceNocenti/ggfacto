@@ -22,7 +22,7 @@ ggpca(
   max_profiles = 2000,
   alpha_profiles = 0.7,
   color_profiles = TRUE,
-  base_profiles_color = "#aaaaaa",
+  base_profiles_color = "#bbbbbb",
   text_repel = TRUE,
   title,
   sup_in_italic = TRUE,
