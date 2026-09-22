@@ -399,7 +399,10 @@ test_that("pca_interpret gives one block of three columns per axis, named as the
 
 test_that("the PCA interpretation table is stable", {
   withr::local_options(tabxplor.print = "console")
-  expect_snapshot(print(pca_interpret(fx_pca(), axes = 1:2), n = Inf, width = Inf))
+  # WARNING: whether the eigenvalue footer's Total row is bold (and so its padding) is tabxplor's
+  #   choice, which differs between its CRAN 2.0.1 and its development build: normalised away.
+  expect_snapshot(print(pca_interpret(fx_pca(), axes = 1:2), n = Inf, width = Inf),
+                  transform = function(x) gsub("-+", "-", gsub(" *\\| *", "|", gsub("\\*\\*", "", x))))
 })
 
 # --- the eigenvalue block ------------------------------------------------------------------------

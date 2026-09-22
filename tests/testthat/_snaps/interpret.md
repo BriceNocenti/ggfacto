@@ -129,17 +129,17 @@
     Code
       print(pca_interpret(fx_pca(), axes = 1:2), n = Inf, width = Inf)
     Output
-      | Axe      |eigenvalue  |% variance  |cumul.  |
-      |:---------|-----------:|-----------:|-------:|
-      |          | *Variance* |            |        |
-      |          |   *<var>*  |  *<col%>*  |        |
-      | Axe 1    |     5.086  |     72.7%  | 72.7%  |
-      | Axe 2    |     1.157  |     16.5%  | 89.2%  |
-      | Axe 3    |     0.345  |      4.9%  | 94.1%  |
-      | Axe 4    |     0.158  |      2.3%  | 96.4%  |
-      | Axe 5    |     0.129  |      1.8%  | 98.2%  |
-      | ... of 7 |       ...  |       ...  |   ...  |
-      |**Total** |   **7.000**|    **100%**|        |
+      |Axe|eigenvalue|% variance|cumul.|
+      |:-|-:|-:|-:|
+      ||*Variance*|||
+      ||*<var>*|*<col%>*||
+      |Axe 1|5.086|72.7%|72.7%|
+      |Axe 2|1.157|16.5%|89.2%|
+      |Axe 3|0.345|4.9%|94.1%|
+      |Axe 4|0.158|2.3%|96.4%|
+      |Axe 5|0.129|1.8%|98.2%|
+      |... of 7|...|...|...|
+      |Total|7.000|100%||
       
       # A tabxplor tab: 8 x 10
         variable mean_Variables sd_Variables `sd/mean_Variables` `coord_Axe 1`
@@ -165,5 +165,5 @@
       # coordinate on the axis (Total): -0.8 -0.4 -0.2 -0.1 +0.1 +0.2 +0.4 +0.8
       # contrib: its contribution to the variance of the axis; an axis sums to 100 %
       # cos2: quality of representation
-      # sd/mean: coefficient of variation -- the standard deviation as a percentage of the mean, comparable between variables measured in different units
+      # sd/mean: coefficient of variation - the standard deviation as a percentage of the mean, comparable between variables measured in different units
 
