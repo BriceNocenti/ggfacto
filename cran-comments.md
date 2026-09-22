@@ -12,7 +12,7 @@ Major update: new functions for the three analyses (principal component, corresp
   - Ubuntu Linux LTS, R-release
   - Ubuntu Linux LTS, R-oldrel-1
 
-* win-builder (R-devel): <FILL>
+* win-builder (R-devel): [https://win-builder.r-project.org/pYO235CgUV85/](https://win-builder.r-project.org/pYO235CgUV85/)
 
 * rhub: [https://github.com/BriceNocenti/ggfacto/actions/runs/35752659051](https://github.com/BriceNocenti/ggfacto/actions/runs/35752659051)
   Platforms run: nold, atlas, mkl, donttest, ubuntu-next, ubuntu-release.
