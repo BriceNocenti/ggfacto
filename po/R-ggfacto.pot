@@ -1,0 +1,269 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: ggfacto 0.3.2.9001\n"
+"POT-Creation-Date: 2026-09-19 15:50+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ca.R:164 interpret.R:854
+msgid "Rows"
+msgstr ""
+
+#: ca.R:164 interpret.R:854
+msgid "Columns"
+msgstr ""
+
+#: ca.R:174
+msgid "Supplementary rows"
+msgstr ""
+
+#: ca.R:174
+msgid "Supplementary columns"
+msgstr ""
+
+#: ca.R:287
+#, c-format
+msgid "%s:"
+msgstr ""
+
+#: ca.R:289
+#, c-format
+msgid "%s (supplementary):"
+msgstr ""
+
+#: clust.R:361
+msgid "Hierarchical clustering"
+msgstr ""
+
+#: clust.R:362
+msgid "inertia gain"
+msgstr ""
+
+#: clust.R:364
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axis 1"
+msgstr ""
+
+#: clust.R:367
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axes 1 to "
+"%d"
+msgstr ""
+
+#: interpret.R:285
+#, c-format
+msgid "... of %s"
+msgstr ""
+
+#: interpret.R:466
+msgid "Above mean ctr"
+msgstr ""
+
+#: interpret.R:467
+msgid "All levels"
+msgstr ""
+
+#: interpret.R:468
+#, c-format
+msgid "Above %s%%"
+msgstr ""
+
+#: interpret.R:470
+#, c-format
+msgid "%s: above mean ctr"
+msgstr ""
+
+#: interpret.R:471
+#, c-format
+msgid "%s: all levels"
+msgstr ""
+
+#: interpret.R:472
+#, c-format
+msgid "%s: above %s%%"
+msgstr ""
+
+#: interpret.R:594
+msgid "contribution to the variance of the axis"
+msgstr ""
+
+#: interpret.R:595
+msgid "a level"
+msgstr ""
+
+#: interpret.R:596
+msgid "%1$s on the positive side, contributing"
+msgstr ""
+
+#: interpret.R:597
+msgid "%1$s on the negative side, contributing"
+msgstr ""
+
+#: interpret.R:598 interpret.R:599
+msgid "the mean contribution"
+msgstr ""
+
+#: interpret.R:611
+msgid "coordinate on the axis"
+msgstr ""
+
+#: interpret.R:612
+msgid "coordinate on the axis, i.e. its correlation with it"
+msgstr ""
+
+#: interpret.R:613
+msgid "a variable"
+msgstr ""
+
+#: interpret.R:614
+msgid "%1$s above, by"
+msgstr ""
+
+#: interpret.R:615
+msgid "%1$s below, by"
+msgstr ""
+
+#: interpret.R:622
+msgid ""
+"sd/mean: coefficient of variation -- the standard deviation as a percentage "
+"of the mean, comparable between variables measured in different units"
+msgstr ""
+
+#: interpret.R:634
+msgid "ctr: the level's contribution to the variance of the axis"
+msgstr ""
+
+#: interpret.R:635
+msgid "contrib: the whole question's contribution to the axis"
+msgstr ""
+
+#: interpret.R:637
+msgid "coord: coordinate on the axis"
+msgstr ""
+
+#: interpret.R:638 interpret.R:966
+msgid "cos2: quality of representation"
+msgstr ""
+
+#: interpret.R:639
+msgid ""
+"spread: share of the group's contribution the gap between its two sides "
+"accounts for"
+msgstr ""
+
+#: interpret.R:795 interpret.R:863
+#, c-format
+msgid "Axe %s: %s%% of variance"
+msgstr ""
+
+#: interpret.R:796
+#, c-format
+msgid "Axe %s: %s%% of variance (mod. %s%%)"
+msgstr ""
+
+#: interpret.R:890
+msgid "Total"
+msgstr ""
+
+#: interpret.R:965
+msgid ""
+"contrib: its contribution to the variance of the axis; an axis sums to 100 %"
+msgstr ""
+
+#: interpret.R:968
+msgid "NA: missing values, placed at the mean of their variable"
+msgstr ""
+
+#: mca-data.R:442 pca.R:337
+msgid "Active variables:"
+msgstr ""
+
+#: mca-data.R:443
+#, c-format
+msgid "Distribution by %s:"
+msgstr ""
+
+#: mca-data.R:505 mca-data.R:511
+#, c-format
+msgid "Answer profile n°%s"
+msgstr ""
+
+#: mca-data.R:510 pca.R:388
+#, c-format
+msgid "Cluster: %s"
+msgstr ""
+
+#: pca.R:194
+#, c-format
+msgid "Coord axe %s: %s (cor. %s%%)"
+msgstr ""
+
+#: pca.R:203
+#, c-format
+msgid "mean (cv): %s"
+msgstr ""
+
+#: pca.R:347 plot-model.R:60 tooltips.R:25
+msgid "Central point"
+msgstr ""
+
+#: pca.R:347 tooltips.R:297
+#, c-format
+msgid "n: %s"
+msgstr ""
+
+#: pca.R:348 tooltips.R:299
+#, c-format
+msgid "weighted n: %s"
+msgstr ""
+
+#: pca.R:350
+msgid "mean (cv):"
+msgstr ""
+
+#: pca.R:386
+#, c-format
+msgid "Individual n°%s"
+msgstr ""
+
+#: pca.R:398
+#, c-format
+msgid "missing: %s (%s%%), placed at the mean"
+msgstr ""
+
+#: plot-render.R:104 plot-render.R:105
+#, c-format
+msgid "Contrib axe %s: %s%%"
+msgstr ""
+
+#: plot-render.R:176 plot-render.R:178
+#, c-format
+msgid "Coord axe %s: %s"
+msgstr ""
+
+#: render.R:85
+#, c-format
+msgid "Axe %s (%s%%): %s"
+msgstr ""
+
+#: render.R:87
+#, c-format
+msgid "Axe %s (%s%%)"
+msgstr ""
+
+#: tooltips.R:27
+#, c-format
+msgid "Frequency (n=%s): %s%%"
+msgstr ""
+
+#: tooltips.R:81
+#, c-format
+msgid "%s (mean): %s"
+msgstr ""

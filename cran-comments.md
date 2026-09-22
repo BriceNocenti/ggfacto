@@ -1,36 +1,37 @@
-## ggfacto new version 0.3.2 : second submission 
+## New version 0.4.0
 
-This update makes ggfacto work again after a recent change in a dependency 
- I also maintain : tabxplor (1.2.1).
- 
-The first submission was not compatible with former versions of tabxplor.
-
-This second is ok with both 1.2.1 and the formers. 
-
+Major update: new functions for the three analyses (principal component, correspondence and multiple correspondence analysis), their interpretation tables and their clustering. The former API keeps working, through soft deprecation.
 
 ## Test environments
-* local Windows 11, R devel
+* local WSL2 Ubuntu install, R 4.6.1
 
-* github Actions : https://github.com/BriceNocenti/ggfacto/actions/runs/11148729657
-   - macOS 12.7.2, R-release
-   - Microsoft Windows Server 2022, R-release
-   - Ubuntu Linux 22.04.3 LTS, R-devel
-   - Ubuntu Linux 22.04.3 LTS, R-release
-   - Ubuntu Linux 22.04.3 LTS, R-oldrel-1
+* github Actions (PR merge) : <FILL>
+  - macOS, R-release
+  - Microsoft Windows Server, R-release
+  - Ubuntu Linux LTS, R-devel
+  - Ubuntu Linux LTS, R-release
+  - Ubuntu Linux LTS, R-oldrel-1
 
-* https://win-builder.r-project.org/0D85P23K0na8
-   - Windows x86_64-w64-mingw32 (64-bit), R-devel
+* win-builder (R-devel): <FILL>
+
+* rhub: <FILL>
+  Platforms run: nold, atlas, mkl, donttest, ubuntu-next, ubuntu-release.
 
 ## R CMD check results
-* local Windows 11:
-    No ERRORs, no WARNINGs, no NOTEs. 
+* local (devtools::check(manual = TRUE, remote = TRUE, incoming = TRUE)):
+  - No Error, no Warning, no Note.
 
-* github Actions : 
-    No ERRORs, no WARNINGs, no NOTEs. 
+* local, with `_R_CHECK_DEPENDS_ONLY_=true` (the `nosuggests` check):
+  - No Error, no Warning, no Note.
 
-* https://win-builder.r-project.org : 
-    No ERRORs, no WARNINGs, no NOTEs. 
+* github Actions :
+  - No Error, no Warning, no Note.
 
+* win-builder
+  - No Error, no Warning, no Note.
+
+* rhub
+  - No Error, no Warning, no Note.
 
 ## Downstream dependencies
 There are currently no downstream dependencies for this package.

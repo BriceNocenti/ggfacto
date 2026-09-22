@@ -1,0 +1,306 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: ggfacto 0.3.2.9001\n"
+"POT-Creation-Date: 2026-09-19 15:50+0200\n"
+"PO-Revision-Date: 2026-09-04 18:32+0200\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: ca.R:164 interpret.R:854
+msgid "Rows"
+msgstr "Lignes"
+
+#: ca.R:164 interpret.R:854
+msgid "Columns"
+msgstr "Colonnes"
+
+#: ca.R:174
+msgid "Supplementary rows"
+msgstr "Lignes supplémentaires"
+
+#: ca.R:174
+msgid "Supplementary columns"
+msgstr "Colonnes supplémentaires"
+
+#: ca.R:287
+#, c-format
+msgid "%s:"
+msgstr "%s :"
+
+#: ca.R:289
+#, c-format
+msgid "%s (supplementary):"
+msgstr "%s (supplémentaire) :"
+
+#: clust.R:361
+msgid "Hierarchical clustering"
+msgstr "Classification ascendante hiérarchique"
+
+#: clust.R:362
+msgid "inertia gain"
+msgstr "gain de variance inter"
+
+#: clust.R:364
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axis 1"
+msgstr ""
+"%d classes : la variance inter représente %s %% de la variance de l'axe 1"
+
+#: clust.R:367
+#, c-format
+msgid ""
+"%d clusters: the between-cluster inertia is %s%% of the inertia of axes 1 to "
+"%d"
+msgstr ""
+"%d classes : la variance inter représente %s %% de la variance des axes 1 à "
+"%d"
+
+#: interpret.R:285
+#, c-format
+msgid "... of %s"
+msgstr "... sur %s"
+
+#: interpret.R:466
+msgid "Above mean ctr"
+msgstr "Contrib. > moyenne"
+
+#: interpret.R:467
+msgid "All levels"
+msgstr "Toutes modalités"
+
+#: interpret.R:468
+#, c-format
+msgid "Above %s%%"
+msgstr "Contrib. > %s %%"
+
+#: interpret.R:470
+#, c-format
+msgid "%s: above mean ctr"
+msgstr "%s : contrib. > moyenne"
+
+#: interpret.R:471
+#, c-format
+msgid "%s: all levels"
+msgstr "%s : toutes modalités"
+
+#: interpret.R:472
+#, c-format
+msgid "%s: above %s%%"
+msgstr "%s : contrib. > %s %%"
+
+#: interpret.R:594
+msgid "contribution to the variance of the axis"
+msgstr "contribution à la variance de l'axe"
+
+#: interpret.R:595
+msgid "a level"
+msgstr "une modalité"
+
+#: interpret.R:596
+msgid "%1$s on the positive side, contributing"
+msgstr "%1$s du côté positif, contribuant"
+
+#: interpret.R:597
+msgid "%1$s on the negative side, contributing"
+msgstr "%1$s du côté négatif, contribuant"
+
+#: interpret.R:598 interpret.R:599
+msgid "the mean contribution"
+msgstr "la contribution moyenne"
+
+#: interpret.R:611
+msgid "coordinate on the axis"
+msgstr "coordonnée sur l'axe"
+
+#: interpret.R:612
+msgid "coordinate on the axis, i.e. its correlation with it"
+msgstr "coordonnée sur l'axe, c'est-à-dire sa corrélation avec lui"
+
+#: interpret.R:613
+msgid "a variable"
+msgstr "une variable"
+
+#: interpret.R:614
+msgid "%1$s above, by"
+msgstr "%1$s au-dessus, de"
+
+#: interpret.R:615
+msgid "%1$s below, by"
+msgstr "%1$s en-dessous, de"
+
+#: interpret.R:622
+msgid ""
+"sd/mean: coefficient of variation -- the standard deviation as a percentage "
+"of the mean, comparable between variables measured in different units"
+msgstr ""
+"sd/mean : coefficient de variation -- l'écart-type en pourcentage de la "
+"moyenne, comparable entre variables mesurées dans des unités différentes"
+
+#: interpret.R:634
+msgid "ctr: the level's contribution to the variance of the axis"
+msgstr "ctr : la contribution de la modalité à la variance de l'axe"
+
+#: interpret.R:635
+msgid "contrib: the whole question's contribution to the axis"
+msgstr "contrib : la contribution de la question entière à l'axe"
+
+#: interpret.R:637
+msgid "coord: coordinate on the axis"
+msgstr "coord : coordonnée sur l'axe"
+
+#: interpret.R:638 interpret.R:966
+msgid "cos2: quality of representation"
+msgstr "cos2 : qualité de représentation"
+
+#: interpret.R:639
+msgid ""
+"spread: share of the group's contribution the gap between its two sides "
+"accounts for"
+msgstr ""
+"spread : part de la contribution de la question qu'explique l'écart entre "
+"ses deux côtés"
+
+#: interpret.R:795 interpret.R:863
+#, c-format
+msgid "Axe %s: %s%% of variance"
+msgstr "Axe %s : %s %% de variance"
+
+#: interpret.R:796
+#, c-format
+msgid "Axe %s: %s%% of variance (mod. %s%%)"
+msgstr "Axe %s : %s %% de variance (mod. %s %%)"
+
+#: interpret.R:890
+msgid "Total"
+msgstr "Total"
+
+#: interpret.R:965
+msgid ""
+"contrib: its contribution to the variance of the axis; an axis sums to 100 %"
+msgstr "contrib : sa contribution à la variance de l'axe ; un axe fait 100 %"
+
+#: interpret.R:968
+msgid "NA: missing values, placed at the mean of their variable"
+msgstr "NA : valeurs manquantes, placées à la moyenne de leur variable"
+
+#: mca-data.R:442 pca.R:337
+msgid "Active variables:"
+msgstr "Variables actives :"
+
+#: mca-data.R:443
+#, c-format
+msgid "Distribution by %s:"
+msgstr "Répartition par %s :"
+
+#: mca-data.R:505 mca-data.R:511
+#, c-format
+msgid "Answer profile n°%s"
+msgstr "Profil de réponses n°%s"
+
+#: mca-data.R:510 pca.R:388
+#, c-format
+msgid "Cluster: %s"
+msgstr "Classe : %s"
+
+#: pca.R:194
+#, c-format
+msgid "Coord axe %s: %s (cor. %s%%)"
+msgstr "Coord axe %s : %s (cor. %s %%)"
+
+#: pca.R:203
+#, c-format
+msgid "mean (cv): %s"
+msgstr "moyenne (cv) : %s"
+
+#: pca.R:347 plot-model.R:60 tooltips.R:25
+msgid "Central point"
+msgstr "Point moyen"
+
+#: pca.R:347 tooltips.R:297
+#, c-format
+msgid "n: %s"
+msgstr "n : %s"
+
+#: pca.R:348 tooltips.R:299
+#, c-format
+msgid "weighted n: %s"
+msgstr "n pondéré : %s"
+
+#: pca.R:350
+msgid "mean (cv):"
+msgstr "moyenne (cv) :"
+
+#: pca.R:386
+#, c-format
+msgid "Individual n°%s"
+msgstr "Individu n°%s"
+
+#: pca.R:398
+#, c-format
+msgid "missing: %s (%s%%), placed at the mean"
+msgstr "valeurs manquantes : %s (%s %%), placées à la moyenne"
+
+#: plot-render.R:104 plot-render.R:105
+#, c-format
+msgid "Contrib axe %s: %s%%"
+msgstr "Contrib axe %s : %s %%"
+
+#: plot-render.R:176 plot-render.R:178
+#, c-format
+msgid "Coord axe %s: %s"
+msgstr "Coord axe %s : %s"
+
+#: render.R:85
+#, c-format
+msgid "Axe %s (%s%%): %s"
+msgstr "Axe %s (%s %%) : %s"
+
+#: render.R:87
+#, c-format
+msgid "Axe %s (%s%%)"
+msgstr "Axe %s (%s %%)"
+
+#: tooltips.R:27
+#, c-format
+msgid "Frequency (n=%s): %s%%"
+msgstr "Fréquence (n=%s) : %s %%"
+
+#: tooltips.R:81
+#, c-format
+msgid "%s (mean): %s"
+msgstr "%s (moyenne) : %s"
+
+#~ msgid ""
+#~ "Variables rescaled onto the cloud of individuals: read their directions, "
+#~ "not their lengths."
+#~ msgstr ""
+#~ "Variables remises à l'échelle du nuage des individus : lire leurs "
+#~ "directions, pas leurs longueurs."
+
+#~ msgid "quality of representation"
+#~ msgstr "qualité de représentation"
+
+#~ msgid "quality of representation, against the rule of 50 %"
+#~ msgstr "qualité de représentation, par rapport au seuil de 50 %"
+
+#, c-format
+#~ msgid ""
+#~ "contrib: contribution to the variance of the axis, vs the mean "
+#~ "contribution: %s"
+#~ msgstr ""
+#~ "contrib : contribution à la variance de l'axe, /la contribution moyenne : "
+#~ "%s"
+
+#~ msgid ""
+#~ "cos2: quality of representation -- the share of the variable's own "
+#~ "variance this axis holds; over all the axes, a variable sums to 100 %"
+#~ msgstr ""
+#~ "cos2 : qualité de représentation -- la part de la variance propre de la "
+#~ "variable que retient cet axe ; sur l'ensemble des axes, une variable fait "
+#~ "100 %"
