@@ -5,7 +5,7 @@ Major update: new functions for the three analyses (principal component, corresp
 ## Test environments
 * local WSL2 Ubuntu install, R 4.6.1
 
-* github Actions (PR merge) : <FILL>
+* github Actions (PR merge) : [https://github.com/BriceNocenti/ggfacto/actions/runs/35751383626](https://github.com/BriceNocenti/ggfacto/actions/runs/35751383626)
   - macOS, R-release
   - Microsoft Windows Server, R-release
   - Ubuntu Linux LTS, R-devel
@@ -14,7 +14,7 @@ Major update: new functions for the three analyses (principal component, corresp
 
 * win-builder (R-devel): <FILL>
 
-* rhub: <FILL>
+* rhub: [https://github.com/BriceNocenti/ggfacto/actions/runs/35752659051](https://github.com/BriceNocenti/ggfacto/actions/runs/35752659051)
   Platforms run: nold, atlas, mkl, donttest, ubuntu-next, ubuntu-release.
 
 ## R CMD check results
