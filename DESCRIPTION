@@ -1,6 +1,6 @@
 Package: ggfacto
 Title: Graphs for Correspondence Analysis
-Version: 0.3.2.9001
+Version: 0.4.0
 Authors@R: c(
     person(given = "Brice",
            family = "Nocenti",
@@ -18,14 +18,15 @@ Authors@R: c(
            family = "Molto",
            role = c("ctb", "cph"),
            comment = "the cut rule and tree plot of hierarchical_clust(), after 'FactoMineR' HCPC()"))
-Description: Readable, complete and pretty graphs for correspondence analysis made 
-    with 'FactoMineR'. They can be rendered as interactive 'HTML' plots, showing useful
-    informations at mouse hover. The interest is not mainly visual but statistical.
-    It helps the reader to keep in mind the data contained in the cross-table or Burt
-    table while reading the correspondence analysis, thus preventing over-interpretation.
-    Most graphs are made with 'ggplot2', which means that you can use the + syntax to 
-    manually add as many graphical pieces you want, or change theme elements. 3D 
-    graphs are made with 'plotly'.
+Description: Readable, complete and pretty graphs for multiple correspondence analysis,
+    correspondence analysis and principal component analysis made with 'FactoMineR'.
+    They can be rendered as interactive 'HTML' plots, showing useful information at
+    mouse hover. The interest is not mainly visual but statistical. It helps the reader
+    to keep in mind the data contained in the cross-table or Burt table while reading
+    the correspondence analysis, thus preventing over-interpretation. Most graphs are
+    made with 'ggplot2', which means that you can use the + syntax to manually add as
+    many graphical pieces you want, or change theme elements. 3D graphs are made with
+    'plotly'.
 URL: https://bricenocenti.github.io/ggfacto/,
     https://github.com/BriceNocenti/ggfacto
 BugReports: https://github.com/BriceNocenti/ggfacto/issues

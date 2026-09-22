@@ -5,3 +5,4 @@
 docs/
 pkgdown/index.md
 pkgdown/assets/
+tests/testthat/_problems/

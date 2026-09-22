@@ -74,6 +74,7 @@ A \code{\link[plotly]{plotly}} html interactive 3d (or 2d) graph.
 Interactive 3D Plot for Multiple Correspondence Analyses (plotly::)
 }
 \examples{
+\dontshow{if (requireNamespace("plotly", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 data(tea, package = "FactoMineR")
 res.mca <- multiple_correspondence_analysis(tea, 1:18)
@@ -84,4 +85,5 @@ tea <- tea |>
   dplyr::mutate(clust = hierarchical_clust(res.mca, ncp = 3, nb_clust = 6))
 ggmca_3d(res.mca, tea, clust = clust)
 }
+\dontshow{\}) # examplesIf}
 }

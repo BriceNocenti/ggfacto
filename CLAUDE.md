@@ -54,7 +54,7 @@ Nineteen files in `R/`, four groups. Every file carries a `# PURPOSE / # ROLE / 
 - `knit.R` — the knitr seams: a widget written to its own file with an `<iframe>` in its place when `options(ggfacto.widget_dir)` asks, and a graph drawn at its own aspect ratio.
 - `ggfacto-package.R` — imports, global bindings, `.onLoad()`, the deprecated `%>%` re-export.
 
-**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `po/` (the message catalogues, `R-ggfacto.pot` and `R-fr.po`) · `inst/po/fr/LC_MESSAGES/` (the compiled `.mo`, committed, since `R CMD build` does not compile it) · `vignettes/articles/` (the guide, EN and FR, web-only) · `pkgdown/` (the site's home page `index.Rmd`, `extra.js`) · `dev/` (`.Rbuildignore`'d; holds `build_site.R` and `site_prune.R`, `dependency-audit.md`, `hierarchical_clustering.md`, `analysis_engine.md` with its prototype `analysis_engine.R`, `update_translations.R`, `hclust_chunked.R` and `stacked_crosstab.R`).
+**Other directories:** `man/` (roxygen-generated, never edit) · `tests/testthat/` (the package's contract: the exported entry points, the argument matrix, the tooltip and table goldens) · `po/` (the message catalogues, `R-ggfacto.pot` and `R-fr.po`) · `inst/po/fr/LC_MESSAGES/` (the compiled `.mo`, committed, since `R CMD build` does not compile it) · `vignettes/articles/` (the guide, EN and FR, web-only) · `pkgdown/` (the site's home page `index.Rmd`, `extra.js`) · `dev/` (`.Rbuildignore`'d; holds `release_checklist.md`, `build_site.R` and `site_prune.R`, `dependency-audit.md`, `hierarchical_clustering.md`, `analysis_engine.md` with its prototype `analysis_engine.R`, `update_translations.R`, `hclust_chunked.R` and `stacked_crosstab.R`).
 
 ---
 
@@ -174,7 +174,7 @@ The docs form one hierarchy, general to specific. **Each fact is stated at exact
 - **Inline `# DESIGN:` / `# WARNING:` tags** — the non-obvious "why" at the exact line, caveats to avoid, etc.
 - **The guide** — usage and teaching, for users: one short article, `vignettes/articles/ggfacto.Rmd` (the pkgdown site's "Get started", the `GGFACTO_GUIDE` target) and its French twin `ggfacto-fr.Rmd`, written apart rather than translated. ⚠ **Web-only, never on CRAN**: `vignettes/` is `.Rbuildignore`'d and there is no `VignetteBuilder`, because a self-contained page with its interactive graphs weighs ~5 MB. The site (`_pkgdown.yml`, txtheme, `pkgdown/index.Rmd` knitted by `dev/build_site.R` or CI) deploys from main. A `@param` that needs more than a sentence links to the guide's section.
 - **Roxygen man pages** (`?ggmca`, `?ggca`) — user-facing reference: *usage* and the main use cases, never build/internals/history. A `@param` states what the argument is, its values, and at most one sentence of when to change it; the rest is a link to the vignette that owns it. ⚠ The manual is LaTeX, so an Rd file is ASCII but for the few glyphs it can set (`— … × ÷`); `test-non-ascii.R` locks it.
-- **`dev/*.md`** (`.Rbuildignore`'d) — transversal or expert technical guides only; there are three, `dependency-audit.md` (what each dependency costs to install, and the ruling on each), `hierarchical_clustering.md` (the clustering workflow: its design, the options weighed, the course code, the jamovi seam) and `analysis_engine.md` (what computes the analyses: FactoMineR's cost, the answer profile as the unit, parity, upstream and the community, the ruling). Each holds what an `R/` header is too short to derive — a foreign system, a cross-file policy, a statistical derivation — and the header that needs it points at it by section.
+- **`dev/*.md`** (`.Rbuildignore`'d) — transversal or expert technical guides only; there are three, `dependency-audit.md` (what each dependency costs to install, and the ruling on each), `hierarchical_clustering.md` (the clustering workflow: its design, the options weighed, the course code, the jamovi seam) and `analysis_engine.md` (what computes the analyses: FactoMineR's cost, the answer profile as the unit, parity, upstream and the community, the ruling). Each holds what an `R/` header is too short to derive — a foreign system, a cross-file policy, a statistical derivation — and the header that needs it points at it by section. `release_checklist.md` is the release procedure, step by step.
 - **Roadmap "DONE" summaries are appended to the section below** (this file) — the **ONLY** place dev history lives. The maintainer then manualy moves them to `dev/ggfacto_roadmap_DONE_PHASES.md` for archiving.
 
 ---
@@ -681,23 +681,17 @@ Les bulles sont des blocs (`tip_block()`) sur un même constructeur (`R/tooltips
 
 **Tests** : les tests qui utilisaient `MCA2()` comme ajustement sur profils passent à `fit_mca`, vrai alias de test du nom long (un wrapper casserait le rejeu du pipe) ; un bloc `MCA2()` dans `test-ingress.R` épingle l'ajustement sur individus, le modèle égal à celui du nom long, `HCPC(MCA2())` égal à `hierarchical_clust()` en `mutate()` (pondéré, avec manquants), l'ordre d'un `arrange()` et les sous-populations ; `ggi(iframe =)` dans `test-knit.R`. **2 496 assertions**, 0 échec, 0 avertissement ; `check` 0/0/1, la note étant le dossier `.claude/` qu'une session Claude Code crée à la racine, désormais dans `.Rbuildignore`.
 
-#### Phase 1v — 0.4.0 release
+#### Phase 1v — publication de la 0.4.0 (DONE jusqu'à la PR)
 
-Help me do the new CRAN release, so I don’t have to check everything myself : I want you to plan for everything, and only let me accept the pull request on github.com and do the `devtools::submit_cran()` myself. You can commit (but you do not sign the commits), you can push : I’ll have a harness permission asked, that’s all.
+**La procédure est écrite une fois pour toutes** : `dev/release_checklist.md`, celle de tabxplor sans jamovi ni dépendance inverse — `dev` / `main` / `gh-pages`, le contrôle préalable dans l'ordre (suite, `check(manual, remote, incoming)`, le contrôle `_R_CHECK_DEPENDS_ONLY_`, `check_pkgdown()`), la branche `release/x.y.z` sans `dev/` ni `CLAUDE.md` et la preuve que son arbre est celui de `dev`, la PR fusionnée par un **commit de fusion**, puis l'URL, rhub et win-builder **après** le déploiement du site. « Aide-moi à publier la v0.x.y » doit suffire.
 
-Look at `/home/dev1/github/tabxplor/dev/release_checklist.md` and create a release checklist for ggfacto : remove everything useless here because it is only useful in tabxplor (next time, simply giving a prompt like "help me release v 0.x.x" should be enough).
+**Préparé sur `dev`.** `Version: 0.4.0`, et la description nomme les trois analyses. `NEWS.md` : la section 0.4.0 réécrite en une trentaine de lignes — l'ancienne annonçait `ggi(iframe =)` supprimé, R ≥ 4.1 et ggplot2 ≥ 3.4, trois choses fausses. `cran-comments.md` repris de tabxplor, liens à remplir. `CRAN-RELEASE` (2021) supprimé. `R-CMD-check.yaml` repris de tabxplor (lancé aussi sur `dev`, `workflow_dispatch`, `checkout@v5`), `rhub.yaml` ajouté — rhub ne se déclenche que depuis la branche par défaut, donc après la fusion.
 
-On `dev/` branch, we’ll do R CMD CHECK, then github actions and rhub (use the same rhub platforms than tabxplor ?), and everything else needed for the new release. (No reverse dependency exists.)
+**Deux choses trouvées par les contrôles.** Les exemples de `ggmca_3d()` et `ggpca_3d()` échouaient sans plotly (`Suggests`) : `@examplesIf requireNamespace("plotly")`. Et `tests/testthat/_problems/`, deux reproductions d'échec écrites par testthat le 18 septembre, était suivi par git et serait parti dans l'archive : retiré, et ignoré.
 
-Look at dev history, and write a very extremely concise NEWS.md, presenting new functions and arguments very shortly ; only the two or three more important bug corrections and detail changed, nobody cares really.
+**Résultats** : suite 2 498 assertions, 0 échec ; `check(manual, remote, incoming)` 0/0/1, la note étant les 404 du site, jamais déployé (pas de branche `gh-pages`) ; contrôle `nosuggests` 0/0/0 ; `check_pkgdown()` propre, le site se construit.
 
-Then, release branch, pull request, new github actions.
-
-For my message to CRAN, reuse `/home/dev1/github/tabxplor/cran-comments.md` and modify it, and change the rhub and github actions links once you have them.
-
-At the end, when everything is ready, I’ll add the win-builder link in CRAN comments and submit to CRAN myself.
-
-github release when CRAN have accepted.
+**Reste** : la PR `release/0.4.0` → `main` (fusion par le mainteneur), GitHub Pages sur `gh-pages` (le mainteneur), `url_check()`, rhub sur six plateformes, win-builder, les liens de `cran-comments.md`, `submit_cran()` (le mainteneur), puis le tag `v0.4.0` et la release GitHub après acceptation.
 
 
 ---

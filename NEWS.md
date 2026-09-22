@@ -1,82 +1,35 @@
-# ggfacto 0.4.0 (development version)
+# ggfacto 0.4.0
 
-## Interactive graphs can be written to their own file
+One workflow for the three analyses: the analysis, `interpret()` for its axes, `ggfacto()` for its graph, `hierarchical_clust()` for its clusters. See the guide: <https://bricenocenti.github.io/ggfacto/articles/ggfacto.html>.
 
-A `bookdown` book merges every chapter into one markdown file and hands it to a single `pandoc`
-call. A widget embedded inline is a raw HTML block of several megabytes on one line, which is the
-case that reader handles worst: one course book measured 30 GB of resident memory before being
-killed. Setting
+## New functions
 
-``` r
-options(ggfacto.widget_dir = "auto")
-```
+* `multiple_correspondence_analysis()`, `principal_component_analysis()`, `correspondence_analysis()` (from a `tabxplor::tab()`): the analyses, weights and variables selected as in `tab()`.
+* `interpret()`: the table of an analysis' axes, with its eigenvalues below; `eigenvalues()` alone.
+* `ggfacto()`: the graph of any of the three analyses; `ggpca()`, the individuals of a PCA and its biplot.
+* `hierarchical_clust()`: `HCPC()`'s clusters, in linear memory, written into the data with `mutate()`; `clust_tab()` describes them.
+* `axis_coord()`, `is_in_analysis()`: an analysis' coordinates, and its population, back into the data. `name_axes()` names the axes on graphs and tables.
 
-makes every interactive graph write itself to `widget_<chunk label>.html` and put an `<iframe>` in
-the document instead. `"auto"` follows the chunk's `fig.path`, so the files travel with the
-document exactly like its figures do. See `?ggfacto_widget`.
+## New arguments and changes
 
-* The chunk needs a label, since the label names the file. Unset (the default), the option changes
-  nothing at all and the widget is embedded as before.
-* The frame's aspect ratio is the graph's own --- the ratio of the analysis' axes, computed in R,
-  not negotiated in JavaScript --- so an interactive plot keeps the scale it is interpreted with.
-  For the 3D graphs, which have no such ratio, the chunk's `fig.width` and `fig.height` decide.
-* `ggi()`, `ggpca_cor_circle()`, `ggmca_3d()` and `ggpca_3d()` all return widgets carrying the new
-  `ggfacto_widget` class. Printing them interactively is unchanged.
+* `excl =` takes exact level names; missing answers become `<VAR>.NA` levels, excluded by default (specific MCA).
+* `filter =` analyses a subset; the whole data frame is then passed to every later function.
+* `clust =`, `names =`, `interactive =`, `lang =`; `options(ggfacto.widget_dir)` writes widgets to their own file in documents.
+* `profiles = TRUE` and `active_tables = "active"` are the defaults: the crosstables of the Burt table are in the tooltips.
+* The MCA is fitted on the distinct answer profiles (same results, much faster); `MCA2()` keeps the 0.3.2 fit on individuals.
+* A missing value of a PCA sits at its variable's weighted mean.
+* Requires R >= 4.3, ggplot2 >= 4.0 and tabxplor >= 2.0.1.
 
-## `ggi(savewidget = TRUE)` writes one standalone file
+## Deprecations and removals
 
-* It used to write two --- `Plot.html` plus a `Plot_widget/index.html` that had to travel beside
-  it, framed by `widgetframe` and pym.js. It now writes a single self-contained page: a file that
-  can simply be sent to someone.
-* **Breaking:** `ggi(iframe = )` and `ggi(pixel_width = )` are removed, along with the
-  `widgetframe` dependency. They existed only to build that frame, and their own documentation
-  warned they produced a blank graph under `rmarkdown`. Use `ggfacto.widget_dir` for documents.
-
-## Requires tabxplor 2.0.0
-
-Every table is now built with `tabxplor::tab()` and the 2.0.0 vocabulary.
-
-* `HCPC_tab()` is built the way round it is read --- the variables' levels down the page, the
-  clusters across it --- instead of being built the other way round and transposed by hand. Numeric
-  variables still become mean rows. The duplicated `n` row is gone, and the summary rows (`%
-  of population`, `n`) are declared as display rows, so they are no longer coloured or counted as
-  data.
-* `HCPC_tab(color = )` takes the tabxplor 2.0.0 measure names and defaults to `"difference"`. The
-  mean rows of a table that also holds percentages stay uncoloured, a difference of means and a
-  difference of percentages having no ladder in common; `color = "ratio"` colours every row.
-* `pca_interpret()` colours a coordinate by its SIZE (the standardized-difference ladder) instead of
-  by its sign alone.
-* `ggca()` and the README now build the correspondence-analysis input with
-  `as.matrix(tabxplor::tab(data, row_var, col_var))`, which drops the totals for you.
-
-## A lighter dependency tree
-
-Installing ggfacto with its `Suggests` now pulls **133 packages instead of 164, 204 MB instead of
-244** --- 31 fewer packages, four fewer of them compiled from source. Nothing about the API
-changes.
-
-* `finalfit` and `gridExtra` are gone. They were only ever used by `pers_or_plot()`, which has been
-  removed --- regression tables belong to tabxplor now. This is the bulk of the saving: 27 packages.
-* `ggforce` is gone. It drew one circle, the PCA correlation circle, which is now a `geom_path()`.
-  As a side effect that circle is drawn once instead of once per row of the plot's data.
-* `stringr` and `stringi` are gone, replaced by base-R helpers that keep stringr's semantics
-  (`NA` propagation, padding width and fill) rather than base R's.
-* `scales`, `stats` and `grDevices` move from `Suggests` to `Imports`, where their use always
-  belonged; `grid` was used but never declared. `ggplot2` now requires 3.4.0 or later, and R 4.1.0
-  or later --- the package already used the base pipe, which R 4.0 does not have.
-
-## Deprecations
-
-* Piping with `%>%` is deprecated. ggfacto uses the base pipe `|>` throughout, and re-exports
-  `%>%` only for backward compatibility; the re-export, and the magrittr dependency with it, will
-  be removed in a future release. Use `|>`.
+* `HCPC_tab()` (use `clust_tab()`), the `cah` and `dat` arguments (use `clust` and `data`), and `%>%` are soft-deprecated.
+* `pers_or_plot()` is removed; `ggi(iframe =, pixel_width =)` are ignored.
 
 ## Bug corrections
 
-* `ggmca(active_tables = )` / `ggmca(sup_vars = )` gave every level an empty tooltip.
-* A level whose name is also a variable's name (`breakfast` of `breakfast`) lost its tooltip.
-* The `Frequency` line of a tooltip could read above 100 %: it was divided by the last row of the
-  last table instead of by the population.
+* The `Frequency` line of a tooltip could exceed 100 %.
+* A question with levels `y`/`n` disappeared from the graphs and tables.
+* The ellipses of a weighted analysis ignored the weights.
 
 # ggfacto 0.3.2
 

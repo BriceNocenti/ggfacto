@@ -40,7 +40,7 @@
 #' @return A \code{\link[plotly]{plotly}} html interactive 3d (or 2d) graph.
 #' @export
 #'
-#' @examples
+#' @examplesIf requireNamespace("plotly", quietly = TRUE)
 #' \donttest{
 #' data(tea, package = "FactoMineR")
 #' res.mca <- multiple_correspondence_analysis(tea, 1:18)

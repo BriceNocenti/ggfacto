@@ -96,6 +96,7 @@ A \code{\link[plotly]{plotly}} html interactive 2d or 3d graph.
 Interactive 3D Plot for Principal Component Analyses (plotly::)
 }
 \examples{
+\dontshow{if (requireNamespace("plotly", quietly = TRUE)) withAutoprint(\{ # examplesIf}
 \donttest{
 data(mtcars, package = "datasets")
 mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
@@ -110,4 +111,5 @@ ggpca_3d(res.pca, type = c("cor", "cor_sphere"),
          princ_axes_print = -1:1, view = "All"
 )
 }
+\dontshow{\}) # examplesIf}
 }

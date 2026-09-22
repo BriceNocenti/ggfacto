@@ -56,7 +56,7 @@
 #' @return A \code{\link[plotly]{plotly}} html interactive 2d or 3d graph.
 #' @export
 #'
-#'@examples
+#' @examplesIf requireNamespace("plotly", quietly = TRUE)
 #' \donttest{
 #' data(mtcars, package = "datasets")
 #' mtcars <- mtcars[1:7] |> dplyr::rename(weight = wt)
